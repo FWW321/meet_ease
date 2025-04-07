@@ -332,6 +332,12 @@ class VoiceMeetingWidget extends HookConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 角色标签
+          if (participant.isCreator) _buildRoleTag('创建者', Colors.orange),
+          if (participant.isAdmin && !participant.isCreator)
+            _buildRoleTag('管理员', Colors.blue),
+          const SizedBox(width: 4),
+
           // 发言指示器
           if (showSpeakingStatus && participant.isSpeaking)
             Container(
@@ -364,6 +370,26 @@ class VoiceMeetingWidget extends HookConsumerWidget {
               size: 20,
             ),
         ],
+      ),
+    );
+  }
+
+  // 构建角色标签
+  Widget _buildRoleTag(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

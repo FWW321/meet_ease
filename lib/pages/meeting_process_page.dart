@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/meeting.dart';
+import '../models/user.dart';
 import '../providers/meeting_providers.dart';
+import '../providers/user_providers.dart';
+import '../providers/webrtc_providers.dart';
 import '../widgets/agenda_list_widget.dart';
 import '../widgets/materials_list_widget.dart';
 import '../widgets/notes_list_widget.dart';
 import '../widgets/votes_list_widget.dart';
 import '../widgets/chat_widget.dart';
 import '../widgets/voice_meeting_widget.dart';
+import '../services/webrtc_service.dart';
+import '../pages/meeting_settings_page.dart';
 
 /// 会议过程管理页面 - 以实时语音为主要内容的界面
 class MeetingProcessPage extends HookConsumerWidget {
@@ -32,6 +37,40 @@ class MeetingProcessPage extends HookConsumerWidget {
     // 是否为已结束的会议
     final isCompletedMeeting = meeting.status == MeetingStatus.completed;
 
+    // 获取当前用户ID
+    final currentUserId = ref.watch(currentUserIdProvider);
+
+    // 检查当前用户是否在黑名单中
+    final isBlocked = meeting.blacklist.contains(currentUserId);
+
+    // 如果用户在黑名单中，显示拒绝访问提示
+    if (isBlocked) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('无法加入会议'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.block, size: 64, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                '您无法加入此会议',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('您没有权限访问此会议内容', style: TextStyle(color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+    }
+
     // 签到状态
     final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
 
@@ -40,6 +79,9 @@ class MeetingProcessPage extends HookConsumerWidget {
 
     // 当前选中的功能选项
     final selectedFeatureIndex = useState(-1);
+
+    // 获取参会人员列表
+    final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
 
     // 功能选项列表
     final features = [
@@ -132,6 +174,21 @@ class MeetingProcessPage extends HookConsumerWidget {
             ),
           ),
 
+        // 显示用户权限徽章
+        if (!isCompletedMeeting)
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Chip(
+              label: Text(
+                getMeetingPermissionText(
+                  meeting.getUserPermission(currentUserId),
+                ),
+              ),
+              backgroundColor: Colors.blue.shade100,
+              labelStyle: const TextStyle(color: Colors.blue, fontSize: 12),
+            ),
+          ),
+
         // 会议信息按钮
         IconButton(
           icon: const Icon(Icons.info_outline),
@@ -145,11 +202,8 @@ class MeetingProcessPage extends HookConsumerWidget {
           itemBuilder: (context) {
             final menuItems = <PopupMenuItem<String>>[];
 
-            // 进行中的会议才显示会议设置和邀请参会者
+            // 进行中的会议才显示邀请参会者
             if (!isCompletedMeeting) {
-              menuItems.add(
-                const PopupMenuItem(value: 'settings', child: Text('会议设置')),
-              );
               menuItems.add(
                 const PopupMenuItem(value: 'invite', child: Text('邀请参会者')),
               );
@@ -165,9 +219,6 @@ class MeetingProcessPage extends HookConsumerWidget {
           onSelected: (value) {
             // 处理菜单项选择
             switch (value) {
-              case 'settings':
-                // 实现会议设置功能
-                break;
               case 'invite':
                 // 实现邀请参会者功能
                 break;
@@ -202,7 +253,7 @@ class MeetingProcessPage extends HookConsumerWidget {
                     ? _buildCompletedMeetingView(ref)
                     : VoiceMeetingWidget(
                       meetingId: meetingId,
-                      userId: 'currentUserId', // 替换为实际用户ID
+                      userId: currentUserId,
                       userName: '当前用户', // 替换为实际用户名
                     ),
           ),
@@ -300,6 +351,9 @@ class MeetingProcessPage extends HookConsumerWidget {
                                 child: _buildFeaturePanel(
                                   selectedFeatureIndex.value,
                                   isReadOnly: isCompletedMeeting,
+                                  currentUserId: currentUserId,
+                                  participants: participantsAsync,
+                                  ref: ref,
                                 ),
                               ),
                             ],
@@ -400,9 +454,24 @@ class MeetingProcessPage extends HookConsumerWidget {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                     error:
-                        (_, __) => const Text(
-                          '未知',
-                          style: TextStyle(color: Colors.grey),
+                        (_, __) => Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey),
+                          ),
+                          child: const Text(
+                            '加载失败',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                   ),
                 ],
@@ -413,43 +482,317 @@ class MeetingProcessPage extends HookConsumerWidget {
 
         const SizedBox(height: 24),
 
-        // 使用VoiceMeetingWidget的只读模式，但不显示实时通话相关UI
+        // 会议历史记录入口提示
         Expanded(
-          child: VoiceMeetingWidget(
-            meetingId: meetingId,
-            userId: 'currentUserId',
-            userName: '当前用户',
-            isReadOnly: true,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.history_toggle_off,
+                  size: 64,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '此会议已结束',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '您可以通过底部功能栏查看会议记录',
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.mail_outline),
+                  label: const Text('发送会议纪要至邮箱'),
+                  onPressed: () {
+                    // 实现发送会议纪要功能
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  // 根据选择的索引构建相应的功能面板
-  Widget _buildFeaturePanel(int index, {bool isReadOnly = false}) {
-    switch (index) {
-      case 0:
-        return ChatWidget(
-          meetingId: meetingId,
-          userId: 'currentUserId', // 替换为实际用户ID
-          userName: '当前用户', // 替换为实际用户名
-          isReadOnly: isReadOnly, // 已结束会议聊天只读
-        );
-      case 1:
-        return AgendaListWidget(meetingId: meetingId, isReadOnly: isReadOnly);
-      case 2:
-        return MaterialsListWidget(
-          meetingId: meetingId,
-          isReadOnly: isReadOnly,
-        );
-      case 3:
-        return NotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly);
-      case 4:
-        return VotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly);
-      default:
-        return const Center(child: Text('请选择功能'));
+  // 构建功能面板内容
+  Widget _buildFeaturePanel(
+    int index, {
+    bool isReadOnly = false,
+    required String currentUserId,
+    required AsyncValue<List<User>> participants,
+    required WidgetRef ref,
+  }) {
+    // 功能列表
+    final functionWidgets = [
+      ChatWidget(
+        meetingId: meetingId,
+        isReadOnly: isReadOnly,
+        userId: currentUserId,
+        userName: '当前用户', // 替换为实际用户名
+      ),
+      AgendaListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+      MaterialsListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+      NotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+      VotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+    ];
+
+    if (index >= 0 && index < functionWidgets.length) {
+      return functionWidgets[index];
     }
+
+    return const Center(child: Text('未知功能'));
+  }
+
+  // 构建参会人员面板
+  Widget _buildParticipantsPanel(
+    AsyncValue<List<User>> participantsAsync,
+    String currentUserId,
+    WidgetRef ref,
+  ) {
+    // 获取WebRTC参会人员列表，保持与主页面显示的参会人员一致
+    final webRTCParticipantsAsync = ref.watch(webRTCParticipantsProvider);
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // 会议参与者列表（User类型）
+          Expanded(
+            child: participantsAsync.when(
+              data:
+                  (participants) => ListView.builder(
+                    itemCount: participants.length,
+                    itemBuilder: (context, index) {
+                      final user = participants[index];
+                      // 确定用户角色
+                      String? roleLabel;
+                      Color? roleColor;
+
+                      if (user.id == meeting.organizerId) {
+                        roleLabel = '创建者';
+                        roleColor = Colors.orange;
+                      } else if (meeting.admins.contains(user.id)) {
+                        roleLabel = '管理员';
+                        roleColor = Colors.blue;
+                      }
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.2),
+                          child: Text(
+                            user.name.isNotEmpty
+                                ? user.name[0].toUpperCase()
+                                : '?',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        ),
+                        title: Text(user.name),
+                        subtitle: Text(user.email),
+                        trailing:
+                            roleLabel != null
+                                ? _buildRoleChip(roleLabel, roleColor!)
+                                : null,
+                      );
+                    },
+                  ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error:
+                  (error, stackTrace) => Center(child: Text('无法加载参会者: $error')),
+            ),
+          ),
+
+          const Divider(),
+
+          // 实时连接状态的参会人员列表（MeetingParticipant类型）
+          const Text(
+            '实时连接状态',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: webRTCParticipantsAsync.when(
+              data: (participants) {
+                if (participants.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      '暂无实时连接的参会人员',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: participants.length,
+                  itemBuilder: (context, index) {
+                    final participant = participants[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            participant.isMe
+                                ? Colors.blue
+                                : Colors.grey.shade300,
+                        child: Text(
+                          participant.name.isNotEmpty
+                              ? participant.name[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color:
+                                participant.isMe ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ),
+                      title: Row(
+                        children: [
+                          Text(
+                            participant.name,
+                            style: TextStyle(
+                              fontWeight:
+                                  participant.isMe
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                            ),
+                          ),
+                          if (participant.isMe)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 8),
+                              child: Text(
+                                '(我)',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                        ],
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 麦克风状态
+                          Icon(
+                            participant.isMuted ? Icons.mic_off : Icons.mic,
+                            color:
+                                participant.isMuted ? Colors.red : Colors.green,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 发言指示器
+                          if (participant.isSpeaking)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.record_voice_over,
+                                    size: 16,
+                                    color: Colors.green,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    '发言中',
+                                    style: TextStyle(
+                                      color: Colors.green,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, _) => Center(child: Text('无法加载实时参会者: $error')),
+            ),
+          ),
+
+          // 仅会议管理员显示的权限管理按钮
+          if (meeting.canUserManage(currentUserId) &&
+              meeting.status != MeetingStatus.completed)
+            Builder(
+              builder:
+                  (context) => Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.admin_panel_settings),
+                      label: const Text('权限管理'),
+                      onPressed:
+                          () => _navigateToSettings(context, currentUserId),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 导航到权限管理页面
+  void _navigateToSettings(BuildContext context, String currentUserId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder:
+            (context) => MeetingSettingsPage(
+              meetingId: meetingId,
+              currentUserId: currentUserId,
+            ),
+      ),
+    );
+  }
+
+  // 构建角色标签
+  Widget _buildRoleChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
   }
 
   // 显示会议信息对话框
@@ -463,25 +806,27 @@ class MeetingProcessPage extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('标题: ${meeting.title}'),
-                const SizedBox(height: 8),
-                Text('开始时间: ${meeting.startTime}'),
-                const SizedBox(height: 8),
-                Text('结束时间: ${meeting.endTime}'),
-                const SizedBox(height: 8),
-                Text('组织者: ${meeting.organizerName}'),
-                const SizedBox(height: 8),
-                Text('参会人数: ${meeting.participantCount}人'),
-                if (meeting.description != null &&
-                    meeting.description!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text('会议描述: ${meeting.description}'),
-                ],
+                _buildInfoRow('标题', meeting.title),
+                _buildInfoRow(
+                  '开始时间',
+                  meeting.startTime.toString().substring(0, 16),
+                ),
+                _buildInfoRow(
+                  '结束时间',
+                  meeting.endTime.toString().substring(0, 16),
+                ),
+                _buildInfoRow('地点', meeting.location),
+                _buildInfoRow('状态', getMeetingStatusText(meeting.status)),
+                _buildInfoRow('类型', getMeetingTypeText(meeting.type)),
+                _buildInfoRow('组织者', meeting.organizerName),
+                if (meeting.description != null)
+                  _buildInfoRow('描述', meeting.description!),
+                _buildInfoRow('参与人数', meeting.participantCount.toString()),
               ],
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () => Navigator.of(context).pop(),
                 child: const Text('关闭'),
               ),
             ],
@@ -493,74 +838,92 @@ class MeetingProcessPage extends HookConsumerWidget {
   void _showSignInDialog(
     BuildContext context,
     WidgetRef ref,
-    VoidCallback onClose,
+    VoidCallback onComplete,
   ) {
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder:
           (context) => AlertDialog(
             title: const Text('会议签到'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('确认签到参加本次会议吗？'),
-                const SizedBox(height: 12),
-                const Text(
-                  '签到后将被记录为已参加本次会议',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                const Text('确认签到本次会议吗？'),
+                const SizedBox(height: 16),
+                Text(
+                  meeting.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '开始时间：${meeting.startTime.toString().substring(0, 16)}',
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  onClose();
+                  Navigator.of(context).pop();
+                  onComplete();
                 },
                 child: const Text('取消'),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  _signIn(context, ref);
-                  Navigator.pop(context);
-                  onClose();
+              Consumer(
+                builder: (context, ref, child) {
+                  final signInAsyncValue = ref.watch(
+                    meetingSignInProvider(meetingId),
+                  );
+                  final isLoading = signInAsyncValue.isLoading;
+
+                  return TextButton(
+                    onPressed:
+                        isLoading
+                            ? null
+                            : () async {
+                              await ref
+                                  .read(
+                                    meetingSignInProvider(meetingId).notifier,
+                                  )
+                                  .signIn();
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                                onComplete();
+                              }
+                            },
+                    child:
+                        isLoading
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                            : const Text('确认签到'),
+                  );
                 },
-                child: const Text('确认签到'),
               ),
             ],
           ),
     );
   }
 
-  // 签到方法
-  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(meetingSignInProvider(meetingId).notifier).signIn();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('签到成功'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('签到失败: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    }
+  // 构建信息行
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 16)),
+          const Divider(height: 16),
+        ],
+      ),
+    );
   }
 }
 
-/// 会议功能项数据类
+/// 会议功能选项模型
 class _MeetingFeature {
   final IconData icon;
   final String label;

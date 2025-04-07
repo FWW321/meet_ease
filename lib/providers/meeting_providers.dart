@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/meeting.dart';
+import '../models/user.dart';
 import '../services/meeting_service.dart';
 
 part 'meeting_providers.g.dart';
@@ -37,6 +38,13 @@ Future<List<Meeting>> myMeetings(Ref ref) async {
 Future<List<Meeting>> searchMeetings(Ref ref, String query) async {
   final meetingService = ref.watch(meetingServiceProvider);
   return meetingService.searchMeetings(query);
+}
+
+/// 会议参与者提供者
+@riverpod
+Future<List<User>> meetingParticipants(Ref ref, String meetingId) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  return meetingService.getMeetingParticipants(meetingId);
 }
 
 /// 会议签到提供者

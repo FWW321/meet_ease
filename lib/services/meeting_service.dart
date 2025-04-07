@@ -1,4 +1,5 @@
 import '../models/meeting.dart';
+import '../models/user.dart';
 
 /// 会议服务接口
 abstract class MeetingService {
@@ -16,6 +17,32 @@ abstract class MeetingService {
 
   /// 签到会议
   Future<bool> signInMeeting(String meetingId);
+
+  /// 获取会议参与者
+  Future<List<User>> getMeetingParticipants(String meetingId);
+
+  /// 添加会议管理员
+  Future<void> addMeetingAdmin(String meetingId, String userId);
+
+  /// 移除会议管理员
+  Future<void> removeMeetingAdmin(String meetingId, String userId);
+
+  /// 添加用户到黑名单
+  Future<void> addUserToBlacklist(String meetingId, String userId);
+
+  /// 从黑名单移除用户
+  Future<void> removeUserFromBlacklist(String meetingId, String userId);
+
+  /// 更新会议信息
+  Future<void> updateMeeting(
+    String meetingId, {
+    String? title,
+    String? description,
+    String? location,
+    DateTime? startTime,
+    DateTime? endTime,
+    MeetingType? type,
+  });
 }
 
 /// 模拟会议服务实现
@@ -35,6 +62,8 @@ class MockMeetingService implements MeetingService {
       description: '讨论本周项目进度和下周计划',
       participantCount: 8,
       createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      admins: ['user5'],
+      blacklist: const [],
     ),
     Meeting(
       id: '2',
@@ -49,6 +78,8 @@ class MockMeetingService implements MeetingService {
       description: '新入职员工系统使用培训',
       participantCount: 15,
       createdAt: DateTime.now().subtract(const Duration(days: 5)),
+      admins: const [],
+      blacklist: const [],
     ),
     Meeting(
       id: '3',
@@ -64,6 +95,8 @@ class MockMeetingService implements MeetingService {
       isSignedIn: true,
       participantCount: 4,
       createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      admins: ['user4'],
+      blacklist: ['user8'],
     ),
     Meeting(
       id: '4',
@@ -79,6 +112,8 @@ class MockMeetingService implements MeetingService {
       isSignedIn: true,
       participantCount: 10,
       createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      admins: const [],
+      blacklist: const [],
     ),
     Meeting(
       id: '5',
@@ -93,7 +128,21 @@ class MockMeetingService implements MeetingService {
       description: '讨论Q2市场推广策略',
       participantCount: 6,
       createdAt: DateTime.now().subtract(const Duration(days: 4)),
+      admins: const [],
+      blacklist: const [],
     ),
+  ];
+
+  // 模拟用户数据
+  final List<User> _users = [
+    User(id: 'user1', name: '张三', email: 'zhangsan@example.com'),
+    User(id: 'user2', name: '李四', email: 'lisi@example.com'),
+    User(id: 'user3', name: '王五', email: 'wangwu@example.com'),
+    User(id: 'user4', name: '赵六', email: 'zhaoliu@example.com'),
+    User(id: 'user5', name: '孙七', email: 'sunqi@example.com'),
+    User(id: 'user6', name: '周八', email: 'zhouba@example.com'),
+    User(id: 'user7', name: '吴九', email: 'wujiu@example.com'),
+    User(id: 'user8', name: '郑十', email: 'zhengshi@example.com'),
   ];
 
   @override
@@ -113,7 +162,11 @@ class MockMeetingService implements MeetingService {
       orElse: () => throw Exception('会议不存在'),
     );
 
-    return meeting;
+    // 确保admins和blacklist不为null
+    return meeting.copyWith(
+      admins: meeting.admins ?? const [],
+      blacklist: meeting.blacklist ?? const [],
+    );
   }
 
   @override
@@ -156,6 +209,118 @@ class MockMeetingService implements MeetingService {
       throw Exception('会议不存在');
     }
   }
+
+  @override
+  Future<List<User>> getMeetingParticipants(String meetingId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 随机选择几个用户作为会议参与者
+    return _users.take(6).toList();
+  }
+
+  @override
+  Future<void> addMeetingAdmin(String meetingId, String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      final currentAdmins = List<String>.from(
+        _meetings[index].admins ?? const [],
+      );
+      if (!currentAdmins.contains(userId)) {
+        currentAdmins.add(userId);
+        _meetings[index] = _meetings[index].copyWith(admins: currentAdmins);
+      }
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
+
+  @override
+  Future<void> removeMeetingAdmin(String meetingId, String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      final currentAdmins = List<String>.from(
+        _meetings[index].admins ?? const [],
+      );
+      currentAdmins.remove(userId);
+      _meetings[index] = _meetings[index].copyWith(admins: currentAdmins);
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
+
+  @override
+  Future<void> addUserToBlacklist(String meetingId, String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      final currentBlacklist = List<String>.from(
+        _meetings[index].blacklist ?? const [],
+      );
+      if (!currentBlacklist.contains(userId)) {
+        currentBlacklist.add(userId);
+        _meetings[index] = _meetings[index].copyWith(
+          blacklist: currentBlacklist,
+        );
+      }
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
+
+  @override
+  Future<void> removeUserFromBlacklist(String meetingId, String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      final currentBlacklist = List<String>.from(
+        _meetings[index].blacklist ?? const [],
+      );
+      currentBlacklist.remove(userId);
+      _meetings[index] = _meetings[index].copyWith(blacklist: currentBlacklist);
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
+
+  @override
+  Future<void> updateMeeting(
+    String meetingId, {
+    String? title,
+    String? description,
+    String? location,
+    DateTime? startTime,
+    DateTime? endTime,
+    MeetingType? type,
+  }) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      _meetings[index] = _meetings[index].copyWith(
+        title: title,
+        description: description,
+        location: location,
+        startTime: startTime,
+        endTime: endTime,
+        type: type,
+        updatedAt: DateTime.now(),
+      );
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -187,6 +352,50 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<bool> signInMeeting(String meetingId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<List<User>> getMeetingParticipants(String meetingId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> addMeetingAdmin(String meetingId, String userId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> removeMeetingAdmin(String meetingId, String userId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> addUserToBlacklist(String meetingId, String userId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> removeUserFromBlacklist(String meetingId, String userId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> updateMeeting(
+    String meetingId, {
+    String? title,
+    String? description,
+    String? location,
+    DateTime? startTime,
+    DateTime? endTime,
+    MeetingType? type,
+  }) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');
   }

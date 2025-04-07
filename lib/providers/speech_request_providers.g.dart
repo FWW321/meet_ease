@@ -7,7 +7,7 @@ part of 'speech_request_providers.dart';
 // **************************************************************************
 
 String _$meetingSpeechRequestsHash() =>
-    r'4dbbe8ef0ee37058afdbebfb0582f3e40bc42176';
+    r'f6d638bac82aed1f43fd06e5e9e16a709662e505';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -167,7 +167,7 @@ class _MeetingSpeechRequestsProviderElement
   String get meetingId => (origin as MeetingSpeechRequestsProvider).meetingId;
 }
 
-String _$currentSpeechHash() => r'3ea0c3349d6755a3626b7f462ced395459d62228';
+String _$currentSpeechHash() => r'9def9445dab72d44a991692cdaa4fdf31673b802';
 
 /// 当前正在进行的发言提供者
 ///

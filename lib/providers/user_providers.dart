@@ -18,6 +18,63 @@ Future<User?> currentUser(Ref ref) async {
   return userService.getCurrentUser();
 }
 
+/// 用户详情提供者
+@riverpod
+Future<User> user(Ref ref, String userId) async {
+  final userService = ref.watch(userServiceProvider);
+  return userService.getUserById(userId);
+}
+
+/// 当前用户ID提供者 (通常从本地存储或会话中获取)
+@riverpod
+String currentUserId(Ref ref) {
+  // 目前返回固定值，实际应用中应该从本地存储或会话中获取
+  return 'user1';
+}
+
+/// 用户登录状态提供者
+@riverpod
+class AuthState extends _$AuthState {
+  @override
+  bool build() {
+    // 初始状态，通常从本地存储中加载
+    return false;
+  }
+
+  // 登录方法
+  Future<void> login(String email, String password) async {
+    state = false; // 临时设置为未登录状态
+
+    try {
+      final userService = ref.read(userServiceProvider);
+      await userService.login(email, password);
+
+      // 登录成功
+      state = true;
+
+      // 刷新当前用户信息
+      ref.invalidate(currentUserProvider);
+    } catch (e) {
+      // 登录失败
+      rethrow;
+    }
+  }
+
+  // 登出方法
+  Future<void> logout() async {
+    try {
+      final userService = ref.read(userServiceProvider);
+      await userService.logout();
+
+      // 登出成功
+      state = false;
+    } catch (e) {
+      // 登出失败
+      rethrow;
+    }
+  }
+}
+
 /// 用户信息提供者
 @riverpod
 class UserNotifier extends _$UserNotifier {

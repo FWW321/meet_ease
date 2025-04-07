@@ -34,6 +34,8 @@ class MeetingParticipant {
   final bool isSpeaking;
   final bool isMuted;
   final bool isMe;
+  final bool isCreator; // 是否是会议创建者
+  final bool isAdmin; // 是否是会议管理员
 
   MeetingParticipant({
     required this.id,
@@ -41,6 +43,8 @@ class MeetingParticipant {
     this.isSpeaking = false,
     this.isMuted = false,
     this.isMe = false,
+    this.isCreator = false,
+    this.isAdmin = false,
   });
 
   MeetingParticipant copyWith({
@@ -49,6 +53,8 @@ class MeetingParticipant {
     bool? isSpeaking,
     bool? isMuted,
     bool? isMe,
+    bool? isCreator,
+    bool? isAdmin,
   }) {
     return MeetingParticipant(
       id: id ?? this.id,
@@ -56,6 +62,8 @@ class MeetingParticipant {
       isSpeaking: isSpeaking ?? this.isSpeaking,
       isMuted: isMuted ?? this.isMuted,
       isMe: isMe ?? this.isMe,
+      isCreator: isCreator ?? this.isCreator,
+      isAdmin: isAdmin ?? this.isAdmin,
     );
   }
 }
@@ -91,8 +99,8 @@ class MockWebRTCService implements WebRTCService {
     // 模拟数据 - 参会人员列表
     _participants = [
       MeetingParticipant(id: userId, name: userName, isMe: true),
-      MeetingParticipant(id: 'user2', name: '李四'),
-      MeetingParticipant(id: 'user3', name: '王五'),
+      MeetingParticipant(id: 'user2', name: '李四', isCreator: true),
+      MeetingParticipant(id: 'user3', name: '王五', isAdmin: true),
       MeetingParticipant(id: 'user4', name: '赵六'),
       MeetingParticipant(id: 'user5', name: '钱七'),
     ];

@@ -16,6 +16,14 @@ enum MeetingType {
   other, // 其他
 }
 
+/// 会议权限枚举
+enum MeetingPermission {
+  creator, // 创建者
+  admin, // 管理员
+  participant, // 普通参与者
+  blocked, // 被封禁用户
+}
+
 /// 会议模型
 class Meeting {
   final String id;
@@ -33,6 +41,8 @@ class Meeting {
   final int participantCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final List<String> admins; // 管理员 ID 列表
+  final List<String> blacklist; // 黑名单 ID 列表
 
   const Meeting({
     required this.id,
@@ -50,6 +60,8 @@ class Meeting {
     this.participantCount = 0,
     this.createdAt,
     this.updatedAt,
+    this.admins = const [],
+    this.blacklist = const [],
   });
 
   // 复制并修改对象的方法
@@ -69,6 +81,8 @@ class Meeting {
     int? participantCount,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? admins,
+    List<String>? blacklist,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -86,7 +100,39 @@ class Meeting {
       participantCount: participantCount ?? this.participantCount,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      admins: admins ?? this.admins,
+      blacklist: blacklist ?? this.blacklist,
     );
+  }
+
+  // 检查用户权限
+  MeetingPermission getUserPermission(String userId) {
+    if (organizerId == userId) {
+      return MeetingPermission.creator;
+    } else if (admins.contains(userId)) {
+      return MeetingPermission.admin;
+    } else if (blacklist.contains(userId)) {
+      return MeetingPermission.blocked;
+    } else {
+      return MeetingPermission.participant;
+    }
+  }
+
+  // 检查用户是否能参加会议
+  bool canUserJoin(String userId) {
+    final userBlacklist = blacklist;
+    return !userBlacklist.contains(userId);
+  }
+
+  // 检查用户是否可以管理会议
+  bool canUserManage(String userId) {
+    final userAdmins = admins;
+    return organizerId == userId || userAdmins.contains(userId);
+  }
+
+  // 检查是否只有创建者才能执行的操作
+  bool isCreatorOnly(String userId) {
+    return organizerId == userId;
   }
 }
 
@@ -129,5 +175,19 @@ String getMeetingTypeText(MeetingType type) {
       return '面试会议';
     case MeetingType.other:
       return '其他';
+  }
+}
+
+// 获取会议权限文本
+String getMeetingPermissionText(MeetingPermission permission) {
+  switch (permission) {
+    case MeetingPermission.creator:
+      return '创建者';
+    case MeetingPermission.admin:
+      return '管理员';
+    case MeetingPermission.participant:
+      return '参与者';
+    case MeetingPermission.blocked:
+      return '已封禁';
   }
 }

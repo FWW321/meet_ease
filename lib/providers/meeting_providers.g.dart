@@ -329,6 +329,141 @@ class _SearchMeetingsProviderElement
   String get query => (origin as SearchMeetingsProvider).query;
 }
 
+String _$meetingParticipantsHash() =>
+    r'951d4223e12e079926290963ff637f77ae60da01';
+
+/// 会议参与者提供者
+///
+/// Copied from [meetingParticipants].
+@ProviderFor(meetingParticipants)
+const meetingParticipantsProvider = MeetingParticipantsFamily();
+
+/// 会议参与者提供者
+///
+/// Copied from [meetingParticipants].
+class MeetingParticipantsFamily extends Family<AsyncValue<List<User>>> {
+  /// 会议参与者提供者
+  ///
+  /// Copied from [meetingParticipants].
+  const MeetingParticipantsFamily();
+
+  /// 会议参与者提供者
+  ///
+  /// Copied from [meetingParticipants].
+  MeetingParticipantsProvider call(String meetingId) {
+    return MeetingParticipantsProvider(meetingId);
+  }
+
+  @override
+  MeetingParticipantsProvider getProviderOverride(
+    covariant MeetingParticipantsProvider provider,
+  ) {
+    return call(provider.meetingId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'meetingParticipantsProvider';
+}
+
+/// 会议参与者提供者
+///
+/// Copied from [meetingParticipants].
+class MeetingParticipantsProvider
+    extends AutoDisposeFutureProvider<List<User>> {
+  /// 会议参与者提供者
+  ///
+  /// Copied from [meetingParticipants].
+  MeetingParticipantsProvider(String meetingId)
+    : this._internal(
+        (ref) => meetingParticipants(ref as MeetingParticipantsRef, meetingId),
+        from: meetingParticipantsProvider,
+        name: r'meetingParticipantsProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$meetingParticipantsHash,
+        dependencies: MeetingParticipantsFamily._dependencies,
+        allTransitiveDependencies:
+            MeetingParticipantsFamily._allTransitiveDependencies,
+        meetingId: meetingId,
+      );
+
+  MeetingParticipantsProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.meetingId,
+  }) : super.internal();
+
+  final String meetingId;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<User>> Function(MeetingParticipantsRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: MeetingParticipantsProvider._internal(
+        (ref) => create(ref as MeetingParticipantsRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        meetingId: meetingId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<User>> createElement() {
+    return _MeetingParticipantsProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MeetingParticipantsProvider && other.meetingId == meetingId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, meetingId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin MeetingParticipantsRef on AutoDisposeFutureProviderRef<List<User>> {
+  /// The parameter `meetingId` of this provider.
+  String get meetingId;
+}
+
+class _MeetingParticipantsProviderElement
+    extends AutoDisposeFutureProviderElement<List<User>>
+    with MeetingParticipantsRef {
+  _MeetingParticipantsProviderElement(super.provider);
+
+  @override
+  String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
+}
+
 String _$meetingSignInHash() => r'13a9e8bdd98df69399b56808d66a5a2a5f107e03';
 
 abstract class _$MeetingSignIn extends BuildlessAutoDisposeAsyncNotifier<bool> {

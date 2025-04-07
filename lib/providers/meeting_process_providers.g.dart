@@ -6,7 +6,7 @@ part of 'meeting_process_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$meetingAgendaHash() => r'cf6c7f3d4477e4277836a7d965a3c355af33526c';
+String _$meetingAgendaHash() => r'd3b519ceaecb55eb4ebbe157ed0ebd8f1c7d104a';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -851,7 +851,7 @@ class _VoteResultsProviderElement
 }
 
 String _$agendaItemStatusNotifierHash() =>
-    r'84e5362786d11724775ee98d5d9a59aab8f4aaf3';
+    r'7de6309c47571508dbd22a40b5f77bba017bbe3e';
 
 abstract class _$AgendaItemStatusNotifier
     extends BuildlessAutoDisposeAsyncNotifier<AgendaItem?> {
@@ -1352,7 +1352,7 @@ class _MeetingNotesNotifierProviderElement
   String get meetingId => (origin as MeetingNotesNotifierProvider).meetingId;
 }
 
-String _$voteNotifierHash() => r'f1359131c9a407daaf02af1ccc1e910b491c16b6';
+String _$voteNotifierHash() => r'1937e4ee288b8842514a146fd24a690ff4de73c1';
 
 abstract class _$VoteNotifier
     extends BuildlessAutoDisposeAsyncNotifier<MeetingVote?> {
