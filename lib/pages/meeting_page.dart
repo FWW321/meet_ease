@@ -76,6 +76,23 @@ class MeetingPage extends HookConsumerWidget {
             ),
           ),
 
+          // 搜索提示
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '提示：可搜索会议只能通过6位数字会议码搜索',
+                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // 搜索状态指示
           if (isSearchingState.value && searchQueryState.value.isNotEmpty)
             Padding(

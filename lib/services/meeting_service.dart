@@ -207,11 +207,22 @@ class MockMeetingService implements MeetingService {
     }
 
     return _meetings.where((m) {
+      // 如果是通过会议ID搜索，优先检查ID匹配
+      final idMatch = m.id.toLowerCase() == query.toLowerCase();
+
+      // 对于可搜索会议，只有通过会议ID搜索才能找到
+      if (m.visibility == MeetingVisibility.searchable) {
+        return idMatch;
+      }
+
+      // 对于其他类型会议，支持通过标题或描述搜索
       final titleMatch = m.title.toLowerCase().contains(query.toLowerCase());
       final descMatch =
           m.description != null &&
           m.description!.toLowerCase().contains(query.toLowerCase());
-      return titleMatch || descMatch;
+
+      // 公开会议可以通过标题、描述或ID找到
+      return titleMatch || descMatch || idMatch;
     }).toList();
   }
 
@@ -357,7 +368,14 @@ class MockMeetingService implements MeetingService {
     await Future.delayed(const Duration(milliseconds: 1000));
 
     // 生成唯一ID
-    final id = 'meeting_${DateTime.now().millisecondsSinceEpoch}';
+    String id;
+    if (visibility == MeetingVisibility.searchable) {
+      // 为可搜索会议生成简短的会议码 (6位数字)
+      id = _generateMeetingCode();
+    } else {
+      // 其他类型会议使用普通ID
+      id = 'meeting_${DateTime.now().millisecondsSinceEpoch}';
+    }
 
     // 创建新会议
     final newMeeting = Meeting(
@@ -385,6 +403,13 @@ class MockMeetingService implements MeetingService {
     _meetings.add(newMeeting);
 
     return newMeeting;
+  }
+
+  // 生成6位数字会议码
+  String _generateMeetingCode() {
+    // 生成6位随机数字
+    final int code = 100000 + (DateTime.now().millisecondsSinceEpoch % 900000);
+    return code.toString();
   }
 
   @override

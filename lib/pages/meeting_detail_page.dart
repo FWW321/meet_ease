@@ -127,6 +127,14 @@ class MeetingDetailPage extends ConsumerWidget {
                   '${meeting.participantCount}人',
                   icon: Icons.people,
                 ),
+                // 如果是可搜索会议，显示会议码
+                if (meeting.visibility == MeetingVisibility.searchable)
+                  _buildInfoItem(
+                    '会议码',
+                    meeting.id,
+                    icon: Icons.qr_code,
+                    color: Colors.orange,
+                  ),
               ]),
 
               // 会议参与者（显示创建者和管理员标识）

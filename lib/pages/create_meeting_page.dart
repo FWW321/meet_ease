@@ -460,7 +460,7 @@ class CreateMeetingPage extends HookConsumerWidget {
         color = Colors.blue;
         break;
       case MeetingVisibility.searchable:
-        helperText = '可搜索会议需要通过搜索才能显示，所有人可参加';
+        helperText = '可搜索会议仅通过会议码搜索才能显示，将自动生成6位数字会议码';
         color = Colors.orange;
         break;
       case MeetingVisibility.private:
