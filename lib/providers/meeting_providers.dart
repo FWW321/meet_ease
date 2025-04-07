@@ -65,6 +65,7 @@ class CreateMeeting extends _$CreateMeeting {
     required MeetingVisibility visibility,
     String? description,
     List<String> allowedUsers = const [],
+    String? password,
   }) async {
     state = const AsyncValue.loading();
 
@@ -79,6 +80,7 @@ class CreateMeeting extends _$CreateMeeting {
         visibility: visibility,
         description: description,
         allowedUsers: allowedUsers,
+        password: password,
       );
 
       // 创建成功后更新状态
@@ -88,6 +90,35 @@ class CreateMeeting extends _$CreateMeeting {
       ref.invalidate(meetingListProvider);
 
       return meeting;
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+      throw e;
+    }
+  }
+}
+
+/// 验证会议密码提供者
+@riverpod
+class ValidateMeetingPassword extends _$ValidateMeetingPassword {
+  @override
+  FutureOr<bool?> build(String meetingId) {
+    // 初始状态为null，表示未验证密码
+    return null;
+  }
+
+  // 验证密码
+  Future<bool> validate(String password) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final meetingService = ref.read(meetingServiceProvider);
+      final result = await meetingService.validateMeetingPassword(
+        meetingId,
+        password,
+      );
+
+      state = AsyncValue.data(result);
+      return result;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
       throw e;

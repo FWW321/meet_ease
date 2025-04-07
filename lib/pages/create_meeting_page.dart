@@ -15,6 +15,7 @@ class CreateMeetingPage extends HookConsumerWidget {
     final titleController = TextEditingController();
     final locationController = TextEditingController();
     final descriptionController = TextEditingController();
+    final passwordController = TextEditingController();
 
     // 日期和时间
     final startDate = ValueNotifier<DateTime>(
@@ -29,6 +30,9 @@ class CreateMeetingPage extends HookConsumerWidget {
     final meetingVisibility = ValueNotifier<MeetingVisibility>(
       MeetingVisibility.public,
     );
+
+    // 是否启用密码
+    final enablePassword = ValueNotifier<bool>(false);
 
     // 可选择的用户列表（对于私有会议）
     final selectedUsers = ValueNotifier<List<String>>([]);
@@ -183,6 +187,98 @@ class CreateMeetingPage extends HookConsumerWidget {
             ),
             const SizedBox(height: 16),
 
+            // 会议密码设置
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(color: Colors.grey.shade300),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.lock, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            '会议密码',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: enablePassword,
+                          builder: (context, enabled, _) {
+                            return Switch(
+                              value: enabled,
+                              onChanged: (value) {
+                                enablePassword.value = value;
+                                if (!value) {
+                                  passwordController.clear();
+                                }
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: enablePassword,
+                      builder: (context, enabled, _) {
+                        return enabled
+                            ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: passwordController,
+                                  decoration: const InputDecoration(
+                                    labelText: '设置密码',
+                                    hintText: '参会者需要输入此密码才能加入会议',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  validator:
+                                      enabled
+                                          ? (value) {
+                                            if (value == null ||
+                                                value.isEmpty) {
+                                              return '请输入会议密码';
+                                            }
+                                            return null;
+                                          }
+                                          : null,
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  '启用密码后，参会者需要输入正确的密码才能加入会议。',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            )
+                            : const Text(
+                              '不启用密码，所有参会者可直接加入会议。',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
+                            );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // 当选择私有会议时，显示用户选择列表
             ValueListenableBuilder<MeetingVisibility>(
               valueListenable: meetingVisibility,
@@ -260,110 +356,59 @@ class CreateMeetingPage extends HookConsumerWidget {
             const SizedBox(height: 24),
 
             // 创建按钮
-            ValueListenableBuilder<MeetingVisibility>(
-              valueListenable: meetingVisibility,
-              builder: (context, visibility, _) {
-                return ValueListenableBuilder<List<String>>(
-                  valueListenable: selectedUsers,
-                  builder: (context, users, _) {
-                    // 检查私有会议是否选择了用户
-                    final bool canSubmit =
-                        visibility != MeetingVisibility.private ||
-                        users.isNotEmpty;
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24.0),
+              child: ElevatedButton(
+                onPressed:
+                    createMeetingState.isLoading
+                        ? null
+                        : () async {
+                          if (formKey.currentState!.validate()) {
+                            // 调用创建会议方法
+                            final notifier = ref.read(
+                              createMeetingProvider.notifier,
+                            );
 
-                    return ElevatedButton(
-                      onPressed:
-                          createMeetingState.isLoading
-                              ? null
-                              : () => _submitForm(
-                                context,
-                                ref,
-                                formKey,
-                                titleController.text,
-                                locationController.text,
-                                descriptionController.text,
-                                startDate.value,
-                                endDate.value,
-                                meetingType.value,
-                                meetingVisibility.value,
-                                selectedUsers.value,
-                              ),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                      ),
-                      child:
-                          createMeetingState.isLoading
-                              ? const CircularProgressIndicator()
-                              : const Text('创建会议'),
-                    );
-                  },
-                );
-              },
+                            await notifier.create(
+                              title: titleController.text.trim(),
+                              location: locationController.text.trim(),
+                              startTime: startDate.value,
+                              endTime: endDate.value,
+                              description: descriptionController.text.trim(),
+                              type: meetingType.value,
+                              visibility: meetingVisibility.value,
+                              allowedUsers:
+                                  meetingVisibility.value ==
+                                          MeetingVisibility.private
+                                      ? selectedUsers.value
+                                      : [],
+                              password:
+                                  enablePassword.value
+                                      ? passwordController.text.trim()
+                                      : null,
+                            );
+                          }
+                        },
+                child:
+                    createMeetingState.isLoading
+                        ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                        : const Text('创建会议'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  // 提交表单
-  Future<void> _submitForm(
-    BuildContext context,
-    WidgetRef ref,
-    GlobalKey<FormState> formKey,
-    String title,
-    String location,
-    String description,
-    DateTime startTime,
-    DateTime endTime,
-    MeetingType type,
-    MeetingVisibility visibility,
-    List<String> allowedUsers,
-  ) async {
-    // 验证表单
-    if (!formKey.currentState!.validate()) {
-      return;
-    }
-
-    // 检查开始时间和结束时间
-    if (endTime.isBefore(startTime)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('结束时间不能早于开始时间'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // 对于私有会议，检查是否选择了用户
-    if (visibility == MeetingVisibility.private && allowedUsers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('私有会议需要选择至少一名参与者'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // 创建会议
-    try {
-      await ref
-          .read(createMeetingProvider.notifier)
-          .create(
-            title: title,
-            startTime: startTime,
-            endTime: endTime,
-            location: location,
-            type: type,
-            visibility: visibility,
-            description: description,
-            allowedUsers: allowedUsers,
-          );
-    } catch (e) {
-      // 错误处理在 ref.listen 中
-    }
   }
 
   // 选择日期和时间

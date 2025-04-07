@@ -18,6 +18,9 @@ abstract class MeetingService {
   /// 签到会议
   Future<bool> signInMeeting(String meetingId);
 
+  /// 验证会议密码
+  Future<bool> validateMeetingPassword(String meetingId, String password);
+
   /// 获取会议参与者
   Future<List<User>> getMeetingParticipants(String meetingId);
 
@@ -54,6 +57,7 @@ abstract class MeetingService {
     required MeetingVisibility visibility,
     String? description,
     List<String> allowedUsers = const [],
+    String? password,
   });
 }
 
@@ -344,17 +348,17 @@ class MockMeetingService implements MeetingService {
     required MeetingVisibility visibility,
     String? description,
     List<String> allowedUsers = const [],
+    String? password,
   }) async {
     // 模拟网络延迟
     await Future.delayed(const Duration(milliseconds: 1000));
 
-    // 创建新会议ID（简单实现，实际应用中可能需要更复杂的ID生成逻辑）
-    final newId =
-        '${_meetings.length + 1}${DateTime.now().millisecondsSinceEpoch}';
+    // 生成唯一ID
+    final id = 'meeting_${DateTime.now().millisecondsSinceEpoch}';
 
     // 创建新会议
     final newMeeting = Meeting(
-      id: newId,
+      id: id,
       title: title,
       startTime: startTime,
       endTime: endTime,
@@ -371,12 +375,29 @@ class MockMeetingService implements MeetingService {
       admins: const [],
       blacklist: const [],
       allowedUsers: allowedUsers,
+      password: password,
     );
 
     // 将新会议添加到列表中
     _meetings.add(newMeeting);
 
     return newMeeting;
+  }
+
+  @override
+  Future<bool> validateMeetingPassword(
+    String meetingId,
+    String password,
+  ) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    try {
+      final meeting = await getMeetingById(meetingId);
+      return meeting.checkPassword(password);
+    } catch (e) {
+      return false;
+    }
   }
 }
 
@@ -467,7 +488,17 @@ class ApiMeetingService implements MeetingService {
     required MeetingVisibility visibility,
     String? description,
     List<String> allowedUsers = const [],
+    String? password,
   }) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<bool> validateMeetingPassword(
+    String meetingId,
+    String password,
+  ) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');
   }

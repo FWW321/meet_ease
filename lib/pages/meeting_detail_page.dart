@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/meeting.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
+import '../widgets/meeting_password_dialog.dart';
 import 'meeting_process_page.dart';
 import 'meeting_settings_page.dart';
 
@@ -188,15 +189,33 @@ class MeetingDetailPage extends ConsumerWidget {
   }
 
   // 进入会议
-  void _joinMeeting(BuildContext context, Meeting meeting) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) =>
-                MeetingProcessPage(meetingId: meetingId, meeting: meeting),
-      ),
-    );
+  Future<void> _joinMeeting(BuildContext context, Meeting meeting) async {
+    // 检查会议是否需要密码
+    if (meeting.password != null && meeting.password!.isNotEmpty) {
+      // 显示密码验证对话框
+      final passwordValid = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => MeetingPasswordDialog(meetingId: meetingId),
+      );
+
+      // 如果密码验证失败或用户取消，则不进入会议
+      if (passwordValid != true) {
+        return;
+      }
+    }
+
+    // 密码验证成功或不需要密码，进入会议
+    if (context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) =>
+                  MeetingProcessPage(meetingId: meetingId, meeting: meeting),
+        ),
+      );
+    }
   }
 
   // 构建会议参与者列表

@@ -464,7 +464,7 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
-String _$createMeetingHash() => r'8f9c071d61af6801c0e744f6cc1a9eb27639e7a7';
+String _$createMeetingHash() => r'4763362a9bb3066c9e4e13d21050979f7372f884';
 
 /// 创建会议提供者
 ///
@@ -483,6 +483,155 @@ final createMeetingProvider =
     );
 
 typedef _$CreateMeeting = AutoDisposeAsyncNotifier<Meeting?>;
+String _$validateMeetingPasswordHash() =>
+    r'5a2d50b80aab94c989b48eb25791396de0daf95e';
+
+abstract class _$ValidateMeetingPassword
+    extends BuildlessAutoDisposeAsyncNotifier<bool?> {
+  late final String meetingId;
+
+  FutureOr<bool?> build(String meetingId);
+}
+
+/// 验证会议密码提供者
+///
+/// Copied from [ValidateMeetingPassword].
+@ProviderFor(ValidateMeetingPassword)
+const validateMeetingPasswordProvider = ValidateMeetingPasswordFamily();
+
+/// 验证会议密码提供者
+///
+/// Copied from [ValidateMeetingPassword].
+class ValidateMeetingPasswordFamily extends Family<AsyncValue<bool?>> {
+  /// 验证会议密码提供者
+  ///
+  /// Copied from [ValidateMeetingPassword].
+  const ValidateMeetingPasswordFamily();
+
+  /// 验证会议密码提供者
+  ///
+  /// Copied from [ValidateMeetingPassword].
+  ValidateMeetingPasswordProvider call(String meetingId) {
+    return ValidateMeetingPasswordProvider(meetingId);
+  }
+
+  @override
+  ValidateMeetingPasswordProvider getProviderOverride(
+    covariant ValidateMeetingPasswordProvider provider,
+  ) {
+    return call(provider.meetingId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'validateMeetingPasswordProvider';
+}
+
+/// 验证会议密码提供者
+///
+/// Copied from [ValidateMeetingPassword].
+class ValidateMeetingPasswordProvider
+    extends
+        AutoDisposeAsyncNotifierProviderImpl<ValidateMeetingPassword, bool?> {
+  /// 验证会议密码提供者
+  ///
+  /// Copied from [ValidateMeetingPassword].
+  ValidateMeetingPasswordProvider(String meetingId)
+    : this._internal(
+        () => ValidateMeetingPassword()..meetingId = meetingId,
+        from: validateMeetingPasswordProvider,
+        name: r'validateMeetingPasswordProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$validateMeetingPasswordHash,
+        dependencies: ValidateMeetingPasswordFamily._dependencies,
+        allTransitiveDependencies:
+            ValidateMeetingPasswordFamily._allTransitiveDependencies,
+        meetingId: meetingId,
+      );
+
+  ValidateMeetingPasswordProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.meetingId,
+  }) : super.internal();
+
+  final String meetingId;
+
+  @override
+  FutureOr<bool?> runNotifierBuild(covariant ValidateMeetingPassword notifier) {
+    return notifier.build(meetingId);
+  }
+
+  @override
+  Override overrideWith(ValidateMeetingPassword Function() create) {
+    return ProviderOverride(
+      origin: this,
+      override: ValidateMeetingPasswordProvider._internal(
+        () => create()..meetingId = meetingId,
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        meetingId: meetingId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeAsyncNotifierProviderElement<ValidateMeetingPassword, bool?>
+  createElement() {
+    return _ValidateMeetingPasswordProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ValidateMeetingPasswordProvider &&
+        other.meetingId == meetingId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, meetingId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin ValidateMeetingPasswordRef on AutoDisposeAsyncNotifierProviderRef<bool?> {
+  /// The parameter `meetingId` of this provider.
+  String get meetingId;
+}
+
+class _ValidateMeetingPasswordProviderElement
+    extends
+        AutoDisposeAsyncNotifierProviderElement<ValidateMeetingPassword, bool?>
+    with ValidateMeetingPasswordRef {
+  _ValidateMeetingPasswordProviderElement(super.provider);
+
+  @override
+  String get meetingId => (origin as ValidateMeetingPasswordProvider).meetingId;
+}
+
 String _$meetingSignInHash() => r'13a9e8bdd98df69399b56808d66a5a2a5f107e03';
 
 abstract class _$MeetingSignIn extends BuildlessAutoDisposeAsyncNotifier<bool> {

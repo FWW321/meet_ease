@@ -52,6 +52,7 @@ class Meeting {
   final List<String> admins; // 管理员 ID 列表
   final List<String> blacklist; // 黑名单 ID 列表
   final List<String> allowedUsers; // 允许参加的用户 ID 列表（仅当visibility为private时有效）
+  final String? password; // 会议密码，为空表示不需要密码
 
   const Meeting({
     required this.id,
@@ -73,6 +74,7 @@ class Meeting {
     this.admins = const [],
     this.blacklist = const [],
     this.allowedUsers = const [],
+    this.password,
   });
 
   // 复制并修改对象的方法
@@ -96,6 +98,7 @@ class Meeting {
     List<String>? admins,
     List<String>? blacklist,
     List<String>? allowedUsers,
+    String? password,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -117,6 +120,7 @@ class Meeting {
       admins: admins ?? this.admins,
       blacklist: blacklist ?? this.blacklist,
       allowedUsers: allowedUsers ?? this.allowedUsers,
+      password: password ?? this.password,
     );
   }
 
@@ -160,6 +164,22 @@ class Meeting {
   // 检查是否只有创建者才能执行的操作
   bool isCreatorOnly(String userId) {
     return organizerId == userId;
+  }
+
+  // 验证会议密码
+  bool checkPassword(String? inputPassword) {
+    // 如果会议没有设置密码，直接返回true
+    if (password == null || password!.isEmpty) {
+      return true;
+    }
+
+    // 如果会议有密码但用户没有提供密码，返回false
+    if (inputPassword == null || inputPassword.isEmpty) {
+      return false;
+    }
+
+    // 比较密码是否正确
+    return password == inputPassword;
   }
 }
 
