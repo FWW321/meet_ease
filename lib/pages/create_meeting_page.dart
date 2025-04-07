@@ -80,14 +80,22 @@ class CreateMeetingPage extends HookConsumerWidget {
             // 会议标题
             TextFormField(
               controller: titleController,
+              maxLength: 50, // 限制标题最大长度为50个字符
               decoration: const InputDecoration(
                 labelText: '会议标题',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.title),
+                counterText: '', // 隐藏内置的字符计数
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return '请输入会议标题';
+                }
+                if (value.trim().length < 3) {
+                  return '会议标题至少需要3个字符';
+                }
+                if (value.trim().length > 50) {
+                  return '会议标题不能超过50个字符';
                 }
                 return null;
               },
@@ -97,14 +105,19 @@ class CreateMeetingPage extends HookConsumerWidget {
             // 会议地点
             TextFormField(
               controller: locationController,
+              maxLength: 100, // 限制地点最大长度
               decoration: const InputDecoration(
                 labelText: '会议地点',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on),
+                counterText: '',
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return '请输入会议地点';
+                }
+                if (value.trim().length < 2) {
+                  return '会议地点至少需要2个字符';
                 }
                 return null;
               },
@@ -164,6 +177,11 @@ class CreateMeetingPage extends HookConsumerWidget {
                           onChanged: (newValue) {
                             if (newValue != null) {
                               meetingVisibility.value = newValue;
+
+                              // 重置已选用户列表，当可见性从私有变为其他类型时
+                              if (newValue != MeetingVisibility.private) {
+                                selectedUsers.value = [];
+                              }
                             }
                           },
                           items:
@@ -238,6 +256,7 @@ class CreateMeetingPage extends HookConsumerWidget {
                                 const SizedBox(height: 8),
                                 TextFormField(
                                   controller: passwordController,
+                                  obscureText: true, // 隐藏密码
                                   decoration: const InputDecoration(
                                     labelText: '设置密码',
                                     hintText: '参会者需要输入此密码才能加入会议',
@@ -249,6 +268,18 @@ class CreateMeetingPage extends HookConsumerWidget {
                                             if (value == null ||
                                                 value.isEmpty) {
                                               return '请输入会议密码';
+                                            }
+                                            if (value.length < 4) {
+                                              return '密码长度至少为4位';
+                                            }
+                                            if (value.length > 16) {
+                                              return '密码长度不能超过16位';
+                                            }
+                                            // 验证密码格式，可以根据需要增加字母、数字等要求
+                                            if (!RegExp(
+                                              r'^[a-zA-Z0-9]+$',
+                                            ).hasMatch(value)) {
+                                              return '密码只能包含字母和数字';
                                             }
                                             return null;
                                           }
@@ -297,6 +328,37 @@ class CreateMeetingPage extends HookConsumerWidget {
                       const SizedBox(height: 8),
                       // 这里应该实现用户选择逻辑，为简化示例，使用模拟数据
                       _buildUserSelectionList(selectedUsers),
+                      // 显示选择用户提示
+                      ValueListenableBuilder<List<String>>(
+                        valueListenable: selectedUsers,
+                        builder: (context, selectedIds, _) {
+                          if (selectedIds.isEmpty) {
+                            return const Padding(
+                              padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                              child: Text(
+                                '请至少选择一名用户',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            );
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                              top: 8.0,
+                              left: 16.0,
+                            ),
+                            child: Text(
+                              '已选择 ${selectedIds.length} 名用户',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontSize: 12,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 16),
                     ],
                   );
@@ -341,17 +403,66 @@ class CreateMeetingPage extends HookConsumerWidget {
                 );
               },
             ),
+            // 时间验证错误提示
+            ValueListenableBuilder<DateTime>(
+              valueListenable: startDate,
+              builder: (context, startTime, _) {
+                return ValueListenableBuilder<DateTime>(
+                  valueListenable: endDate,
+                  builder: (context, endTime, _) {
+                    if (endTime.isBefore(startTime) ||
+                        endTime.isAtSameMomentAs(startTime)) {
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                        child: Text(
+                          '结束时间必须晚于开始时间',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      );
+                    }
+                    // 检查会议时长是否合理
+                    final duration = endTime.difference(startTime);
+                    if (duration.inMinutes < 15) {
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                        child: Text(
+                          '会议时长至少需要15分钟',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      );
+                    }
+                    if (duration.inHours > 24) {
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                        child: Text(
+                          '会议时长不建议超过24小时',
+                          style: TextStyle(color: Colors.orange, fontSize: 12),
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                );
+              },
+            ),
             const SizedBox(height: 16),
 
             // 会议描述
             TextFormField(
               controller: descriptionController,
+              maxLength: 500, // 限制描述最大长度
               decoration: const InputDecoration(
                 labelText: '会议描述',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.description),
               ),
               maxLines: 3,
+              validator: (value) {
+                if (value != null && value.length > 500) {
+                  return '会议描述不能超过500个字符';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 24),
 
@@ -363,7 +474,49 @@ class CreateMeetingPage extends HookConsumerWidget {
                     createMeetingState.isLoading
                         ? null
                         : () async {
-                          if (formKey.currentState!.validate()) {
+                          bool isValid = formKey.currentState!.validate();
+
+                          // 额外验证
+                          // 1. 检查结束时间是否晚于开始时间
+                          if (endDate.value.isBefore(startDate.value) ||
+                              endDate.value.isAtSameMomentAs(startDate.value)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('结束时间必须晚于开始时间'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            isValid = false;
+                          }
+
+                          // 2. 检查会议时长是否至少15分钟
+                          final duration = endDate.value.difference(
+                            startDate.value,
+                          );
+                          if (duration.inMinutes < 15) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('会议时长至少需要15分钟'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            isValid = false;
+                          }
+
+                          // 3. 如果是私有会议，必须选择至少一名用户
+                          if (meetingVisibility.value ==
+                                  MeetingVisibility.private &&
+                              selectedUsers.value.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('私有会议必须选择至少一名用户'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            isValid = false;
+                          }
+
+                          if (isValid) {
                             // 调用创建会议方法
                             final notifier = ref.read(
                               createMeetingProvider.notifier,
@@ -423,7 +576,10 @@ class CreateMeetingPage extends HookConsumerWidget {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: isStartTime ? DateTime.now() : dateTimeNotifier.value,
+      firstDate:
+          isStartTime
+              ? DateTime.now() // 开始时间不早于当前时间
+              : DateTime.now(), // 结束时间不早于当前时间（实际使用时应该不早于开始时间，但这里简化处理）
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
 
@@ -526,4 +682,30 @@ class User {
   final String name;
 
   User({required this.id, required this.name});
+}
+
+// 获取会议类型文本
+String getMeetingTypeText(MeetingType type) {
+  switch (type) {
+    case MeetingType.regular:
+      return '常规会议';
+    case MeetingType.training:
+      return '培训会议';
+    case MeetingType.interview:
+      return '面试会议';
+    case MeetingType.other:
+      return '其他类型';
+  }
+}
+
+// 获取会议可见性文本
+String getMeetingVisibilityText(MeetingVisibility visibility) {
+  switch (visibility) {
+    case MeetingVisibility.public:
+      return '公开会议';
+    case MeetingVisibility.searchable:
+      return '可搜索会议';
+    case MeetingVisibility.private:
+      return '私有会议';
+  }
 }
