@@ -38,10 +38,45 @@ class MeetingSettingsPage extends HookConsumerWidget {
           }
 
           // 检查会议状态 - 只允许在即将开始或进行中的会议中修改设置
-          if (meeting.status == MeetingStatus.completed ||
-              meeting.status == MeetingStatus.cancelled) {
+          if (meeting.status == MeetingStatus.completed) {
             return Center(
               child: Text('无法修改${getMeetingStatusText(meeting.status)}的会议设置'),
+            );
+          }
+
+          // 对已取消的会议显示特别的提示
+          if (meeting.status == MeetingStatus.cancelled) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.cancel_outlined,
+                    size: 64,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '会议已被取消',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '无法修改已取消的会议设置',
+                    style: TextStyle(color: Colors.red.shade700),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('返回'),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             );
           }
 

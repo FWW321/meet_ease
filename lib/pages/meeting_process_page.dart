@@ -37,6 +37,46 @@ class MeetingProcessPage extends HookConsumerWidget {
     // 是否为已结束的会议
     final isCompletedMeeting = meeting.status == MeetingStatus.completed;
 
+    // 检查会议是否已取消
+    final isCancelledMeeting = meeting.status == MeetingStatus.cancelled;
+
+    // 如果会议已取消，显示无法进入提示并返回
+    if (isCancelledMeeting) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('无法进入会议'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cancel_outlined, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                '会议已被取消',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '此会议已被取消，无法进入',
+                style: TextStyle(color: Colors.red.shade700),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('返回'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // 获取当前用户ID
     final currentUserId = ref.watch(currentUserIdProvider);
 

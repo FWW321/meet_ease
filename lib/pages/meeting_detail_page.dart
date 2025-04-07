@@ -95,6 +95,9 @@ class MeetingDetailPage extends ConsumerWidget {
           // 获取当前用户的权限
           final userPermission = meeting.getUserPermission(currentUserId);
 
+          // 检查会议是否已取消
+          final isCancelled = meeting.status == MeetingStatus.cancelled;
+
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -165,10 +168,48 @@ class MeetingDetailPage extends ConsumerWidget {
               // 会议参与者（显示创建者和管理员标识）
               _buildParticipantsList(context, ref, meeting),
 
+              // 如果会议已取消，显示取消原因
+              if (isCancelled)
+                Container(
+                  margin: const EdgeInsets.only(top: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '此会议已取消',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '会议已被取消，无法进入或修改会议设置。',
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ],
+                  ),
+                ),
+
               const SizedBox(height: 32),
 
-              // 权限管理按钮 - 只对管理员在未结束的会议中显示
-              if (canConfigureMeeting)
+              // 权限管理按钮 - 只对管理员在未结束且未取消的会议中显示
+              if (canConfigureMeeting && !isCancelled)
                 ElevatedButton.icon(
                   icon: const Icon(Icons.admin_panel_settings),
                   label: const Text('权限管理'),
@@ -180,25 +221,27 @@ class MeetingDetailPage extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
-              // 进入会议按钮
-              ElevatedButton(
-                onPressed:
+              // 进入会议按钮 - 已取消的会议无法进入
+              if (!isCancelled)
+                ElevatedButton(
+                  onPressed:
+                      meeting.status == MeetingStatus.upcoming ||
+                              meeting.status == MeetingStatus.cancelled
+                          ? null // 即将开始或已取消的会议禁用按钮
+                          : () => _joinMeeting(context, meeting),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    disabledBackgroundColor: Colors.grey[300],
+                    disabledForegroundColor: Colors.grey[600],
+                  ),
+                  child: Text(
                     meeting.status == MeetingStatus.upcoming
-                        ? null // 即将开始的会议禁用按钮
-                        : () => _joinMeeting(context, meeting),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  disabledBackgroundColor: Colors.grey[300],
-                  disabledForegroundColor: Colors.grey[600],
+                        ? '会议即将开始，暂不可进入'
+                        : '进入会议',
+                  ),
                 ),
-                child: Text(
-                  meeting.status == MeetingStatus.upcoming
-                      ? '会议即将开始，暂不可进入'
-                      : '进入会议',
-                ),
-              ),
             ],
           );
         },
@@ -223,6 +266,17 @@ class MeetingDetailPage extends ConsumerWidget {
 
   // 进入会议
   Future<void> _joinMeeting(BuildContext context, Meeting meeting) async {
+    // 如果会议已取消，不允许进入
+    if (meeting.status == MeetingStatus.cancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('会议已取消，无法进入'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // 检查会议是否需要密码
     if (meeting.password != null && meeting.password!.isNotEmpty) {
       // 显示密码验证对话框
