@@ -5,10 +5,15 @@ import '../models/meeting_agenda.dart';
 import '../providers/meeting_process_providers.dart';
 
 /// 会议议程列表组件
-class AgendaListWidget extends HookConsumerWidget {
+class AgendaListWidget extends ConsumerWidget {
   final String meetingId;
+  final bool isReadOnly;
 
-  const AgendaListWidget({required this.meetingId, super.key});
+  const AgendaListWidget({
+    required this.meetingId,
+    this.isReadOnly = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

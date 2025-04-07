@@ -12,12 +12,14 @@ class ChatWidget extends HookConsumerWidget {
   final String userId;
   final String userName;
   final String? userAvatar;
+  final bool isReadOnly;
 
   const ChatWidget({
     required this.meetingId,
     required this.userId,
     required this.userName,
     this.userAvatar,
+    this.isReadOnly = false,
     super.key,
   });
 
@@ -420,78 +422,94 @@ class ChatWidget extends HookConsumerWidget {
           ),
 
         // 输入框
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(26),
-                offset: const Offset(0, -1),
-                blurRadius: 3,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // 表情按钮
-              IconButton(
-                icon: Icon(
-                  Icons.emoji_emotions_outlined,
-                  color: showEmojiPicker.value ? Colors.blue : null,
+        if (!isReadOnly)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(26),
+                  offset: const Offset(0, -1),
+                  blurRadius: 3,
                 ),
-                onPressed: () {
-                  focusNode.unfocus();
-                  showEmojiPicker.value = !showEmojiPicker.value;
-                },
-                tooltip: '表情',
-              ),
-
-              // 语音/文本输入切换按钮
-              IconButton(
-                icon: const Icon(Icons.mic),
-                onPressed: isRecording.value ? stopRecording : startRecording,
-                color: isRecording.value ? Colors.red : null,
-                tooltip: isRecording.value ? '停止录音' : '开始录音',
-              ),
-
-              // 文本输入框
-              Expanded(
-                child: TextField(
-                  controller: textController,
-                  focusNode: focusNode,
-                  enabled: !isRecording.value,
-                  decoration: InputDecoration(
-                    hintText: isRecording.value ? '正在录音...' : '输入消息...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // 表情按钮
+                IconButton(
+                  icon: Icon(
+                    Icons.emoji_emotions_outlined,
+                    color: showEmojiPicker.value ? Colors.blue : null,
                   ),
-                  maxLines: 5,
-                  minLines: 1,
-                  textInputAction: TextInputAction.newline,
-                  onSubmitted:
-                      isRecording.value ? null : (_) => sendTextMessage(),
+                  onPressed: () {
+                    focusNode.unfocus();
+                    showEmojiPicker.value = !showEmojiPicker.value;
+                  },
+                  tooltip: '表情',
                 ),
-              ),
 
-              // 发送按钮
-              IconButton(
-                icon: const Icon(Icons.send),
-                color: Colors.blue,
-                onPressed: isRecording.value ? null : sendTextMessage,
-                tooltip: '发送',
-              ),
-            ],
+                // 语音/文本输入切换按钮
+                IconButton(
+                  icon: const Icon(Icons.mic),
+                  onPressed: isRecording.value ? stopRecording : startRecording,
+                  color: isRecording.value ? Colors.red : null,
+                  tooltip: isRecording.value ? '停止录音' : '开始录音',
+                ),
+
+                // 文本输入框
+                Expanded(
+                  child: TextField(
+                    controller: textController,
+                    focusNode: focusNode,
+                    enabled: !isRecording.value,
+                    decoration: InputDecoration(
+                      hintText: isRecording.value ? '正在录音...' : '输入消息...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade100,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                    maxLines: 5,
+                    minLines: 1,
+                    textInputAction: TextInputAction.newline,
+                    onSubmitted:
+                        isRecording.value ? null : (_) => sendTextMessage(),
+                  ),
+                ),
+
+                // 发送按钮
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  color: Colors.blue,
+                  onPressed: isRecording.value ? null : sendTextMessage,
+                  tooltip: '发送',
+                ),
+              ],
+            ),
           ),
-        ),
+
+        // 只读模式提示
+        if (isReadOnly)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              border: Border(top: BorderSide(color: Colors.grey.shade300)),
+            ),
+            child: const Text(
+              '此会议已结束，无法发送新消息',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
       ],
     );
   }

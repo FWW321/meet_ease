@@ -5,10 +5,15 @@ import '../models/meeting_note.dart';
 import '../providers/meeting_process_providers.dart';
 
 /// 会议笔记列表组件
-class NotesListWidget extends HookConsumerWidget {
+class NotesListWidget extends ConsumerWidget {
   final String meetingId;
+  final bool isReadOnly;
 
-  const NotesListWidget({required this.meetingId, super.key});
+  const NotesListWidget({
+    required this.meetingId,
+    this.isReadOnly = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

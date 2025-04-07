@@ -93,48 +93,25 @@ class MeetingDetailPage extends ConsumerWidget {
           Center(
             child: Column(
               children: [
-                // 签到按钮
-                if (meeting.status == MeetingStatus.upcoming ||
-                    meeting.status == MeetingStatus.ongoing)
-                  signInStatusAsync.when(
-                    data:
-                        (isSignedIn) =>
-                            isSignedIn
-                                ? const Chip(
-                                  label: Text('已签到'),
-                                  backgroundColor: Colors.green,
-                                  labelStyle: TextStyle(color: Colors.white),
-                                )
-                                : ElevatedButton(
-                                  onPressed: () => _signIn(context, ref),
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size(200, 45),
-                                  ),
-                                  child: const Text('签到'),
-                                ),
-                    loading: () => const CircularProgressIndicator(),
-                    error:
-                        (error, _) => TextButton(
-                          onPressed: () => _signIn(context, ref),
-                          child: const Text('重试签到'),
-                        ),
-                  ),
-
-                const SizedBox(height: 16),
-
-                // 会议过程管理按钮 - 对于进行中或已签到的会议显示
+                // 会议过程管理按钮 - 仅对进行中或已结束的会议显示
                 if (meeting.status == MeetingStatus.ongoing ||
-                    (meeting.isSignedIn &&
-                        meeting.status != MeetingStatus.cancelled))
+                    meeting.status == MeetingStatus.completed)
                   ElevatedButton.icon(
                     onPressed:
                         () => _navigateToMeetingProcess(context, meeting),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(200, 45),
-                      backgroundColor: Colors.blue,
+                      backgroundColor:
+                          meeting.status == MeetingStatus.ongoing
+                              ? Colors.blue
+                              : Colors.grey,
                     ),
                     icon: const Icon(Icons.meeting_room),
-                    label: const Text('进入会议'),
+                    label: Text(
+                      meeting.status == MeetingStatus.ongoing
+                          ? '进入会议'
+                          : '查看会议记录',
+                    ),
                   ),
               ],
             ),
@@ -170,24 +147,6 @@ class MeetingDetailPage extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  // 签到方法
-  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
-    try {
-      await ref.read(meetingSignInProvider(meetingId).notifier).signIn();
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('签到成功')));
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('签到失败: ${e.toString()}')));
-      }
-    }
   }
 
   // 导航到会议过程管理页面

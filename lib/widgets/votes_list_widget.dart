@@ -5,10 +5,15 @@ import '../models/meeting_vote.dart';
 import '../providers/meeting_process_providers.dart';
 
 /// 会议投票列表组件
-class VotesListWidget extends HookConsumerWidget {
+class VotesListWidget extends ConsumerWidget {
   final String meetingId;
+  final bool isReadOnly;
 
-  const VotesListWidget({required this.meetingId, super.key});
+  const VotesListWidget({
+    required this.meetingId,
+    this.isReadOnly = false,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
