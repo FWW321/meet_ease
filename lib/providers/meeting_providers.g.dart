@@ -775,5 +775,26 @@ class _MeetingSignInProviderElement
   String get meetingId => (origin as MeetingSignInProvider).meetingId;
 }
 
+String _$meetingOperationsHash() => r'cbe8d4759a778772c85e52306014150a3e2bdc0a';
+
+/// 会议管理操作提供者
+///
+/// Copied from [MeetingOperations].
+@ProviderFor(MeetingOperations)
+final meetingOperationsProvider = AutoDisposeNotifierProvider<
+  MeetingOperations,
+  AsyncValue<Meeting?>
+>.internal(
+  MeetingOperations.new,
+  name: r'meetingOperationsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$meetingOperationsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+typedef _$MeetingOperations = AutoDisposeNotifier<AsyncValue<Meeting?>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

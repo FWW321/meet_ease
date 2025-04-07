@@ -156,3 +156,57 @@ class MeetingSignIn extends _$MeetingSignIn {
     }
   }
 }
+
+/// 会议管理操作提供者
+@riverpod
+class MeetingOperations extends _$MeetingOperations {
+  @override
+  AsyncValue<Meeting?> build() {
+    // 初始状态为未加载
+    return const AsyncValue.data(null);
+  }
+
+  // 取消会议
+  Future<Meeting> cancelMeeting(String meetingId, String creatorId) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final meetingService = ref.read(meetingServiceProvider);
+      final meeting = await meetingService.cancelMeeting(meetingId, creatorId);
+
+      // 更新状态
+      state = AsyncValue.data(meeting);
+
+      // 刷新相关数据
+      ref.invalidate(meetingListProvider);
+      ref.invalidate(meetingDetailProvider(meetingId));
+
+      return meeting;
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+      throw e;
+    }
+  }
+
+  // 结束会议
+  Future<Meeting> endMeeting(String meetingId, String creatorId) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final meetingService = ref.read(meetingServiceProvider);
+      final meeting = await meetingService.endMeeting(meetingId, creatorId);
+
+      // 更新状态
+      state = AsyncValue.data(meeting);
+
+      // 刷新相关数据
+      ref.invalidate(meetingListProvider);
+      ref.invalidate(meetingDetailProvider(meetingId));
+
+      return meeting;
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+      throw e;
+    }
+  }
+}

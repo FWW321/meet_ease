@@ -62,6 +62,12 @@ abstract class MeetingService {
     List<String> allowedUsers = const [],
     String? password,
   });
+
+  /// 取消会议 - 仅即将开始的会议可取消，只有创建者有权限
+  Future<Meeting> cancelMeeting(String meetingId, String creatorId);
+
+  /// 结束会议 - 仅进行中的会议可结束，只有创建者有权限
+  Future<Meeting> endMeeting(String meetingId, String creatorId);
 }
 
 /// 模拟会议服务实现
@@ -443,6 +449,70 @@ class MockMeetingService implements MeetingService {
       throw Exception('会议不存在');
     }
   }
+
+  @override
+  Future<Meeting> cancelMeeting(String meetingId, String creatorId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index == -1) {
+      throw Exception('会议不存在');
+    }
+
+    final meeting = _meetings[index];
+
+    // 检查创建者权限
+    if (meeting.organizerId != creatorId) {
+      throw Exception('只有会议创建者才能取消会议');
+    }
+
+    // 检查会议状态
+    if (meeting.status != MeetingStatus.upcoming) {
+      throw Exception('只有即将开始的会议可以取消');
+    }
+
+    // 更新会议状态为已取消
+    final updatedMeeting = meeting.copyWith(
+      status: MeetingStatus.cancelled,
+      updatedAt: DateTime.now(),
+    );
+
+    _meetings[index] = updatedMeeting;
+    return updatedMeeting;
+  }
+
+  @override
+  Future<Meeting> endMeeting(String meetingId, String creatorId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index == -1) {
+      throw Exception('会议不存在');
+    }
+
+    final meeting = _meetings[index];
+
+    // 检查创建者权限
+    if (meeting.organizerId != creatorId) {
+      throw Exception('只有会议创建者才能结束会议');
+    }
+
+    // 检查会议状态
+    if (meeting.status != MeetingStatus.ongoing) {
+      throw Exception('只有进行中的会议可以结束');
+    }
+
+    // 更新会议状态为已结束
+    final updatedMeeting = meeting.copyWith(
+      status: MeetingStatus.completed,
+      updatedAt: DateTime.now(),
+    );
+
+    _meetings[index] = updatedMeeting;
+    return updatedMeeting;
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -549,6 +619,18 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<void> updateMeetingPassword(String meetingId, String? password) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<Meeting> cancelMeeting(String meetingId, String creatorId) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<Meeting> endMeeting(String meetingId, String creatorId) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');
   }

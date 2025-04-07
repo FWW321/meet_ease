@@ -207,6 +207,17 @@ class MeetingProcessPage extends HookConsumerWidget {
               menuItems.add(
                 const PopupMenuItem(value: 'invite', child: Text('邀请参会者')),
               );
+
+              // 创建者可以结束进行中的会议
+              if (meeting.isCreatorOnly(currentUserId) &&
+                  meeting.status == MeetingStatus.ongoing) {
+                menuItems.add(
+                  const PopupMenuItem(
+                    value: 'end_meeting',
+                    child: Text('结束会议', style: TextStyle(color: Colors.red)),
+                  ),
+                );
+              }
             }
 
             // 添加退出会议选项
@@ -221,6 +232,9 @@ class MeetingProcessPage extends HookConsumerWidget {
             switch (value) {
               case 'invite':
                 // 实现邀请参会者功能
+                break;
+              case 'end_meeting':
+                _showEndMeetingConfirmDialog(context, ref, currentUserId);
                 break;
               case 'exit':
                 Navigator.of(context).pop();
@@ -565,7 +579,7 @@ class MeetingProcessPage extends HookConsumerWidget {
     WidgetRef ref,
   ) {
     // 获取WebRTC参会人员列表，保持与主页面显示的参会人员一致
-    final webRTCParticipantsAsync = ref.watch(webRTCParticipantsProvider);
+    final rtcParticipantsAsync = ref.watch(webRTCParticipantsProvider);
 
     return Container(
       color: Colors.white,
@@ -631,7 +645,7 @@ class MeetingProcessPage extends HookConsumerWidget {
           const SizedBox(height: 8),
 
           Expanded(
-            child: webRTCParticipantsAsync.when(
+            child: rtcParticipantsAsync.when(
               data: (participants) {
                 if (participants.isEmpty) {
                   return const Center(
@@ -919,6 +933,82 @@ class MeetingProcessPage extends HookConsumerWidget {
           const Divider(height: 16),
         ],
       ),
+    );
+  }
+
+  // 显示结束会议确认对话框
+  void _showEndMeetingConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String currentUserId,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('结束会议'),
+            content: const Text('确认要结束此会议吗？此操作不可撤销，所有参会者将收到会议已结束的通知。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+
+                  // 显示加载指示器
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) =>
+                            const Center(child: CircularProgressIndicator()),
+                  );
+
+                  try {
+                    // 调用结束会议服务
+                    final meetingService = ref.read(meetingServiceProvider);
+                    await meetingService.endMeeting(meetingId, currentUserId);
+
+                    // 刷新会议详情
+                    ref.invalidate(meetingDetailProvider(meetingId));
+
+                    if (context.mounted) {
+                      // 关闭加载指示器
+                      Navigator.of(context).pop();
+
+                      // 显示成功提示
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('会议已成功结束'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+
+                      // 返回会议列表
+                      Navigator.of(context).pop();
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      // 关闭加载指示器
+                      Navigator.of(context).pop();
+
+                      // 显示错误提示
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('结束会议失败: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('确定结束'),
+              ),
+            ],
+          ),
     );
   }
 }

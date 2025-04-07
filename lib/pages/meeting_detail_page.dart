@@ -23,7 +23,45 @@ class MeetingDetailPage extends ConsumerWidget {
     final currentUserId = ref.watch(currentUserIdProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('会议详情')),
+      appBar: AppBar(
+        title: const Text('会议详情'),
+        actions: [
+          // 右上角操作菜单
+          meetingAsync.when(
+            data: (meeting) {
+              // 只有创建者可以看到更多操作按钮
+              if (meeting.isCreatorOnly(currentUserId)) {
+                return PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'cancel' &&
+                        meeting.status == MeetingStatus.upcoming) {
+                      _showCancelConfirmDialog(context, ref, currentUserId);
+                    }
+                  },
+                  itemBuilder: (context) {
+                    final items = <PopupMenuItem<String>>[];
+
+                    // 只有即将开始的会议可以取消
+                    if (meeting.status == MeetingStatus.upcoming) {
+                      items.add(
+                        const PopupMenuItem(
+                          value: 'cancel',
+                          child: Text('取消会议'),
+                        ),
+                      );
+                    }
+
+                    return items;
+                  },
+                );
+              }
+              return const SizedBox.shrink();
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
+        ],
+      ),
       body: meetingAsync.when(
         data: (meeting) {
           // 检查用户是否被拉黑
@@ -425,5 +463,78 @@ class MeetingDetailPage extends ConsumerWidget {
       case MeetingPermission.blocked:
         return Colors.red;
     }
+  }
+
+  // 显示取消会议确认对话框
+  void _showCancelConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String creatorId,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('取消会议'),
+            content: const Text('确定要取消此会议吗？此操作不可撤销，所有参会者将收到会议取消的通知。'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+
+                  // 显示加载指示器
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) =>
+                            const Center(child: CircularProgressIndicator()),
+                  );
+
+                  try {
+                    // 调用取消会议服务
+                    final meetingService = ref.read(meetingServiceProvider);
+                    await meetingService.cancelMeeting(meetingId, creatorId);
+
+                    // 刷新会议详情
+                    ref.invalidate(meetingDetailProvider(meetingId));
+
+                    if (context.mounted) {
+                      // 关闭加载指示器
+                      Navigator.of(context).pop();
+
+                      // 显示成功提示
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('会议已成功取消'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      // 关闭加载指示器
+                      Navigator.of(context).pop();
+
+                      // 显示错误提示
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('取消会议失败: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('确定取消'),
+              ),
+            ],
+          ),
+    );
   }
 }
