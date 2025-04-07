@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/meeting.dart';
+import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../widgets/meeting_password_dialog.dart';
@@ -113,20 +114,6 @@ class MeetingDetailPage extends ConsumerWidget {
                   icon: Icons.access_time_filled,
                 ),
                 _buildInfoItem('地点', meeting.location, icon: Icons.location_on),
-              ]),
-
-              // 组织信息
-              _buildInfoCard([
-                _buildInfoItem(
-                  '组织者',
-                  meeting.organizerName,
-                  icon: Icons.person,
-                ),
-                _buildInfoItem(
-                  '预计参会人数',
-                  '${meeting.participantCount}人',
-                  icon: Icons.people,
-                ),
                 // 如果是可搜索会议，显示会议码
                 if (meeting.visibility == MeetingVisibility.searchable)
                   _buildInfoItem(
@@ -233,6 +220,12 @@ class MeetingDetailPage extends ConsumerWidget {
     Meeting meeting,
   ) {
     final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final canManageMeeting = meeting.canUserManage(currentUserId);
+
+    // 决定标题文字
+    final titleText =
+        meeting.visibility == MeetingVisibility.private ? '允许参加的人员' : '组织者和管理员';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -241,45 +234,94 @@ class MeetingDetailPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '参会人员',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  titleText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // 私有会议且用户是管理员时，显示管理按钮
+                if (meeting.visibility == MeetingVisibility.private &&
+                    canManageMeeting)
+                  TextButton.icon(
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('管理'),
+                    onPressed: () {
+                      // TODO: 实现添加/删除参会人员的功能
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('管理参会人员功能即将上线')),
+                      );
+                    },
+                  ),
+              ],
             ),
             const SizedBox(height: 16),
             participantsAsync.when(
-              data:
-                  (participants) => Column(
-                    children:
-                        participants.map((user) {
-                          // 确定用户角色标签
-                          Widget? roleTag;
-                          if (user.id == meeting.organizerId) {
-                            roleTag = _buildRoleTag('创建者', Colors.orange);
-                          } else if (meeting.admins.contains(user.id)) {
-                            roleTag = _buildRoleTag('管理员', Colors.blue);
-                          }
+              data: (participants) {
+                // 根据会议可见性筛选要显示的参与者
+                List<User> filteredParticipants;
 
-                          return ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Theme.of(
-                                context,
-                              ).primaryColor.withOpacity(0.2),
-                              child: Text(
-                                user.name.isNotEmpty
-                                    ? user.name[0].toUpperCase()
-                                    : '?',
-                                style: TextStyle(
-                                  color: Theme.of(context).primaryColor,
-                                ),
+                if (meeting.visibility == MeetingVisibility.private) {
+                  // 私有会议: 显示所有允许参与的人员
+                  filteredParticipants = participants;
+                } else {
+                  // 公开/可搜索会议: 只显示创建者和管理员
+                  filteredParticipants =
+                      participants
+                          .where(
+                            (user) =>
+                                user.id! == meeting.organizerId ||
+                                meeting.admins.contains(user.id!),
+                          )
+                          .toList();
+                }
+
+                if (filteredParticipants.isEmpty) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24.0),
+                      child: Text('暂无数据', style: TextStyle(color: Colors.grey)),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children:
+                      filteredParticipants.map((user) {
+                        // 确定用户角色标签
+                        Widget? roleTag;
+                        if (user.id! == meeting.organizerId) {
+                          roleTag = _buildRoleTag('创建者', Colors.orange);
+                        } else if (meeting.admins.contains(user.id!)) {
+                          roleTag = _buildRoleTag('管理员', Colors.blue);
+                        }
+
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.2),
+                            child: Text(
+                              user.name!.isNotEmpty
+                                  ? user.name![0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
                               ),
                             ),
-                            title: Text(user.name),
-                            subtitle:
-                                user.email.isNotEmpty ? Text(user.email) : null,
-                            trailing: roleTag,
-                          );
-                        }).toList(),
-                  ),
+                          ),
+                          title: Text(user.name!),
+                          subtitle:
+                              user.email!.isNotEmpty ? Text(user.email!) : null,
+                          trailing: roleTag,
+                        );
+                      }).toList(),
+                );
+              },
               loading:
                   () => const Center(
                     child: Padding(
