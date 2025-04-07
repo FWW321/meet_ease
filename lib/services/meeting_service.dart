@@ -21,6 +21,9 @@ abstract class MeetingService {
   /// 验证会议密码
   Future<bool> validateMeetingPassword(String meetingId, String password);
 
+  /// 更新会议密码
+  Future<void> updateMeetingPassword(String meetingId, String? password);
+
   /// 获取会议参与者
   Future<List<User>> getMeetingParticipants(String meetingId);
 
@@ -399,6 +402,22 @@ class MockMeetingService implements MeetingService {
       return false;
     }
   }
+
+  @override
+  Future<void> updateMeetingPassword(String meetingId, String? password) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final index = _meetings.indexWhere((m) => m.id == meetingId);
+    if (index != -1) {
+      _meetings[index] = _meetings[index].copyWith(
+        password: password,
+        updatedAt: DateTime.now(),
+      );
+    } else {
+      throw Exception('会议不存在');
+    }
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -499,6 +518,12 @@ class ApiMeetingService implements MeetingService {
     String meetingId,
     String password,
   ) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<void> updateMeetingPassword(String meetingId, String? password) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');
   }

@@ -140,6 +140,9 @@ class _MeetingInfoTab extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 获取会议ID
+    final meetingId = meeting.id;
+
     // 标题控制器
     final titleController = useTextEditingController(text: meeting.title);
     final descriptionController = useTextEditingController(
@@ -147,12 +150,123 @@ class _MeetingInfoTab extends HookConsumerWidget {
     );
     final locationController = useTextEditingController(text: meeting.location);
 
+    // 密码相关状态
+    final passwordController = useTextEditingController(
+      text: meeting.password ?? '',
+    );
+    final enablePassword = useState(
+      meeting.password != null && meeting.password!.isNotEmpty,
+    );
+    final isUpdatingPassword = useState(false);
+    final passwordError = useState<String?>(null);
+
     // 日期选择
     final startTime = useState(meeting.startTime);
     final endTime = useState(meeting.endTime);
 
     // 会议类型
     final meetingType = useState(meeting.type);
+
+    // 构建密码设置UI
+    Widget buildPasswordSettings() {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lock, color: Colors.blue),
+              const SizedBox(width: 8.0),
+              const Text(
+                '会议密码',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0),
+              ),
+              const Spacer(),
+              Switch(
+                value: enablePassword.value,
+                onChanged: (value) {
+                  enablePassword.value = value;
+                  if (!value) {
+                    passwordController.clear();
+                    passwordError.value = null;
+                  }
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8.0),
+          if (enablePassword.value) ...[
+            TextField(
+              controller: passwordController,
+              decoration: InputDecoration(
+                labelText: '设置密码',
+                hintText: '参会者需要输入此密码才能加入会议',
+                border: const OutlineInputBorder(),
+                errorText: passwordError.value,
+                suffixIcon:
+                    isUpdatingPassword.value
+                        ? Container(
+                          width: 20.0,
+                          height: 20.0,
+                          padding: const EdgeInsets.all(8.0),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.0,
+                          ),
+                        )
+                        : IconButton(
+                          icon: const Icon(Icons.check_circle),
+                          color: Colors.green,
+                          onPressed:
+                              () => _updatePassword(
+                                context,
+                                ref,
+                                passwordController,
+                                isUpdatingPassword,
+                                passwordError,
+                              ),
+                        ),
+              ),
+              obscureText: true,
+              onSubmitted:
+                  (_) => _updatePassword(
+                    context,
+                    ref,
+                    passwordController,
+                    isUpdatingPassword,
+                    passwordError,
+                  ),
+            ),
+            const SizedBox(height: 8.0),
+            const Text(
+              '启用密码后，参会者需要输入正确的密码才能加入会议',
+              style: TextStyle(color: Colors.grey, fontSize: 12.0),
+            ),
+          ] else ...[
+            const Text(
+              '不启用密码，所有参会者可直接加入会议',
+              style: TextStyle(color: Colors.grey, fontSize: 12.0),
+            ),
+            if (meeting.password != null && meeting.password!.isNotEmpty) ...[
+              const SizedBox(height: 8.0),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.delete, size: 18.0),
+                label: const Text('删除现有密码'),
+                onPressed:
+                    () => _removePassword(
+                      context,
+                      ref,
+                      enablePassword,
+                      passwordController,
+                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[100],
+                  foregroundColor: Colors.red[800],
+                ),
+              ),
+            ],
+          ],
+        ],
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -290,6 +404,10 @@ class _MeetingInfoTab extends HookConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16.0),
+
+                // 会议密码设置
+                buildPasswordSettings(),
+                const Divider(height: 24.0),
 
                 // 权限设置
                 SwitchListTile(
@@ -505,6 +623,95 @@ class _MeetingInfoTab extends HookConsumerWidget {
             ),
           );
         });
+  }
+
+  // 更新会议密码
+  Future<void> _updatePassword(
+    BuildContext context,
+    WidgetRef ref,
+    TextEditingController passwordController,
+    ValueNotifier<bool> isUpdatingPassword,
+    ValueNotifier<String?> passwordError,
+  ) async {
+    final password = passwordController.text.trim();
+    final meetingId = meeting.id;
+
+    // 验证密码
+    if (password.isEmpty) {
+      passwordError.value = '请输入会议密码';
+      return;
+    }
+
+    // 重置错误信息
+    passwordError.value = null;
+
+    // 设置更新状态
+    isUpdatingPassword.value = true;
+
+    try {
+      // 更新会议信息，添加密码
+      final meetingService = ref.read(meetingServiceProvider);
+      await meetingService.updateMeetingPassword(meetingId, password);
+
+      // 显示成功消息
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('会议密码已更新'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // 刷新会议详情
+      ref.invalidate(meetingDetailProvider(meetingId));
+    } catch (e) {
+      // 显示错误消息
+      passwordError.value = '更新密码失败: $e';
+    } finally {
+      // 重置状态
+      isUpdatingPassword.value = false;
+    }
+  }
+
+  // 删除会议密码
+  Future<void> _removePassword(
+    BuildContext context,
+    WidgetRef ref,
+    ValueNotifier<bool> enablePassword,
+    TextEditingController passwordController,
+  ) async {
+    final meetingId = meeting.id;
+
+    try {
+      // 更新会议信息，删除密码
+      final meetingService = ref.read(meetingServiceProvider);
+      await meetingService.updateMeetingPassword(meetingId, null);
+
+      // 更新本地状态
+      enablePassword.value = false;
+      passwordController.clear();
+
+      // 显示成功消息
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('会议密码已删除'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+      // 刷新会议详情
+      ref.invalidate(meetingDetailProvider(meetingId));
+    } catch (e) {
+      // 显示错误消息
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除密码失败: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }
 
