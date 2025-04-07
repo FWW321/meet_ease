@@ -10,6 +10,8 @@ import 'pages/notification_settings_page.dart';
 import 'pages/help_center_page.dart';
 import 'pages/about_page.dart';
 import 'pages/privacy_policy_page.dart';
+import 'pages/create_meeting_page.dart';
+import 'pages/meeting_detail_page.dart';
 import 'configs/app_theme.dart';
 import 'constants/app_constants.dart';
 
@@ -62,6 +64,16 @@ class MyApp extends ConsumerWidget {
         AppConstants.helpCenterRoute: (context) => const HelpCenterPage(),
         AppConstants.aboutRoute: (context) => const AboutPage(),
         AppConstants.privacyPolicyRoute: (context) => const PrivacyPolicyPage(),
+        AppConstants.createMeetingRoute: (context) => const CreateMeetingPage(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == AppConstants.meetingDetailRoute) {
+          final meetingId = settings.arguments as String;
+          return MaterialPageRoute(
+            builder: (context) => MeetingDetailPage(meetingId: meetingId),
+          );
+        }
+        return null;
       },
     );
   }

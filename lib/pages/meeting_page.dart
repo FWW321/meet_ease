@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/meeting.dart';
 import '../providers/meeting_providers.dart';
 import '../widgets/meeting_list_item.dart';
+import '../constants/app_constants.dart';
 import 'meeting_detail_page.dart';
 
 class MeetingPage extends HookConsumerWidget {
@@ -158,11 +159,20 @@ class MeetingPage extends HookConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // 创建新会议功能
-          ScaffoldMessenger.of(
+        onPressed: () async {
+          // 导航到创建会议页面
+          final result = await Navigator.pushNamed(
             context,
-          ).showSnackBar(const SnackBar(content: Text('创建会议功能待实现')));
+            AppConstants.createMeetingRoute,
+          );
+
+          // 如果创建成功，刷新会议列表
+          if (result == true) {
+            ref.invalidate(meetingListProvider);
+            if (searchQueryState.value.isNotEmpty) {
+              ref.invalidate(searchMeetingsProvider(searchQueryState.value));
+            }
+          }
         },
         tooltip: '创建会议',
         child: const Icon(Icons.add),

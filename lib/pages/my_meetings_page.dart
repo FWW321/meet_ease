@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../providers/meeting_providers.dart';
 import '../widgets/meeting_list_item.dart';
+import '../constants/app_constants.dart';
 
 class MyMeetingsPage extends HookConsumerWidget {
   const MyMeetingsPage({super.key});
@@ -56,13 +57,29 @@ class MyMeetingsPage extends HookConsumerWidget {
                 onTap:
                     () => Navigator.pushNamed(
                       context,
-                      '/meeting_detail',
+                      AppConstants.meetingDetailRoute,
                       arguments: meeting.id,
                     ),
               );
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          // 导航到创建会议页面
+          final result = await Navigator.pushNamed(
+            context,
+            AppConstants.createMeetingRoute,
+          );
+
+          // 如果创建成功，刷新会议列表
+          if (result == true) {
+            ref.invalidate(meetingListProvider);
+            ref.invalidate(myMeetingsProvider);
+          }
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }

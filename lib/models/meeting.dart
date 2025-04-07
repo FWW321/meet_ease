@@ -16,6 +16,13 @@ enum MeetingType {
   other, // 其他
 }
 
+/// 会议可见性枚举
+enum MeetingVisibility {
+  public, // 公开会议，所有人可见且可参加
+  searchable, // 可搜索会议，需要搜索才能显示，所有人可参加
+  private, // 私有会议，只有指定人员可参加
+}
+
 /// 会议权限枚举
 enum MeetingPermission {
   creator, // 创建者
@@ -33,6 +40,7 @@ class Meeting {
   final String location;
   final MeetingStatus status;
   final MeetingType type;
+  final MeetingVisibility visibility;
   final String organizerId;
   final String organizerName;
   final String? description;
@@ -43,6 +51,7 @@ class Meeting {
   final DateTime? updatedAt;
   final List<String> admins; // 管理员 ID 列表
   final List<String> blacklist; // 黑名单 ID 列表
+  final List<String> allowedUsers; // 允许参加的用户 ID 列表（仅当visibility为private时有效）
 
   const Meeting({
     required this.id,
@@ -52,6 +61,7 @@ class Meeting {
     required this.location,
     required this.status,
     required this.type,
+    this.visibility = MeetingVisibility.public,
     required this.organizerId,
     required this.organizerName,
     this.description,
@@ -62,6 +72,7 @@ class Meeting {
     this.updatedAt,
     this.admins = const [],
     this.blacklist = const [],
+    this.allowedUsers = const [],
   });
 
   // 复制并修改对象的方法
@@ -73,6 +84,7 @@ class Meeting {
     String? location,
     MeetingStatus? status,
     MeetingType? type,
+    MeetingVisibility? visibility,
     String? organizerId,
     String? organizerName,
     String? description,
@@ -83,6 +95,7 @@ class Meeting {
     DateTime? updatedAt,
     List<String>? admins,
     List<String>? blacklist,
+    List<String>? allowedUsers,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -92,6 +105,7 @@ class Meeting {
       location: location ?? this.location,
       status: status ?? this.status,
       type: type ?? this.type,
+      visibility: visibility ?? this.visibility,
       organizerId: organizerId ?? this.organizerId,
       organizerName: organizerName ?? this.organizerName,
       description: description ?? this.description,
@@ -102,6 +116,7 @@ class Meeting {
       updatedAt: updatedAt ?? this.updatedAt,
       admins: admins ?? this.admins,
       blacklist: blacklist ?? this.blacklist,
+      allowedUsers: allowedUsers ?? this.allowedUsers,
     );
   }
 
@@ -120,8 +135,20 @@ class Meeting {
 
   // 检查用户是否能参加会议
   bool canUserJoin(String userId) {
-    final userBlacklist = blacklist;
-    return !userBlacklist.contains(userId);
+    // 在黑名单中的用户不能参加
+    if (blacklist.contains(userId)) {
+      return false;
+    }
+
+    // 对于私有会议，检查用户是否在允许列表中
+    if (visibility == MeetingVisibility.private) {
+      return organizerId == userId ||
+          admins.contains(userId) ||
+          allowedUsers.contains(userId);
+    }
+
+    // 公开和可搜索会议所有人可参加
+    return true;
   }
 
   // 检查用户是否可以管理会议
@@ -189,5 +216,17 @@ String getMeetingPermissionText(MeetingPermission permission) {
       return '参与者';
     case MeetingPermission.blocked:
       return '已封禁';
+  }
+}
+
+// 获取会议可见性文本
+String getMeetingVisibilityText(MeetingVisibility visibility) {
+  switch (visibility) {
+    case MeetingVisibility.public:
+      return '公开会议';
+    case MeetingVisibility.searchable:
+      return '可搜索会议';
+    case MeetingVisibility.private:
+      return '私有会议';
   }
 }

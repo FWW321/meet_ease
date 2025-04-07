@@ -464,6 +464,25 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
+String _$createMeetingHash() => r'8f9c071d61af6801c0e744f6cc1a9eb27639e7a7';
+
+/// 创建会议提供者
+///
+/// Copied from [CreateMeeting].
+@ProviderFor(CreateMeeting)
+final createMeetingProvider =
+    AutoDisposeAsyncNotifierProvider<CreateMeeting, Meeting?>.internal(
+      CreateMeeting.new,
+      name: r'createMeetingProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$createMeetingHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$CreateMeeting = AutoDisposeAsyncNotifier<Meeting?>;
 String _$meetingSignInHash() => r'13a9e8bdd98df69399b56808d66a5a2a5f107e03';
 
 abstract class _$MeetingSignIn extends BuildlessAutoDisposeAsyncNotifier<bool> {

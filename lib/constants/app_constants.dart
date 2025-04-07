@@ -24,6 +24,8 @@ class AppConstants {
   static const String helpCenterRoute = '/help_center';
   static const String aboutRoute = '/about';
   static const String privacyPolicyRoute = '/privacy_policy';
+  static const String createMeetingRoute = '/create_meeting';
+  static const String meetingDetailRoute = '/meeting_detail';
 
   /// 动画时长
   static const Duration shortAnimationDuration = Duration(milliseconds: 200);

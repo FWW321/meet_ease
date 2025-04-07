@@ -43,6 +43,18 @@ abstract class MeetingService {
     DateTime? endTime,
     MeetingType? type,
   });
+
+  /// 创建会议
+  Future<Meeting> createMeeting({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String location,
+    required MeetingType type,
+    required MeetingVisibility visibility,
+    String? description,
+    List<String> allowedUsers = const [],
+  });
 }
 
 /// 模拟会议服务实现
@@ -321,6 +333,51 @@ class MockMeetingService implements MeetingService {
       throw Exception('会议不存在');
     }
   }
+
+  @override
+  Future<Meeting> createMeeting({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String location,
+    required MeetingType type,
+    required MeetingVisibility visibility,
+    String? description,
+    List<String> allowedUsers = const [],
+  }) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 创建新会议ID（简单实现，实际应用中可能需要更复杂的ID生成逻辑）
+    final newId =
+        '${_meetings.length + 1}${DateTime.now().millisecondsSinceEpoch}';
+
+    // 创建新会议
+    final newMeeting = Meeting(
+      id: newId,
+      title: title,
+      startTime: startTime,
+      endTime: endTime,
+      location: location,
+      status: MeetingStatus.upcoming, // 新创建的会议默认为即将开始
+      type: type,
+      visibility: visibility,
+      organizerId: 'user1', // 假设当前用户ID，实际中应该从认证服务中获取
+      organizerName: '张三', // 假设当前用户名，实际中应该从认证服务中获取
+      description: description,
+      participantCount: 1, // 初始只有创建者
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      admins: const [],
+      blacklist: const [],
+      allowedUsers: allowedUsers,
+    );
+
+    // 将新会议添加到列表中
+    _meetings.add(newMeeting);
+
+    return newMeeting;
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -395,6 +452,21 @@ class ApiMeetingService implements MeetingService {
     DateTime? startTime,
     DateTime? endTime,
     MeetingType? type,
+  }) async {
+    // TODO: 使用HTTP客户端调用后端API
+    throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<Meeting> createMeeting({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String location,
+    required MeetingType type,
+    required MeetingVisibility visibility,
+    String? description,
+    List<String> allowedUsers = const [],
   }) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');

@@ -47,6 +47,54 @@ Future<List<User>> meetingParticipants(Ref ref, String meetingId) async {
   return meetingService.getMeetingParticipants(meetingId);
 }
 
+/// 创建会议提供者
+@riverpod
+class CreateMeeting extends _$CreateMeeting {
+  @override
+  FutureOr<Meeting?> build() {
+    // 初始状态为null，表示没有创建会议
+    return null;
+  }
+
+  Future<Meeting> create({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    required String location,
+    required MeetingType type,
+    required MeetingVisibility visibility,
+    String? description,
+    List<String> allowedUsers = const [],
+  }) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final meetingService = ref.read(meetingServiceProvider);
+      final meeting = await meetingService.createMeeting(
+        title: title,
+        startTime: startTime,
+        endTime: endTime,
+        location: location,
+        type: type,
+        visibility: visibility,
+        description: description,
+        allowedUsers: allowedUsers,
+      );
+
+      // 创建成功后更新状态
+      state = AsyncValue.data(meeting);
+
+      // 刷新相关提供者
+      ref.invalidate(meetingListProvider);
+
+      return meeting;
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+      throw e;
+    }
+  }
+}
+
 /// 会议签到提供者
 @riverpod
 class MeetingSignIn extends _$MeetingSignIn {
