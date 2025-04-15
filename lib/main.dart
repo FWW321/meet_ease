@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'widgets/auth_checker.dart';
 import 'pages/login_page.dart';
+import 'pages/register_page.dart';
 import 'pages/my_meetings_page.dart';
 import 'pages/profile_settings_page.dart';
 import 'pages/account_security_page.dart';
@@ -18,6 +19,9 @@ import 'constants/app_constants.dart';
 Future<void> main() async {
   try {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // 加载保存的服务器地址
+    await AppConstants.loadApiDomain();
 
     // 设置优选方向
     await SystemChrome.setPreferredOrientations([
@@ -54,6 +58,7 @@ class MyApp extends ConsumerWidget {
       home: const AuthChecker(),
       routes: {
         AppConstants.loginRoute: (context) => const LoginPage(),
+        AppConstants.registerRoute: (context) => const RegisterPage(),
         AppConstants.myMeetingsRoute: (context) => const MyMeetingsPage(),
         AppConstants.profileSettingsRoute:
             (context) => const ProfileSettingsPage(),

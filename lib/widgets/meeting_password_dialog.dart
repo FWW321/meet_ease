@@ -6,8 +6,7 @@ import '../providers/meeting_providers.dart';
 class MeetingPasswordDialog extends ConsumerStatefulWidget {
   final String meetingId;
 
-  const MeetingPasswordDialog({Key? key, required this.meetingId})
-    : super(key: key);
+  const MeetingPasswordDialog({super.key, required this.meetingId});
 
   @override
   ConsumerState<MeetingPasswordDialog> createState() =>

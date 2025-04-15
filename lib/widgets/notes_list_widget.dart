@@ -208,7 +208,7 @@ class NotesListWidget extends ConsumerWidget {
                               fontSize: 12,
                               color: Colors.blue,
                             ),
-                            backgroundColor: Colors.blue.withOpacity(0.1),
+                            backgroundColor: Colors.blue.withValues(alpha: 0.1),
                             visualDensity: VisualDensity.compact,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,

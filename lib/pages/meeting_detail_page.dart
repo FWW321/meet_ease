@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../models/meeting.dart';
 import '../models/user.dart';
 import '../providers/meeting_providers.dart';
@@ -12,8 +11,7 @@ import 'meeting_settings_page.dart';
 class MeetingDetailPage extends ConsumerWidget {
   final String meetingId;
 
-  const MeetingDetailPage({required this.meetingId, Key? key})
-    : super(key: key);
+  const MeetingDetailPage({required this.meetingId, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -174,9 +172,9 @@ class MeetingDetailPage extends ConsumerWidget {
                   margin: const EdgeInsets.only(top: 24),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(color: Colors.red.withAlpha(76)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,8 +364,8 @@ class MeetingDetailPage extends ConsumerWidget {
                       participants
                           .where(
                             (user) =>
-                                user.id! == meeting.organizerId ||
-                                meeting.admins.contains(user.id!),
+                                user.id == meeting.organizerId ||
+                                meeting.admins.contains(user.id),
                           )
                           .toList();
                 }
@@ -386,9 +384,9 @@ class MeetingDetailPage extends ConsumerWidget {
                       filteredParticipants.map((user) {
                         // 确定用户角色标签
                         Widget? roleTag;
-                        if (user.id! == meeting.organizerId) {
+                        if (user.id == meeting.organizerId) {
                           roleTag = _buildRoleTag('创建者', Colors.orange);
-                        } else if (meeting.admins.contains(user.id!)) {
+                        } else if (meeting.admins.contains(user.id)) {
                           roleTag = _buildRoleTag('管理员', Colors.blue);
                         }
 
@@ -396,19 +394,19 @@ class MeetingDetailPage extends ConsumerWidget {
                           leading: CircleAvatar(
                             backgroundColor: Theme.of(
                               context,
-                            ).primaryColor.withOpacity(0.2),
+                            ).primaryColor.withAlpha(51),
                             child: Text(
-                              user.name!.isNotEmpty
-                                  ? user.name![0].toUpperCase()
+                              user.name.isNotEmpty
+                                  ? user.name[0].toUpperCase()
                                   : '?',
                               style: TextStyle(
                                 color: Theme.of(context).primaryColor,
                               ),
                             ),
                           ),
-                          title: Text(user.name!),
+                          title: Text(user.name),
                           subtitle:
-                              user.email!.isNotEmpty ? Text(user.email!) : null,
+                              user.email.isNotEmpty ? Text(user.email) : null,
                           trailing: roleTag,
                         );
                       }).toList(),
@@ -434,9 +432,9 @@ class MeetingDetailPage extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withAlpha(128)),
       ),
       child: Text(
         label,

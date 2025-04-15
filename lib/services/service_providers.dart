@@ -3,6 +3,13 @@ import 'chat_service.dart';
 import 'meeting_process_service.dart';
 import 'speech_request_service.dart';
 import 'webrtc_service.dart';
+import 'user_service.dart';
+import 'api_user_service.dart';
+
+// 用户服务提供者
+final userServiceProvider = Provider<UserService>((ref) {
+  return ApiUserService();
+});
 
 // 会议过程服务提供者
 final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {

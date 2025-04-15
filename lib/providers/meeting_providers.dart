@@ -92,7 +92,7 @@ class CreateMeeting extends _$CreateMeeting {
       return meeting;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
-      throw e;
+      rethrow;
     }
   }
 }
@@ -121,7 +121,7 @@ class ValidateMeetingPassword extends _$ValidateMeetingPassword {
       return result;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
-      throw e;
+      rethrow;
     }
   }
 }
@@ -184,7 +184,7 @@ class MeetingOperations extends _$MeetingOperations {
       return meeting;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
-      throw e;
+      rethrow;
     }
   }
 
@@ -206,7 +206,7 @@ class MeetingOperations extends _$MeetingOperations {
       return meeting;
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
-      throw e;
+      rethrow;
     }
   }
 }

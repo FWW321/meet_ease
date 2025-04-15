@@ -3,25 +3,30 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../services/auth_service.dart';
 import '../services/service_providers.dart';
-import '../pages/home_page.dart';
-import '../pages/register_page.dart';
+import '../pages/login_page.dart';
 import '../constants/app_constants.dart';
 import '../utils/server_utils.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final TextEditingController _serverAddressController =
       TextEditingController();
+
   bool _isLoading = false;
+  final int _defaultRoleId = 4; // 默认角色ID
   bool _isTestingConnection = false;
   bool _isEditingServer = false;
 
@@ -33,13 +38,16 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _serverAddressController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -47,17 +55,32 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
+      final userService = ref.read(userServiceProvider);
+      await userService.register(
+        _usernameController.text,
+        _passwordController.text,
+        _emailController.text,
+        _phoneController.text,
+        _defaultRoleId,
+      );
+
       await AuthService.saveLoginStatus(true);
+
       if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('注册成功！请登录')));
+
+      // 注册成功后跳转到登录页
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(builder: (_) => const LoginPage()),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('登录失败: ${e.toString()}')));
+      ).showSnackBar(SnackBar(content: Text('注册失败: ${e.toString()}')));
     } finally {
       if (mounted) {
         setState(() {
@@ -125,7 +148,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('登录')),
+      appBar: AppBar(title: const Text('注册')),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -137,6 +160,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextFormField(
+                    controller: _usernameController,
+                    decoration: const InputDecoration(
+                      labelText: '用户名',
+                      prefixIcon: Icon(Icons.person),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '请输入用户名';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
                       labelText: '邮箱',
@@ -146,6 +182,20 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     validator: (value) {
                       if (value == null || value.isEmpty) return '请输入邮箱';
                       if (!value.contains('@')) return '请输入有效的邮箱地址';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _phoneController,
+                    decoration: const InputDecoration(
+                      labelText: '手机号码',
+                      prefixIcon: Icon(Icons.phone),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '请输入手机号码';
+                      if (value.length != 11) return '请输入11位手机号码';
                       return null;
                     },
                   ),
@@ -164,26 +214,41 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       return null;
                     },
                   ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: '确认密码',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return '请确认密码';
+                      if (value != _passwordController.text) return '两次密码不一致';
+                      return null;
+                    },
+                  ),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
+                    onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child:
                         _isLoading
                             ? const CircularProgressIndicator()
-                            : const Text('登录', style: TextStyle(fontSize: 16)),
+                            : const Text('注册', style: TextStyle(fontSize: 16)),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      Navigator.push(
+                      Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
                       );
                     },
-                    child: const Text('没有账号？点击注册'),
+                    child: const Text('已有账号？点击登录'),
                   ),
                   const SizedBox(height: 8),
                   Row(

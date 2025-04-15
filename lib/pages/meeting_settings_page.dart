@@ -14,8 +14,7 @@ class MeetingSettingsPage extends HookConsumerWidget {
   const MeetingSettingsPage({
     required this.meetingId,
     required this.currentUserId,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -89,7 +88,7 @@ class MeetingSettingsPage extends HookConsumerWidget {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withAlpha(13),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -167,17 +166,10 @@ class _MeetingInfoTab extends HookConsumerWidget {
   final Meeting meeting;
   final String currentUserId;
 
-  const _MeetingInfoTab({
-    required this.meeting,
-    required this.currentUserId,
-    Key? key,
-  }) : super(key: key);
+  const _MeetingInfoTab({required this.meeting, required this.currentUserId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 获取会议ID
-    final meetingId = meeting.id;
-
     // 标题控制器
     final titleController = useTextEditingController(text: meeting.title);
     final descriptionController = useTextEditingController(
@@ -643,20 +635,24 @@ class _MeetingInfoTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('会议信息更新成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('会议信息更新成功'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         })
         .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('更新会议信息失败: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('更新会议信息失败: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         });
   }
 
@@ -755,11 +751,7 @@ class _AdminsTab extends HookConsumerWidget {
   final Meeting meeting;
   final String currentUserId;
 
-  const _AdminsTab({
-    required this.meeting,
-    required this.currentUserId,
-    Key? key,
-  }) : super(key: key);
+  const _AdminsTab({required this.meeting, required this.currentUserId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -918,20 +910,24 @@ class _AdminsTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('管理员添加成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('管理员添加成功'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         })
         .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('添加管理员失败: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('添加管理员失败: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         });
   }
 
@@ -943,20 +939,24 @@ class _AdminsTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('管理员移除成功'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('管理员移除成功'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         })
         .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('移除管理员失败: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('移除管理员失败: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         });
   }
 }
@@ -966,11 +966,7 @@ class _BlacklistTab extends HookConsumerWidget {
   final Meeting meeting;
   final String currentUserId;
 
-  const _BlacklistTab({
-    required this.meeting,
-    required this.currentUserId,
-    Key? key,
-  }) : super(key: key);
+  const _BlacklistTab({required this.meeting, required this.currentUserId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1116,20 +1112,24 @@ class _BlacklistTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已将用户添加到黑名单'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('已将用户添加到黑名单'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         })
         .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('添加到黑名单失败: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('添加到黑名单失败: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         });
   }
 
@@ -1145,20 +1145,24 @@ class _BlacklistTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('已将用户从黑名单移除'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('已将用户从黑名单移除'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         })
         .catchError((error) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('从黑名单移除失败: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('从黑名单移除失败: $error'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         });
   }
 }
@@ -1175,8 +1179,7 @@ class _UserTile extends HookConsumerWidget {
     required this.label,
     required this.canRemove,
     required this.onRemove,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -1,11 +1,30 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
 /// 应用常量
 class AppConstants {
   // 私有构造函数，防止实例化
   AppConstants._();
 
   /// API相关
-  static const String apiBaseUrl = 'https://api.meetease.com';
+  static String apiDomain = '10.160.97.198:8080'; // Android模拟器访问主机的特殊IP
+  static String get apiBaseUrl => 'http://$apiDomain/api';
   static const int apiTimeout = 10000; // 毫秒
+
+  /// 更新服务器地址并保存到本地存储
+  static Future<void> updateApiDomain(String newDomain) async {
+    apiDomain = newDomain;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('api_domain', newDomain);
+  }
+
+  /// 从本地存储加载服务器地址
+  static Future<void> loadApiDomain() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDomain = prefs.getString('api_domain');
+    if (savedDomain != null && savedDomain.isNotEmpty) {
+      apiDomain = savedDomain;
+    }
+  }
 
   /// 缓存相关
   static const String tokenKey = 'auth_token';

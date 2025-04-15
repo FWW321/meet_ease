@@ -189,8 +189,8 @@ class MockMeetingService implements MeetingService {
 
     // 确保admins和blacklist不为null
     return meeting.copyWith(
-      admins: meeting.admins ?? const [],
-      blacklist: meeting.blacklist ?? const [],
+      admins: meeting.admins,
+      blacklist: meeting.blacklist,
     );
   }
 
@@ -262,9 +262,7 @@ class MockMeetingService implements MeetingService {
 
     final index = _meetings.indexWhere((m) => m.id == meetingId);
     if (index != -1) {
-      final currentAdmins = List<String>.from(
-        _meetings[index].admins ?? const [],
-      );
+      final currentAdmins = List<String>.from(_meetings[index].admins);
       if (!currentAdmins.contains(userId)) {
         currentAdmins.add(userId);
         _meetings[index] = _meetings[index].copyWith(admins: currentAdmins);
@@ -281,9 +279,7 @@ class MockMeetingService implements MeetingService {
 
     final index = _meetings.indexWhere((m) => m.id == meetingId);
     if (index != -1) {
-      final currentAdmins = List<String>.from(
-        _meetings[index].admins ?? const [],
-      );
+      final currentAdmins = List<String>.from(_meetings[index].admins);
       currentAdmins.remove(userId);
       _meetings[index] = _meetings[index].copyWith(admins: currentAdmins);
     } else {
@@ -298,9 +294,7 @@ class MockMeetingService implements MeetingService {
 
     final index = _meetings.indexWhere((m) => m.id == meetingId);
     if (index != -1) {
-      final currentBlacklist = List<String>.from(
-        _meetings[index].blacklist ?? const [],
-      );
+      final currentBlacklist = List<String>.from(_meetings[index].blacklist);
       if (!currentBlacklist.contains(userId)) {
         currentBlacklist.add(userId);
         _meetings[index] = _meetings[index].copyWith(
@@ -319,9 +313,7 @@ class MockMeetingService implements MeetingService {
 
     final index = _meetings.indexWhere((m) => m.id == meetingId);
     if (index != -1) {
-      final currentBlacklist = List<String>.from(
-        _meetings[index].blacklist ?? const [],
-      );
+      final currentBlacklist = List<String>.from(_meetings[index].blacklist);
       currentBlacklist.remove(userId);
       _meetings[index] = _meetings[index].copyWith(blacklist: currentBlacklist);
     } else {

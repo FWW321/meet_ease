@@ -76,8 +76,6 @@ class MockWebRTCService implements WebRTCService {
       StreamController<List<MeetingParticipant>>.broadcast();
   List<MeetingParticipant> _participants = [];
   Timer? _speakingSimulatorTimer;
-  String? _currentMeetingId;
-  String? _currentUserId;
 
   @override
   Future<void> initialize() async {
@@ -92,9 +90,6 @@ class MockWebRTCService implements WebRTCService {
     String userName,
   ) async {
     await Future.delayed(const Duration(seconds: 1));
-
-    _currentMeetingId = meetingId;
-    _currentUserId = userId;
 
     // 模拟数据 - 参会人员列表
     _participants = [
@@ -143,8 +138,6 @@ class MockWebRTCService implements WebRTCService {
     _speakingSimulatorTimer?.cancel();
     _isConnected = false;
     _participants = [];
-    _currentMeetingId = null;
-    _currentUserId = null;
 
     // 发布空列表
     _participantsController.add(_participants);

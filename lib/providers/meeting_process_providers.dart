@@ -64,10 +64,7 @@ class AgendaItemStatusNotifier extends _$AgendaItemStatusNotifier {
 
 /// 会议资料提供者
 @riverpod
-Future<MeetingMaterials> meetingMaterials(
-  MeetingMaterialsRef ref,
-  String meetingId,
-) async {
+Future<MeetingMaterials> meetingMaterials(Ref ref, String meetingId) async {
   final service = ref.watch(meetingProcessServiceProvider);
   return service.getMeetingMaterials(meetingId);
 }
@@ -123,10 +120,7 @@ class MeetingMaterialsNotifier extends _$MeetingMaterialsNotifier {
 
 /// 会议笔记提供者
 @riverpod
-Future<List<MeetingNote>> meetingNotes(
-  MeetingNotesRef ref,
-  String meetingId,
-) async {
+Future<List<MeetingNote>> meetingNotes(Ref ref, String meetingId) async {
   final service = ref.watch(meetingProcessServiceProvider);
   return service.getMeetingNotes(meetingId);
 }
@@ -213,17 +207,14 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
 
 /// 会议投票列表提供者
 @riverpod
-Future<List<MeetingVote>> meetingVotes(
-  MeetingVotesRef ref,
-  String meetingId,
-) async {
+Future<List<MeetingVote>> meetingVotes(Ref ref, String meetingId) async {
   final service = ref.watch(meetingProcessServiceProvider);
   return service.getMeetingVotes(meetingId);
 }
 
 /// 单个投票详情提供者
 @riverpod
-Future<MeetingVote> voteDetail(VoteDetailRef ref, String voteId) async {
+Future<MeetingVote> voteDetail(Ref ref, String voteId) async {
   final service = ref.watch(meetingProcessServiceProvider);
   final votes = await service.getMeetingVotes(''); // 此处简化处理，实际应从投票ID推导会议ID
   return votes.firstWhere(
@@ -234,7 +225,7 @@ Future<MeetingVote> voteDetail(VoteDetailRef ref, String voteId) async {
 
 /// 投票结果提供者
 @riverpod
-Future<List<VoteOption>> voteResults(VoteResultsRef ref, String voteId) async {
+Future<List<VoteOption>> voteResults(Ref ref, String voteId) async {
   final service = ref.watch(meetingProcessServiceProvider);
   return service.getVoteResults(voteId);
 }

@@ -12,7 +12,6 @@ import '../widgets/notes_list_widget.dart';
 import '../widgets/votes_list_widget.dart';
 import '../widgets/chat_widget.dart';
 import '../widgets/voice_meeting_widget.dart';
-import '../services/webrtc_service.dart';
 import '../pages/meeting_settings_page.dart';
 
 /// 会议过程管理页面 - 以实时语音为主要内容的界面
@@ -28,12 +27,6 @@ class MeetingProcessPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 屏幕尺寸
-    final screenSize = MediaQuery.of(context).size;
-
-    // 是否为大屏设备
-    final isLargeScreen = screenSize.width > 1000;
-
     // 是否为已结束的会议
     final isCompletedMeeting = meeting.status == MeetingStatus.completed;
 
@@ -288,11 +281,13 @@ class MeetingProcessPage extends HookConsumerWidget {
     // 显示签到对话框
     if (isShowingSignInDialog.value) {
       // 使用Future.microtask确保在构建完成后显示对话框
-      Future.microtask(
-        () => _showSignInDialog(context, ref, () {
-          isShowingSignInDialog.value = false;
-        }),
-      );
+      Future.microtask(() {
+        if (context.mounted) {
+          _showSignInDialog(context, ref, () {
+            isShowingSignInDialog.value = false;
+          });
+        }
+      });
     }
 
     return Scaffold(
@@ -331,7 +326,7 @@ class MeetingProcessPage extends HookConsumerWidget {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(25),
                         blurRadius: 4,
                         offset: const Offset(0, -2),
                       ),
@@ -350,13 +345,13 @@ class MeetingProcessPage extends HookConsumerWidget {
                                 decoration: BoxDecoration(
                                   color: features[selectedFeatureIndex.value]
                                       .color
-                                      .withOpacity(0.1),
+                                      .withAlpha(25),
                                   border: Border(
                                     bottom: BorderSide(
                                       color: features[selectedFeatureIndex
                                               .value]
                                           .color
-                                          .withOpacity(0.3),
+                                          .withAlpha(76),
                                     ),
                                   ),
                                 ),
@@ -610,243 +605,6 @@ class MeetingProcessPage extends HookConsumerWidget {
     }
 
     return const Center(child: Text('未知功能'));
-  }
-
-  // 构建参会人员面板
-  Widget _buildParticipantsPanel(
-    AsyncValue<List<User>> participantsAsync,
-    String currentUserId,
-    WidgetRef ref,
-  ) {
-    // 获取WebRTC参会人员列表，保持与主页面显示的参会人员一致
-    final rtcParticipantsAsync = ref.watch(webRTCParticipantsProvider);
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // 会议参与者列表（User类型）
-          Expanded(
-            child: participantsAsync.when(
-              data:
-                  (participants) => ListView.builder(
-                    itemCount: participants.length,
-                    itemBuilder: (context, index) {
-                      final user = participants[index];
-                      // 确定用户角色
-                      String? roleLabel;
-                      Color? roleColor;
-
-                      if (user.id == meeting.organizerId) {
-                        roleLabel = '创建者';
-                        roleColor = Colors.orange;
-                      } else if (meeting.admins.contains(user.id)) {
-                        roleLabel = '管理员';
-                        roleColor = Colors.blue;
-                      }
-
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Theme.of(
-                            context,
-                          ).primaryColor.withOpacity(0.2),
-                          child: Text(
-                            user.name.isNotEmpty
-                                ? user.name[0].toUpperCase()
-                                : '?',
-                            style: TextStyle(
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ),
-                        title: Text(user.name),
-                        subtitle: Text(user.email),
-                        trailing:
-                            roleLabel != null
-                                ? _buildRoleChip(roleLabel, roleColor!)
-                                : null,
-                      );
-                    },
-                  ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error:
-                  (error, stackTrace) => Center(child: Text('无法加载参会者: $error')),
-            ),
-          ),
-
-          const Divider(),
-
-          // 实时连接状态的参会人员列表（MeetingParticipant类型）
-          const Text(
-            '实时连接状态',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 8),
-
-          Expanded(
-            child: rtcParticipantsAsync.when(
-              data: (participants) {
-                if (participants.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      '暂无实时连接的参会人员',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: participants.length,
-                  itemBuilder: (context, index) {
-                    final participant = participants[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            participant.isMe
-                                ? Colors.blue
-                                : Colors.grey.shade300,
-                        child: Text(
-                          participant.name.isNotEmpty
-                              ? participant.name[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color:
-                                participant.isMe ? Colors.white : Colors.black,
-                          ),
-                        ),
-                      ),
-                      title: Row(
-                        children: [
-                          Text(
-                            participant.name,
-                            style: TextStyle(
-                              fontWeight:
-                                  participant.isMe
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                            ),
-                          ),
-                          if (participant.isMe)
-                            const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Text(
-                                '(我)',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 麦克风状态
-                          Icon(
-                            participant.isMuted ? Icons.mic_off : Icons.mic,
-                            color:
-                                participant.isMuted ? Colors.red : Colors.green,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-
-                          // 发言指示器
-                          if (participant.isSpeaking)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.record_voice_over,
-                                    size: 16,
-                                    color: Colors.green,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '发言中',
-                                    style: TextStyle(
-                                      color: Colors.green,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('无法加载实时参会者: $error')),
-            ),
-          ),
-
-          // 仅会议管理员显示的权限管理按钮
-          if (meeting.canUserManage(currentUserId) &&
-              meeting.status != MeetingStatus.completed)
-            Builder(
-              builder:
-                  (context) => Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.admin_panel_settings),
-                      label: const Text('权限管理'),
-                      onPressed:
-                          () => _navigateToSettings(context, currentUserId),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // 导航到权限管理页面
-  void _navigateToSettings(BuildContext context, String currentUserId) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder:
-            (context) => MeetingSettingsPage(
-              meetingId: meetingId,
-              currentUserId: currentUserId,
-            ),
-      ),
-    );
-  }
-
-  // 构建角色标签
-  Widget _buildRoleChip(String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          color: color,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
   }
 
   // 显示会议信息对话框
