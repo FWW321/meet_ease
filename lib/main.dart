@@ -13,6 +13,7 @@ import 'pages/about_page.dart';
 import 'pages/privacy_policy_page.dart';
 import 'pages/create_meeting_page.dart';
 import 'pages/meeting_detail_page.dart';
+import 'pages/splash_screen.dart';
 import 'configs/app_theme.dart';
 import 'constants/app_constants.dart';
 
@@ -55,7 +56,7 @@ class MyApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: const AuthChecker(),
+      home: const SplashScreen(),
       routes: {
         AppConstants.loginRoute: (context) => const LoginPage(),
         AppConstants.registerRoute: (context) => const RegisterPage(),
