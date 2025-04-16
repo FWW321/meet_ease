@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'widgets/auth_checker.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
 import 'pages/my_meetings_page.dart';
