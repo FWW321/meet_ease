@@ -464,7 +464,7 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
-String _$createMeetingHash() => r'4763362a9bb3066c9e4e13d21050979f7372f884';
+String _$createMeetingHash() => r'ad7ce223cd00374078eca4dbfa608e7cf52b7c69';
 
 /// 创建会议提供者
 ///
@@ -484,7 +484,7 @@ final createMeetingProvider =
 
 typedef _$CreateMeeting = AutoDisposeAsyncNotifier<Meeting?>;
 String _$validateMeetingPasswordHash() =>
-    r'5a2d50b80aab94c989b48eb25791396de0daf95e';
+    r'2f52ef677a6da34b1b51ac59a84535c7fc7c62bd';
 
 abstract class _$ValidateMeetingPassword
     extends BuildlessAutoDisposeAsyncNotifier<bool?> {
@@ -775,7 +775,7 @@ class _MeetingSignInProviderElement
   String get meetingId => (origin as MeetingSignInProvider).meetingId;
 }
 
-String _$meetingOperationsHash() => r'cbe8d4759a778772c85e52306014150a3e2bdc0a';
+String _$meetingOperationsHash() => r'6176faab397217e0d51836837238fe3c064afc9d';
 
 /// 会议管理操作提供者
 ///

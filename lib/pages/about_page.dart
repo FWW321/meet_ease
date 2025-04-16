@@ -49,7 +49,27 @@ class AboutPage extends HookConsumerWidget {
               ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            const Text('版本 1.0.0', style: TextStyle(color: Colors.grey)),
+            const Text(
+              '版本 1.0.0',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+
+            const SizedBox(height: 40),
+
+            // 图标生成工具
+            const Divider(),
+            const SizedBox(height: 10),
+            const Text('开发工具', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+            ListTile(
+              leading: const Icon(Icons.image),
+              title: const Text('应用图标生成器'),
+              subtitle: const Text('修改应用图标'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pushNamed(context, AppConstants.iconGeneratorRoute);
+              },
+            ),
 
             const SizedBox(height: 40),
 

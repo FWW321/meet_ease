@@ -36,15 +36,16 @@ class AppConstants {
   static const String registerRoute = '/register';
   static const String profileRoute = '/profile';
   static const String meetingRoute = '/meeting';
-  static const String myMeetingsRoute = '/my_meetings';
-  static const String profileSettingsRoute = '/profile_settings';
-  static const String accountSecurityRoute = '/account_security';
-  static const String notificationSettingsRoute = '/notification_settings';
-  static const String helpCenterRoute = '/help_center';
+  static const String myMeetingsRoute = '/my-meetings';
+  static const String profileSettingsRoute = '/profile-settings';
+  static const String accountSecurityRoute = '/account-security';
+  static const String notificationSettingsRoute = '/notification-settings';
+  static const String helpCenterRoute = '/help-center';
   static const String aboutRoute = '/about';
-  static const String privacyPolicyRoute = '/privacy_policy';
-  static const String createMeetingRoute = '/create_meeting';
-  static const String meetingDetailRoute = '/meeting_detail';
+  static const String privacyPolicyRoute = '/privacy-policy';
+  static const String createMeetingRoute = '/create-meeting';
+  static const String meetingDetailRoute = '/meeting-detail';
+  static const String iconGeneratorRoute = '/icon-generator';
 
   /// 动画时长
   static const Duration shortAnimationDuration = Duration(milliseconds: 200);
@@ -64,4 +65,8 @@ class AppConstants {
   static const double radiusM = 12.0;
   static const double radiusL = 16.0;
   static const double radiusXL = 24.0;
+
+  /// 图标路径
+  static const String appIconPath = 'assets/images/app_icon.png';
+  static const String appLogoPath = 'assets/images/app_logo.png';
 }

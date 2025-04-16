@@ -166,7 +166,7 @@ class _MeetingAgendaProviderElement
   String get meetingId => (origin as MeetingAgendaProvider).meetingId;
 }
 
-String _$meetingMaterialsHash() => r'e9c63ff7805a0e079894b934ae4a20954ed8db9c';
+String _$meetingMaterialsHash() => r'49fcef15779cd1555e9ee7eb2bde282754c58a44';
 
 ///--------------------- 会议资料相关 ---------------------///
 /// 会议资料提供者
@@ -306,7 +306,7 @@ class _MeetingMaterialsProviderElement
   String get meetingId => (origin as MeetingMaterialsProvider).meetingId;
 }
 
-String _$meetingNotesHash() => r'8489f699fc66f5999253f812057f125c3f72ebc3';
+String _$meetingNotesHash() => r'68d04f08e20596a69590c842ea05755b59b6b283';
 
 ///--------------------- 会议笔记相关 ---------------------///
 /// 会议笔记提供者
@@ -446,7 +446,7 @@ class _MeetingNotesProviderElement
   String get meetingId => (origin as MeetingNotesProvider).meetingId;
 }
 
-String _$meetingVotesHash() => r'b6304af8a99ae70bc810f1d97f95bc6bcaa6a61c';
+String _$meetingVotesHash() => r'91805351b5ec2190e6ca48b1c3696b295968862c';
 
 ///--------------------- 会议投票相关 ---------------------///
 /// 会议投票列表提供者
@@ -586,7 +586,7 @@ class _MeetingVotesProviderElement
   String get meetingId => (origin as MeetingVotesProvider).meetingId;
 }
 
-String _$voteDetailHash() => r'9f5fc228b0870591308357464b52310ff36d381c';
+String _$voteDetailHash() => r'0b90adcc70364db2f5573bedf8101e3e087762d0';
 
 /// 单个投票详情提供者
 ///
@@ -718,7 +718,7 @@ class _VoteDetailProviderElement
   String get voteId => (origin as VoteDetailProvider).voteId;
 }
 
-String _$voteResultsHash() => r'a3764cf4e543aba2555b8ec9422b333ab6ce6707';
+String _$voteResultsHash() => r'8d7cd5e5c4b5a271a0820f2ed82edd7a2a47e8c0';
 
 /// 投票结果提供者
 ///
