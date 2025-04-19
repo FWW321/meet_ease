@@ -515,11 +515,70 @@ class MockMeetingService implements MeetingService {
 class ApiMeetingService implements MeetingService {
   final http.Client _client = http.Client();
 
-  // TODO: 实现 API 服务
   @override
   Future<List<Meeting>> getMeetings() async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      final response = await _client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/meeting/list'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final meetingListData = responseData['data'];
+          final meetingRecords = meetingListData['records'] as List<dynamic>;
+
+          // 将API返回的会议记录转换为Meeting对象列表
+          return meetingRecords.map<Meeting>((record) {
+            // 解析会议状态
+            final meetingStatus = _parseMeetingStatus(
+              record['status'] ?? '待开始',
+            );
+
+            return Meeting(
+              id: record['meetingId'].toString(),
+              title: record['title'],
+              startTime: DateTime.parse(record['startTime']),
+              endTime: DateTime.parse(record['endTime']),
+              location: record['location'],
+              status: meetingStatus,
+              type: MeetingType.regular, // 默认类型，API未提供
+              visibility: MeetingVisibility.public, // 默认可见性，API未提供
+              organizerId: record['organizerId'].toString(),
+              organizerName: '', // API未提供组织者名称
+              description: record['description'],
+              createdAt: DateTime.parse(record['createdAt']),
+            );
+          }).toList();
+        } else {
+          final message = responseData['message'] ?? '获取会议列表失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception('获取会议列表请求失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('获取会议列表时出错: $e');
+    }
+  }
+
+  // 解析会议状态字符串为枚举值
+  MeetingStatus _parseMeetingStatus(String statusStr) {
+    switch (statusStr) {
+      case '待开始':
+        return MeetingStatus.upcoming;
+      case '进行中':
+        return MeetingStatus.ongoing;
+      case '已结束':
+        return MeetingStatus.completed;
+      case '已取消':
+        return MeetingStatus.cancelled;
+      default:
+        return MeetingStatus.upcoming;
+    }
   }
 
   @override
@@ -676,22 +735,6 @@ class ApiMeetingService implements MeetingService {
       }
     } catch (e) {
       throw Exception('创建会议时出错: $e');
-    }
-  }
-
-  // 解析会议状态字符串为枚举值
-  MeetingStatus _parseMeetingStatus(String statusStr) {
-    switch (statusStr) {
-      case '待开始':
-        return MeetingStatus.upcoming;
-      case '进行中':
-        return MeetingStatus.ongoing;
-      case '已结束':
-        return MeetingStatus.completed;
-      case '已取消':
-        return MeetingStatus.cancelled;
-      default:
-        return MeetingStatus.upcoming;
     }
   }
 

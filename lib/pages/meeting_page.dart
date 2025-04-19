@@ -42,6 +42,23 @@ class MeetingPage extends HookConsumerWidget {
     return Scaffold(
       body: Column(
         children: [
+          // 顶部操作区域
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, right: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.list),
+                  label: const Text('查看所有会议'),
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppConstants.meetingListRoute);
+                  },
+                ),
+              ],
+            ),
+          ),
+
           // 搜索栏
           Padding(
             padding: const EdgeInsets.all(16.0),

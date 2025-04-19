@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
 import 'pages/my_meetings_page.dart';
+import 'pages/meeting_list_page.dart';
 import 'pages/profile_settings_page.dart';
 import 'pages/account_security_page.dart';
 import 'pages/notification_settings_page.dart';
@@ -61,6 +62,7 @@ class MyApp extends ConsumerWidget {
         AppConstants.loginRoute: (context) => const LoginPage(),
         AppConstants.registerRoute: (context) => const RegisterPage(),
         AppConstants.myMeetingsRoute: (context) => const MyMeetingsPage(),
+        AppConstants.meetingListRoute: (context) => const MeetingListPage(),
         AppConstants.profileSettingsRoute:
             (context) => const ProfileSettingsPage(),
         AppConstants.accountSecurityRoute:
