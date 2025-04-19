@@ -8,8 +8,8 @@ part 'meeting_providers.g.dart';
 
 /// 会议服务提供者 - 用于获取会议服务实例
 final meetingServiceProvider = Provider<MeetingService>((ref) {
-  // 目前返回模拟服务，后续可替换为真实API服务
-  return MockMeetingService();
+  // 使用真实API服务
+  return ApiMeetingService();
 });
 
 /// 会议列表提供者

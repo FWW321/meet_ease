@@ -7,7 +7,7 @@ import '../constants/app_constants.dart';
 class MyPage extends HookConsumerWidget {
   const MyPage({super.key});
 
-  Future<void> _showLogoutDialog(BuildContext context) async {
+  Future<void> _showLogoutDialog(BuildContext context, WidgetRef ref) async {
     return showDialog(
       context: context,
       builder:
@@ -20,7 +20,11 @@ class MyPage extends HookConsumerWidget {
               ),
               TextButton(
                 onPressed: () async {
-                  await AuthService.clearLoginStatus(); // 清除登录状态
+                  // 使用Riverpod清除用户状态
+                  await ref.read(authStateProvider.notifier).logout();
+                  // 清除本地登录状态
+                  await AuthService.clearLoginStatus();
+
                   if (context.mounted) {
                     Navigator.pushNamedAndRemoveUntil(
                       context,
@@ -239,7 +243,7 @@ class MyPage extends HookConsumerWidget {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => _showLogoutDialog(context),
+              onPressed: () => _showLogoutDialog(context, ref),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red[50],
                 foregroundColor: Colors.red,

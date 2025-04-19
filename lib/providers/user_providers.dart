@@ -2,13 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/user.dart';
 import '../services/user_service.dart';
+import '../services/api_user_service.dart';
 
 part 'user_providers.g.dart';
 
 /// 用户服务提供者 - 用于获取用户服务实例
 final userServiceProvider = Provider<UserService>((ref) {
-  // 目前返回模拟服务，后续可替换为真实API服务
-  return MockUserService();
+  // 使用服务提供者中定义的API服务
+  return ApiUserService();
 });
 
 /// 当前用户提供者
@@ -42,12 +43,12 @@ class AuthState extends _$AuthState {
   }
 
   // 登录方法
-  Future<void> login(String email, String password) async {
+  Future<void> login(String username, String password) async {
     state = false; // 临时设置为未登录状态
 
     try {
       final userService = ref.read(userServiceProvider);
-      await userService.login(email, password);
+      await userService.login(username, password);
 
       // 登录成功
       state = true;
@@ -80,18 +81,17 @@ class AuthState extends _$AuthState {
 class UserNotifier extends _$UserNotifier {
   @override
   FutureOr<User?> build() async {
+    // 监听认证状态变化
+    ref.listen(authStateProvider, (previous, next) {
+      if (previous != next) {
+        // 如果认证状态发生变化，刷新用户数据
+        ref.invalidateSelf();
+      }
+    });
+
     // 首先尝试从本地获取
     final userService = ref.watch(userServiceProvider);
     User? user = await userService.getUserFromLocal();
-
-    // 如果本地没有，尝试从远程获取
-    if (user == null) {
-      user = await userService.getCurrentUser();
-      // 如果获取到用户，保存到本地
-      if (user != null) {
-        await userService.saveUserToLocal(user);
-      }
-    }
 
     return user;
   }

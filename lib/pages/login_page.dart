@@ -7,6 +7,7 @@ import '../pages/home_page.dart';
 import '../pages/register_page.dart';
 import '../constants/app_constants.dart';
 import '../utils/server_utils.dart';
+import '../providers/user_providers.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -47,9 +48,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      // 使用UserService进行远程登录
-      final userService = ref.read(userServiceProvider);
-      await userService.login(
+      // 使用Riverpod的authStateProvider管理登录状态
+      final authNotifier = ref.read(authStateProvider.notifier);
+      await authNotifier.login(
         _usernameController.text.trim(),
         _passwordController.text,
       );

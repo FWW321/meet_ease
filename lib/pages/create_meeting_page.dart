@@ -634,15 +634,13 @@ class CreateMeetingPage extends HookConsumerWidget {
     );
   }
 
-  // 用户选择列表（简化示例）
+  // 用户选择列表
   Widget _buildUserSelectionList(ValueNotifier<List<String>> selectedUsers) {
-    // 模拟数据
-    final List<User> mockUsers = [
-      User(id: 'user2', name: '李四'),
-      User(id: 'user3', name: '王五'),
-      User(id: 'user4', name: '赵六'),
-      User(id: 'user5', name: '孙七'),
-      User(id: 'user6', name: '周八'),
+    // 接口参数使用的用户ID列表
+    final List<Map<String, dynamic>> apiUsers = [
+      {'id': '1912151761567330306', 'name': '用户A'},
+      {'id': '1912153432590577666', 'name': '用户B'},
+      {'id': '1912154379643449345', 'name': '用户C'},
     ];
 
     return ValueListenableBuilder<List<String>>(
@@ -650,21 +648,22 @@ class CreateMeetingPage extends HookConsumerWidget {
       builder: (context, selectedIds, _) {
         return Column(
           children:
-              mockUsers.map((user) {
-                final bool isSelected = selectedIds.contains(user.id);
+              apiUsers.map((user) {
+                final String userId = user['id'];
+                final bool isSelected = selectedIds.contains(userId);
 
                 return CheckboxListTile(
-                  title: Text(user.name),
-                  subtitle: Text(user.id),
+                  title: Text(user['name']),
+                  subtitle: Text(userId),
                   value: isSelected,
                   onChanged: (bool? value) {
                     final newList = List<String>.from(selectedIds);
                     if (value == true) {
-                      if (!newList.contains(user.id)) {
-                        newList.add(user.id);
+                      if (!newList.contains(userId)) {
+                        newList.add(userId);
                       }
                     } else {
-                      newList.remove(user.id);
+                      newList.remove(userId);
                     }
                     selectedUsers.value = newList;
                   },

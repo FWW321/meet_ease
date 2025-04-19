@@ -1,5 +1,9 @@
 import '../models/meeting.dart';
 import '../models/user.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../constants/app_constants.dart';
 
 /// 会议服务接口
 abstract class MeetingService {
@@ -509,6 +513,8 @@ class MockMeetingService implements MeetingService {
 
 /// API会议服务实现 - 将来用于实际的后端API调用
 class ApiMeetingService implements MeetingService {
+  final http.Client _client = http.Client();
+
   // TODO: 实现 API 服务
   @override
   Future<List<Meeting>> getMeetings() async {
@@ -596,8 +602,97 @@ class ApiMeetingService implements MeetingService {
     List<String> allowedUsers = const [],
     String? password,
   }) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 获取当前用户ID
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString(AppConstants.userKey);
+      String organizerId = '';
+      String organizerName = '';
+
+      if (userJson != null) {
+        final userData = jsonDecode(userJson);
+        organizerId = userData['id'] ?? '';
+        organizerName = userData['name'] ?? '';
+      }
+
+      // 格式化日期时间
+      final formattedStartTime = startTime.toIso8601String();
+      final formattedEndTime = endTime.toIso8601String();
+
+      // 构建请求体
+      final requestBody = jsonEncode({
+        'title': title,
+        'description': description ?? '',
+        'startTime': formattedStartTime,
+        'endTime': formattedEndTime,
+        'organizerId': organizerId,
+        'location': location,
+        'participantIds': allowedUsers,
+      });
+
+      // 发送POST请求
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/meeting/create'),
+        headers: {'Content-Type': 'application/json'},
+        body: requestBody,
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        // 判断请求是否成功
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final meetingData = responseData['data'];
+
+          // 根据返回数据创建Meeting对象
+          final meetingStatus = _parseMeetingStatus(
+            meetingData['status'] ?? '待开始',
+          );
+
+          return Meeting(
+            id: meetingData['meetingId'].toString(),
+            title: meetingData['title'],
+            startTime: DateTime.parse(meetingData['startTime']),
+            endTime: DateTime.parse(meetingData['endTime']),
+            location: meetingData['location'],
+            status: meetingStatus,
+            type: type, // API响应中没有会议类型，使用请求参数中的类型
+            visibility: visibility, // API响应中没有可见性，使用请求参数中的可见性
+            organizerId: meetingData['organizerId'].toString(),
+            organizerName: organizerName, // API响应中可能没有组织者名称
+            description: meetingData['description'],
+            createdAt:
+                meetingData['createdAt'] != null
+                    ? DateTime.parse(meetingData['createdAt'])
+                    : DateTime.now(),
+          );
+        } else {
+          final message = responseData['message'] ?? '创建会议失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception('创建会议请求失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('创建会议时出错: $e');
+    }
+  }
+
+  // 解析会议状态字符串为枚举值
+  MeetingStatus _parseMeetingStatus(String statusStr) {
+    switch (statusStr) {
+      case '待开始':
+        return MeetingStatus.upcoming;
+      case '进行中':
+        return MeetingStatus.ongoing;
+      case '已结束':
+        return MeetingStatus.completed;
+      case '已取消':
+        return MeetingStatus.cancelled;
+      default:
+        return MeetingStatus.upcoming;
+    }
   }
 
   @override
