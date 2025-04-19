@@ -531,19 +531,39 @@ class ApiMeetingService implements MeetingService {
         if (responseData['code'] == 200 && responseData['data'] != null) {
           final meetingListData = responseData['data'];
           final meetingRecords = meetingListData['records'] as List<dynamic>;
+          final currentTime = DateTime.now();
 
           // 将API返回的会议记录转换为Meeting对象列表
           return meetingRecords.map<Meeting>((record) {
             // 解析会议状态
-            final meetingStatus = _parseMeetingStatus(
+            MeetingStatus meetingStatus = _parseMeetingStatus(
               record['status'] ?? '待开始',
             );
+
+            // 解析开始和结束时间
+            final startTime = DateTime.parse(record['startTime']);
+            final endTime = DateTime.parse(record['endTime']);
+
+            // 根据当前时间更新会议状态
+            // 如果当前时间在会议开始和结束时间之间，将状态设为"进行中"
+            if (currentTime.isAfter(startTime) &&
+                currentTime.isBefore(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.ongoing;
+              // TODO: 调用更新会议状态为"进行中"的接口 - 接口未实现，保留逻辑
+            }
+            // 如果当前时间超过会议结束时间，将状态设为"已结束"
+            else if (currentTime.isAfter(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.completed;
+              // TODO: 调用更新会议状态为"已结束"的接口 - 接口未实现，保留逻辑
+            }
 
             return Meeting(
               id: record['meetingId'].toString(),
               title: record['title'],
-              startTime: DateTime.parse(record['startTime']),
-              endTime: DateTime.parse(record['endTime']),
+              startTime: startTime,
+              endTime: endTime,
               location: record['location'],
               status: meetingStatus,
               type: MeetingType.regular, // 默认类型，API未提供
@@ -598,17 +618,37 @@ class ApiMeetingService implements MeetingService {
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
           final meetingData = responseData['data'];
+          final currentTime = DateTime.now();
 
           // 解析会议状态
-          final meetingStatus = _parseMeetingStatus(
+          MeetingStatus meetingStatus = _parseMeetingStatus(
             meetingData['status'] ?? '待开始',
           );
+
+          // 解析开始和结束时间
+          final startTime = DateTime.parse(meetingData['startTime']);
+          final endTime = DateTime.parse(meetingData['endTime']);
+
+          // 根据当前时间更新会议状态
+          // 如果当前时间在会议开始和结束时间之间，将状态设为"进行中"
+          if (currentTime.isAfter(startTime) &&
+              currentTime.isBefore(endTime) &&
+              meetingStatus != MeetingStatus.cancelled) {
+            meetingStatus = MeetingStatus.ongoing;
+            // TODO: 调用更新会议状态为"进行中"的接口 - 接口未实现，保留逻辑
+          }
+          // 如果当前时间超过会议结束时间，将状态设为"已结束"
+          else if (currentTime.isAfter(endTime) &&
+              meetingStatus != MeetingStatus.cancelled) {
+            meetingStatus = MeetingStatus.completed;
+            // TODO: 调用更新会议状态为"已结束"的接口 - 接口未实现，保留逻辑
+          }
 
           return Meeting(
             id: meetingData['meetingId'].toString(),
             title: meetingData['title'],
-            startTime: DateTime.parse(meetingData['startTime']),
-            endTime: DateTime.parse(meetingData['endTime']),
+            startTime: startTime,
+            endTime: endTime,
             location: meetingData['location'] ?? '',
             status: meetingStatus,
             type: MeetingType.regular, // 默认类型，API未提供
