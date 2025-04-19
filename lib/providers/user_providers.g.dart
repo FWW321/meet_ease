@@ -190,7 +190,7 @@ final currentUserIdProvider = AutoDisposeProvider<String>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentUserIdRef = AutoDisposeProviderRef<String>;
-String _$authStateHash() => r'4e1fc9c7370d4fda9c3d5745586ec56e7c479025';
+String _$authStateHash() => r'33fceb0dde28b06909a44ef5707a318f5e48fe67';
 
 /// 用户登录状态提供者
 ///
@@ -206,7 +206,7 @@ final authStateProvider = AutoDisposeNotifierProvider<AuthState, bool>.internal(
 );
 
 typedef _$AuthState = AutoDisposeNotifier<bool>;
-String _$userNotifierHash() => r'9ab2cc9611f9f7b077e6227bb0db8847ff16a1f0';
+String _$userNotifierHash() => r'511d45be2e87c517495ae02613414a2470712142';
 
 /// 用户信息提供者
 ///

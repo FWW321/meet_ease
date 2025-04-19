@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../constants/app_constants.dart';
+import '../utils/http_utils.dart';
 import 'user_service.dart';
 
 /// API用户服务实现
@@ -19,11 +20,11 @@ class ApiUserService implements UserService {
   Future<User> getUserById(String userId) async {
     final response = await _client.get(
       Uri.parse('${AppConstants.apiBaseUrl}/user/$userId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: HttpUtils.createHeaders(),
     );
 
     if (response.statusCode == 200) {
-      final userData = jsonDecode(response.body);
+      final userData = HttpUtils.decodeResponse(response);
       return User(
         id: userData['id'],
         name: userData['username'],
@@ -39,7 +40,7 @@ class ApiUserService implements UserService {
   Future<User> updateUserInfo(User user) async {
     final response = await _client.put(
       Uri.parse('${AppConstants.apiBaseUrl}/user/${user.id}'),
-      headers: {'Content-Type': 'application/json'},
+      headers: HttpUtils.createHeaders(),
       body: jsonEncode({
         'username': user.name,
         'email': user.email,
@@ -48,7 +49,7 @@ class ApiUserService implements UserService {
     );
 
     if (response.statusCode == 200) {
-      final userData = jsonDecode(response.body);
+      final userData = HttpUtils.decodeResponse(response);
       final updatedUser = User(
         id: userData['id'],
         name: userData['username'],
@@ -68,7 +69,7 @@ class ApiUserService implements UserService {
       developer.log('开始登录请求: $username');
       final response = await _client.post(
         Uri.parse('${AppConstants.apiBaseUrl}/user/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: HttpUtils.createHeaders(),
         body: jsonEncode({'username': username, 'password': password}),
       );
 
@@ -76,7 +77,9 @@ class ApiUserService implements UserService {
       developer.log('响应体: ${response.body}');
 
       // 处理响应
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      final Map<String, dynamic> responseData = HttpUtils.decodeResponse(
+        response,
+      );
       developer.log('解析后的响应数据类型: ${responseData.runtimeType}');
       developer.log('解析后的响应数据: $responseData');
 
@@ -133,7 +136,7 @@ class ApiUserService implements UserService {
     try {
       final response = await _client.post(
         Uri.parse('${AppConstants.apiBaseUrl}/user/register'),
-        headers: {'Content-Type': 'application/json'},
+        headers: HttpUtils.createHeaders(),
         body: jsonEncode({
           'username': username,
           'password': password,
@@ -143,7 +146,7 @@ class ApiUserService implements UserService {
       );
 
       if (response.statusCode == 200) {
-        final userData = jsonDecode(response.body);
+        final userData = HttpUtils.decodeResponse(response);
         final user = User(
           id: userData['id'] ?? '',
           name: username,
@@ -153,14 +156,9 @@ class ApiUserService implements UserService {
         await saveUserToLocal(user);
         return user;
       } else {
-        try {
-          final errorData = jsonDecode(response.body);
-          throw Exception(
-            errorData['message'] ?? '注册失败: ${response.statusCode}',
-          );
-        } catch (e) {
-          throw Exception('注册失败: ${response.statusCode}');
-        }
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '注册失败'),
+        );
       }
     } catch (e) {
       if (e.toString().contains('SocketException') ||

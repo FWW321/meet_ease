@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../constants/app_constants.dart';
+import '../utils/http_utils.dart';
 
 /// 会议服务接口
 abstract class MeetingService {
@@ -520,11 +521,11 @@ class ApiMeetingService implements MeetingService {
     try {
       final response = await _client.get(
         Uri.parse('${AppConstants.apiBaseUrl}/meeting/list'),
-        headers: {'Content-Type': 'application/json'},
+        headers: HttpUtils.createHeaders(),
       );
 
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        final responseData = HttpUtils.decodeResponse(response);
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -558,7 +559,9 @@ class ApiMeetingService implements MeetingService {
           throw Exception(message);
         }
       } else {
-        throw Exception('获取会议列表请求失败: ${response.statusCode}');
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '获取会议列表请求失败'),
+        );
       }
     } catch (e) {
       throw Exception('获取会议列表时出错: $e');
@@ -692,13 +695,13 @@ class ApiMeetingService implements MeetingService {
       // 发送POST请求
       final response = await _client.post(
         Uri.parse('${AppConstants.apiBaseUrl}/meeting/create'),
-        headers: {'Content-Type': 'application/json'},
+        headers: HttpUtils.createHeaders(),
         body: requestBody,
       );
 
       // 处理响应
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
+        final responseData = HttpUtils.decodeResponse(response);
 
         // 判断请求是否成功
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -731,7 +734,9 @@ class ApiMeetingService implements MeetingService {
           throw Exception(message);
         }
       } else {
-        throw Exception('创建会议请求失败: ${response.statusCode}');
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '创建会议请求失败'),
+        );
       }
     } catch (e) {
       throw Exception('创建会议时出错: $e');
