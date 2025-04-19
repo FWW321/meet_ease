@@ -73,6 +73,13 @@ abstract class MeetingService {
 
   /// 结束会议 - 仅进行中的会议可结束，只有创建者有权限
   Future<Meeting> endMeeting(String meetingId, String creatorId);
+
+  /// 上传会议文件
+  Future<bool> uploadMeetingFile(
+    String meetingId,
+    String uploaderId,
+    dynamic file,
+  );
 }
 
 /// 模拟会议服务实现
@@ -510,6 +517,21 @@ class MockMeetingService implements MeetingService {
     _meetings[index] = updatedMeeting;
     return updatedMeeting;
   }
+
+  @override
+  Future<bool> uploadMeetingFile(
+    String meetingId,
+    String uploaderId,
+    dynamic file,
+  ) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    // 实现上传会议文件的逻辑
+    // 这里需要根据实际情况实现文件上传的逻辑
+    // 返回true表示上传成功，返回false表示上传失败
+    return false;
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -856,5 +878,50 @@ class ApiMeetingService implements MeetingService {
   Future<Meeting> endMeeting(String meetingId, String creatorId) async {
     // TODO: 使用HTTP客户端调用后端API
     throw UnimplementedError('API会议服务尚未实现');
+  }
+
+  @override
+  Future<bool> uploadMeetingFile(
+    String meetingId,
+    String uploaderId,
+    dynamic file,
+  ) async {
+    try {
+      // 创建multipart请求
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/file/upload/$meetingId',
+      );
+      final request = http.MultipartRequest('POST', uri);
+
+      // 添加文件
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      // 添加其他表单字段
+      request.fields['meetingId'] = meetingId;
+      request.fields['uploaderId'] = uploaderId;
+
+      // 发送请求
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 判断请求是否成功
+        if (responseData['code'] == 200) {
+          return true;
+        } else {
+          final message = responseData['message'] ?? '上传会议文件失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '上传会议文件请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('上传会议文件时出错: $e');
+    }
   }
 }

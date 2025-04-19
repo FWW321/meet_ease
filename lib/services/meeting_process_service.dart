@@ -2,6 +2,11 @@ import '../models/meeting_agenda.dart';
 import '../models/meeting_material.dart';
 import '../models/meeting_note.dart';
 import '../models/meeting_vote.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'dart:io';
+import '../constants/app_constants.dart';
+import '../services/meeting_service.dart';
 
 /// 会议过程管理服务接口
 abstract class MeetingProcessService {
@@ -595,7 +600,12 @@ class MockMeetingProcessService implements MeetingProcessService {
 
 /// API会议过程管理服务实现 - 将来用于实际的后端API调用
 class ApiMeetingProcessService implements MeetingProcessService {
-  // TODO: 实现 API 服务
+  // 会议服务实例
+  final MeetingService _meetingService;
+
+  // 构造函数
+  ApiMeetingProcessService(this._meetingService);
+
   @override
   Future<MeetingAgenda> getMeetingAgenda(String meetingId) async {
     throw UnimplementedError('API服务尚未实现');
@@ -620,7 +630,46 @@ class ApiMeetingProcessService implements MeetingProcessService {
     String meetingId,
     MaterialItem material,
   ) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 如果material.url是本地文件路径，则需要上传文件
+      if (material.url.startsWith('file://') ||
+          !material.url.startsWith('http')) {
+        // 获取当前用户ID
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = prefs.getString(AppConstants.userKey);
+        String uploaderId = '';
+
+        if (userJson != null) {
+          final userData = jsonDecode(userJson);
+          uploaderId = userData['id'] ?? '';
+        }
+
+        // 上传文件
+        final fileToUpload = File(material.url);
+        final success = await _meetingService.uploadMeetingFile(
+          meetingId,
+          uploaderId,
+          fileToUpload,
+        );
+
+        if (!success) {
+          throw Exception('上传文件失败');
+        }
+
+        // TODO: 获取服务器返回的实际URL和其他信息
+        // 这里暂时模拟返回一个成功的结果
+        return material.copyWith(
+          id: 'server_generated_id_${DateTime.now().millisecondsSinceEpoch}',
+          url:
+              'https://example.com/uploaded_files/${fileToUpload.path.split('/').last}',
+        );
+      }
+
+      // 如果URL已经是远程URL，直接返回material
+      return material;
+    } catch (e) {
+      throw Exception('添加会议资料时出错: $e');
+    }
   }
 
   @override

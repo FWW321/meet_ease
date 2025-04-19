@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
 import '../models/meeting_material.dart' as models;
 import '../providers/meeting_process_providers.dart';
+import '../constants/app_constants.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 /// 会议资料列表组件
 class MaterialsListWidget extends ConsumerWidget {
@@ -123,7 +127,7 @@ class MaterialsListWidget extends ConsumerWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: typeColor.withOpacity(0.1),
+                      color: typeColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
@@ -219,173 +223,338 @@ class MaterialsListWidget extends ConsumerWidget {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     models.MaterialType selectedType = models.MaterialType.document;
+    PlatformFile? selectedFile;
+    String? fileName;
 
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: const Text('添加资料'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(
-                      labelText: '标题',
-                      hintText: '例如：项目进度报告',
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('添加资料'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: titleController,
+                          decoration: const InputDecoration(
+                            labelText: '标题',
+                            hintText: '例如：项目进度报告',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: descriptionController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: '描述 (可选)',
+                            hintText: '例如：详细的项目进度统计报告',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<models.MaterialType>(
+                          value: selectedType,
+                          decoration: const InputDecoration(labelText: '资料类型'),
+                          items: [
+                            DropdownMenuItem(
+                              value: models.MaterialType.document,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getMaterialTypeIcon(
+                                      models.MaterialType.document,
+                                    ),
+                                    color: _getMaterialTypeColor(
+                                      models.MaterialType.document,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('文档'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: models.MaterialType.image,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getMaterialTypeIcon(
+                                      models.MaterialType.image,
+                                    ),
+                                    color: _getMaterialTypeColor(
+                                      models.MaterialType.image,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('图片'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: models.MaterialType.video,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getMaterialTypeIcon(
+                                      models.MaterialType.video,
+                                    ),
+                                    color: _getMaterialTypeColor(
+                                      models.MaterialType.video,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('视频'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: models.MaterialType.presentation,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getMaterialTypeIcon(
+                                      models.MaterialType.presentation,
+                                    ),
+                                    color: _getMaterialTypeColor(
+                                      models.MaterialType.presentation,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('演示文稿'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: models.MaterialType.other,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    _getMaterialTypeIcon(
+                                      models.MaterialType.other,
+                                    ),
+                                    color: _getMaterialTypeColor(
+                                      models.MaterialType.other,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('其他'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                selectedType = value;
+                              });
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  // 打开文件选择器
+                                  FilePickerResult? result = await FilePicker
+                                      .platform
+                                      .pickFiles(
+                                        type: FileType.any,
+                                        allowMultiple: false,
+                                      );
+
+                                  if (result != null &&
+                                      result.files.isNotEmpty) {
+                                    setState(() {
+                                      selectedFile = result.files.first;
+                                      fileName = selectedFile!.name;
+
+                                      // 如果标题为空，使用文件名作为标题
+                                      if (titleController.text.isEmpty) {
+                                        titleController.text = fileName!;
+                                      }
+
+                                      // 根据文件扩展名自动选择类型
+                                      final extension =
+                                          fileName!
+                                              .split('.')
+                                              .last
+                                              .toLowerCase();
+                                      if ([
+                                        'jpg',
+                                        'jpeg',
+                                        'png',
+                                        'gif',
+                                        'webp',
+                                      ].contains(extension)) {
+                                        selectedType =
+                                            models.MaterialType.image;
+                                      } else if ([
+                                        'mp4',
+                                        'mov',
+                                        'avi',
+                                        'mkv',
+                                        'webm',
+                                      ].contains(extension)) {
+                                        selectedType =
+                                            models.MaterialType.video;
+                                      } else if ([
+                                        'ppt',
+                                        'pptx',
+                                        'key',
+                                      ].contains(extension)) {
+                                        selectedType =
+                                            models.MaterialType.presentation;
+                                      } else if ([
+                                        'doc',
+                                        'docx',
+                                        'pdf',
+                                        'txt',
+                                        'xls',
+                                        'xlsx',
+                                      ].contains(extension)) {
+                                        selectedType =
+                                            models.MaterialType.document;
+                                      } else {
+                                        selectedType =
+                                            models.MaterialType.other;
+                                      }
+                                    });
+                                  }
+                                },
+                                icon: const Icon(Icons.upload_file),
+                                label: const Text('选择文件'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (fileName != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '已选择: $fileName',
+                                    style: const TextStyle(fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: descriptionController,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: '描述 (可选)',
-                      hintText: '例如：详细的项目进度统计报告',
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('取消'),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<models.MaterialType>(
-                    value: selectedType,
-                    decoration: const InputDecoration(labelText: '资料类型'),
-                    items: [
-                      DropdownMenuItem(
-                        value: models.MaterialType.document,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getMaterialTypeIcon(
-                                models.MaterialType.document,
-                              ),
-                              color: _getMaterialTypeColor(
-                                models.MaterialType.document,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('文档'),
-                          ],
-                        ),
-                      ),
-                      DropdownMenuItem(
-                        value: models.MaterialType.image,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getMaterialTypeIcon(models.MaterialType.image),
-                              color: _getMaterialTypeColor(
-                                models.MaterialType.image,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('图片'),
-                          ],
-                        ),
-                      ),
-                      DropdownMenuItem(
-                        value: models.MaterialType.video,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getMaterialTypeIcon(models.MaterialType.video),
-                              color: _getMaterialTypeColor(
-                                models.MaterialType.video,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('视频'),
-                          ],
-                        ),
-                      ),
-                      DropdownMenuItem(
-                        value: models.MaterialType.presentation,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getMaterialTypeIcon(
-                                models.MaterialType.presentation,
-                              ),
-                              color: _getMaterialTypeColor(
-                                models.MaterialType.presentation,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('演示文稿'),
-                          ],
-                        ),
-                      ),
-                      DropdownMenuItem(
-                        value: models.MaterialType.other,
-                        child: Row(
-                          children: [
-                            Icon(
-                              _getMaterialTypeIcon(models.MaterialType.other),
-                              color: _getMaterialTypeColor(
-                                models.MaterialType.other,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text('其他'),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        selectedType = value;
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: 实现选择文件的功能
-                    },
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('选择文件'),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  // TODO: 添加资料到会议并上传文件
-                  final newMaterial = models.MaterialItem(
-                    id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
-                    title: titleController.text,
-                    description:
-                        descriptionController.text.isEmpty
-                            ? null
-                            : descriptionController.text,
-                    type: selectedType,
-                    url: 'https://example.com/materials/temp.file',
-                    thumbnailUrl:
-                        selectedType == models.MaterialType.image ||
-                                selectedType == models.MaterialType.video
-                            ? 'https://example.com/thumbnails/temp.jpg'
-                            : null,
-                    fileSize: 1024 * 1024, // 示例大小：1MB
-                    uploaderId: 'current_user_id', // 应从用户状态获取
-                    uploaderName: '当前用户', // 应从用户状态获取
-                    uploadTime: DateTime.now(),
-                  );
+                    ElevatedButton(
+                      onPressed:
+                          selectedFile == null
+                              ? null // 如果没有选择文件，禁用按钮
+                              : () async {
+                                if (titleController.text.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('请输入资料标题')),
+                                  );
+                                  return;
+                                }
 
-                  // 添加资料
-                  final notifier = ref.read(
-                    meetingMaterialsNotifierProvider(meetingId).notifier,
-                  );
-                  notifier.addMaterial(newMaterial);
+                                // 显示加载指示器
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder:
+                                      (context) => const Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                );
 
-                  Navigator.of(context).pop();
-                },
-                child: const Text('上传'),
-              ),
-            ],
+                                try {
+                                  // 获取当前用户信息
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  final userJson = prefs.getString(
+                                    AppConstants.userKey,
+                                  );
+                                  String uploaderId = '';
+                                  String uploaderName = '';
+
+                                  if (userJson != null) {
+                                    final userData = jsonDecode(userJson);
+                                    uploaderId = userData['id'] ?? '';
+                                    uploaderName = userData['name'] ?? '';
+                                  }
+
+                                  // 创建新的资料对象
+                                  final newMaterial = models.MaterialItem(
+                                    id:
+                                        'temp_${DateTime.now().millisecondsSinceEpoch}',
+                                    title: titleController.text,
+                                    description:
+                                        descriptionController.text.isEmpty
+                                            ? null
+                                            : descriptionController.text,
+                                    type: selectedType,
+                                    url: selectedFile!.path!, // 本地文件路径
+                                    thumbnailUrl:
+                                        selectedType ==
+                                                    models.MaterialType.image ||
+                                                selectedType ==
+                                                    models.MaterialType.video
+                                            ? selectedFile!.path!
+                                            : null,
+                                    fileSize: selectedFile!.size,
+                                    uploaderId: uploaderId,
+                                    uploaderName: uploaderName,
+                                    uploadTime: DateTime.now(),
+                                  );
+
+                                  // 添加资料
+                                  final notifier = ref.read(
+                                    meetingMaterialsNotifierProvider(
+                                      meetingId,
+                                    ).notifier,
+                                  );
+                                  await notifier.addMaterial(newMaterial);
+
+                                  // 关闭加载指示器
+                                  Navigator.of(context).pop();
+
+                                  // 关闭对话框
+                                  Navigator.of(context).pop();
+
+                                  // 显示成功消息
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('资料上传成功')),
+                                  );
+                                } catch (e) {
+                                  // 关闭加载指示器
+                                  Navigator.of(context).pop();
+
+                                  // 显示错误消息
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('上传失败: $e')),
+                                  );
+                                }
+                              },
+                      child: const Text('上传'),
+                    ),
+                  ],
+                ),
           ),
     );
   }
