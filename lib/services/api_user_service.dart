@@ -93,10 +93,10 @@ class ApiUserService implements UserService {
 
           // 创建用户对象，使用正确的字段名
           final user = User(
-            id: userData['userId']?.toString() ?? '',
-            name: userData['username']?.toString() ?? username,
-            email: userData['email']?.toString() ?? '',
-            phoneNumber: userData['phone']?.toString() ?? '',
+            id: _safeGetString(userData, 'userId') ?? '',
+            name: _safeGetString(userData, 'username') ?? username,
+            email: _safeGetString(userData, 'email') ?? '',
+            phoneNumber: _safeGetString(userData, 'phone') ?? '',
           );
 
           developer.log('创建的用户对象: ${user.id}, ${user.name}, ${user.email}');
