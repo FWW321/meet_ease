@@ -586,8 +586,56 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<Meeting> getMeetingById(String id) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      final response = await _client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/meeting/$id'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final meetingData = responseData['data'];
+
+          // 解析会议状态
+          final meetingStatus = _parseMeetingStatus(
+            meetingData['status'] ?? '待开始',
+          );
+
+          return Meeting(
+            id: meetingData['meetingId'].toString(),
+            title: meetingData['title'],
+            startTime: DateTime.parse(meetingData['startTime']),
+            endTime: DateTime.parse(meetingData['endTime']),
+            location: meetingData['location'] ?? '',
+            status: meetingStatus,
+            type: MeetingType.regular, // 默认类型，API未提供
+            visibility: MeetingVisibility.public, // 默认可见性，API未提供
+            organizerId: meetingData['organizerId'].toString(),
+            organizerName: '', // API未提供组织者名称
+            description: meetingData['description'],
+            createdAt:
+                meetingData['createdAt'] != null
+                    ? DateTime.parse(meetingData['createdAt'])
+                    : null,
+            admins: const [], // API未提供
+            blacklist: const [], // API未提供
+            allowedUsers: const [], // API未提供
+          );
+        } else {
+          final message = responseData['message'] ?? '获取会议详情失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '获取会议详情请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('获取会议详情时出错: $e');
+    }
   }
 
   @override
