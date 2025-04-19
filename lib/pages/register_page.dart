@@ -26,7 +26,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       TextEditingController();
 
   bool _isLoading = false;
-  final int _defaultRoleId = 4; // 默认角色ID
   bool _isTestingConnection = false;
   bool _isEditingServer = false;
 
@@ -61,7 +60,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         _passwordController.text,
         _emailController.text,
         _phoneController.text,
-        _defaultRoleId,
       );
 
       await AuthService.saveLoginStatus(true);

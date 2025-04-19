@@ -6,7 +6,7 @@ class AppConstants {
   AppConstants._();
 
   /// API相关
-  static String apiDomain = '10.160.97.198:8080'; // Android模拟器访问主机的特殊IP
+  static String apiDomain = 'fwwhub.fun:8080'; // Android模拟器访问主机的特殊IP
   static String get apiBaseUrl => 'http://$apiDomain/api';
   static const int apiTimeout = 10000; // 毫秒
 

@@ -90,7 +90,6 @@ class ApiUserService implements UserService {
     String password,
     String email,
     String phone,
-    int roleId,
   ) async {
     try {
       final response = await _client.post(
@@ -101,7 +100,6 @@ class ApiUserService implements UserService {
           'password': password,
           'email': email,
           'phone': phone,
-          'roleId': roleId,
         }),
       );
 

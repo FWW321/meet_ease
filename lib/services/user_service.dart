@@ -23,7 +23,6 @@ abstract class UserService {
     String password,
     String email,
     String phone,
-    int roleId,
   );
 
   /// 用户登出
@@ -168,7 +167,6 @@ class MockUserService implements UserService {
     String password,
     String email,
     String phone,
-    int roleId,
   ) async {
     // Implementation needed
     throw UnimplementedError();
