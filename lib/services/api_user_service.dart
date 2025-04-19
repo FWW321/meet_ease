@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
@@ -62,26 +63,64 @@ class ApiUserService implements UserService {
   }
 
   @override
-  Future<User> login(String email, String password) async {
-    final response = await _client.post(
-      Uri.parse('${AppConstants.apiBaseUrl}/user/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
-    );
-
-    if (response.statusCode == 200) {
-      final userData = jsonDecode(response.body);
-      final user = User(
-        id: userData['id'],
-        name: userData['username'],
-        email: userData['email'],
-        phoneNumber: userData['phone'],
+  Future<User> login(String username, String password) async {
+    try {
+      developer.log('开始登录请求: $username');
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username, 'password': password}),
       );
-      await saveUserToLocal(user);
-      return user;
-    } else {
-      throw Exception('登录失败: ${response.statusCode}');
+
+      developer.log('收到响应: ${response.statusCode}');
+      developer.log('响应体: ${response.body}');
+
+      // 处理响应
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      developer.log('解析后的响应数据类型: ${responseData.runtimeType}');
+      developer.log('解析后的响应数据: $responseData');
+
+      // 判断成功条件：有code字段且值为200
+      final code = responseData['code'];
+      if (code == 200) {
+        // 获取用户数据，处理响应格式
+        if (responseData.containsKey('data') && responseData['data'] != null) {
+          final userData = responseData['data'];
+          developer.log('用户数据: $userData');
+
+          // 创建用户对象，使用正确的字段名
+          final user = User(
+            id: userData['userId']?.toString() ?? '',
+            name: userData['username']?.toString() ?? username,
+            email: userData['email']?.toString() ?? '',
+            phoneNumber: userData['phone']?.toString() ?? '',
+          );
+
+          developer.log('创建的用户对象: ${user.id}, ${user.name}, ${user.email}');
+          await saveUserToLocal(user);
+          return user;
+        } else {
+          throw Exception('登录成功但未返回用户数据');
+        }
+      } else {
+        final message = responseData['message']?.toString();
+        throw Exception(message ?? '登录失败: 服务器返回码 ${code ?? "未知"}');
+      }
+    } catch (e) {
+      developer.log('登录异常: ${e.toString()}', error: e);
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
     }
+  }
+
+  /// 安全获取字符串值，处理可能的空值和类型转换
+  String? _safeGetString(Map<String, dynamic> map, String key) {
+    final value = map[key];
+    if (value == null) return null;
+    return value.toString();
   }
 
   @override

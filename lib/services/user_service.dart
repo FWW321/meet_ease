@@ -15,7 +15,7 @@ abstract class UserService {
   Future<User> updateUserInfo(User user);
 
   /// 用户登录
-  Future<User> login(String email, String password);
+  Future<User> login(String username, String password);
 
   /// 用户注册
   Future<User> register(
@@ -140,18 +140,18 @@ class MockUserService implements UserService {
   }
 
   @override
-  Future<User> login(String email, String password) async {
+  Future<User> login(String username, String password) async {
     // 模拟网络请求延迟
     await Future.delayed(const Duration(milliseconds: 1000));
 
     // 模拟登录验证
-    if (email.isEmpty || password.isEmpty) {
-      throw Exception('邮箱或密码不能为空');
+    if (username.isEmpty || password.isEmpty) {
+      throw Exception('用户名或密码不能为空');
     }
 
     // 模拟找到对应用户
     final user = _users.firstWhere(
-      (user) => user.email.toLowerCase() == email.toLowerCase(),
+      (user) => user.name.toLowerCase() == username.toLowerCase(),
       orElse: () => throw Exception('用户不存在'),
     );
 

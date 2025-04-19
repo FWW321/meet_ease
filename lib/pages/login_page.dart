@@ -17,7 +17,7 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _serverAddressController =
       TextEditingController();
@@ -33,7 +33,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     _serverAddressController.dispose();
     super.dispose();
@@ -47,17 +47,54 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
 
     try {
-      await AuthService.saveLoginStatus(true);
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+      // 使用UserService进行远程登录
+      final userService = ref.read(userServiceProvider);
+      await userService.login(
+        _usernameController.text.trim(),
+        _passwordController.text,
       );
+
+      // 保存登录状态
+      await AuthService.saveLoginStatus(true);
+
+      if (!mounted) return;
+
+      // 显示登录成功提示
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('登录成功'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // 延迟一下再跳转，让用户看到成功提示
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('登录失败: ${e.toString()}')));
+      String errorMessage = '登录失败';
+
+      // 提取异常中的具体信息
+      final String errorString = e.toString();
+      if (errorString.contains('Exception:')) {
+        errorMessage = errorString.split('Exception:')[1].trim();
+      } else {
+        errorMessage = '登录失败: $errorString';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -137,15 +174,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextFormField(
-                    controller: _emailController,
+                    controller: _usernameController,
                     decoration: const InputDecoration(
-                      labelText: '邮箱',
-                      prefixIcon: Icon(Icons.email),
+                      labelText: '用户名',
+                      prefixIcon: Icon(Icons.person),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) return '请输入邮箱';
-                      if (!value.contains('@')) return '请输入有效的邮箱地址';
+                      if (value == null || value.isEmpty) return '请输入用户名';
                       return null;
                     },
                   ),
@@ -160,7 +196,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) return '请输入密码';
-                      if (value.length < 6) return '密码至少需要6位';
                       return null;
                     },
                   ),
@@ -172,7 +207,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     child:
                         _isLoading
-                            ? const CircularProgressIndicator()
+                            ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                             : const Text('登录', style: TextStyle(fontSize: 16)),
                   ),
                   const SizedBox(height: 16),
@@ -245,17 +287,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     Icons.sync,
                                     size: 14,
                                     color: Colors.blue,
-                                  ),
-                                ),
-                              ],
-                              if (_isEditingServer) ...[
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: _toggleEditServerMode,
-                                  child: const Icon(
-                                    Icons.cancel,
-                                    size: 14,
-                                    color: Colors.red,
                                   ),
                                 ),
                               ],
