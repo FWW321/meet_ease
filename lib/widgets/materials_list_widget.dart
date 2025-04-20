@@ -14,7 +14,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../utils/http_utils.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
 
 /// 会议资料列表组件
 class MaterialsListWidget extends ConsumerWidget {
@@ -593,7 +592,7 @@ class MaterialsListWidget extends ConsumerWidget {
                                   final request = http.MultipartRequest(
                                     'POST',
                                     Uri.parse(
-                                      '${AppConstants.apiBaseUrl}/meeting/file/upload',
+                                      '${AppConstants.apiBaseUrl}/meeting/file/upload/$meetingId',
                                     ),
                                   );
 
@@ -669,7 +668,7 @@ class MaterialsListWidget extends ConsumerWidget {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          '上传失败: ${response.statusCode}',
+                                          '上传失败: ${response.statusCode} - ${response.body}',
                                         ),
                                       ),
                                     );
@@ -913,9 +912,7 @@ class MaterialsListWidget extends ConsumerWidget {
       );
 
       // 刷新当前材料列表状态
-      if (ref != null) {
-        ref.invalidate(meetingMaterialsNotifierProvider(meetingId));
-      }
+      ref.invalidate(meetingMaterialsNotifierProvider(meetingId));
     } catch (e) {
       if (!context.mounted) return;
 

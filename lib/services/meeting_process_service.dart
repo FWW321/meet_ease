@@ -637,9 +637,29 @@ class ApiMeetingProcessService implements MeetingProcessService {
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
 
+        // 添加调试日志
+        print('获取会议资料响应: $responseData');
+
         // 检查响应码
-        if (responseData['code'] == 200 && responseData['data'] != null) {
-          final fileList = responseData['data'] as List<dynamic>;
+        if (responseData['code'] == 200) {
+          final data = responseData['data'];
+          final List<dynamic> fileList;
+
+          // 处理不同格式的响应数据
+          if (data is List) {
+            fileList = data;
+          } else if (data is Map && data.containsKey('records')) {
+            fileList = data['records'] as List<dynamic>;
+          } else if (data is Map && data.containsKey('files')) {
+            fileList = data['files'] as List<dynamic>;
+          } else {
+            // 返回空列表，避免出错
+            return MeetingMaterials(
+              meetingId: meetingId,
+              items: [],
+              updatedAt: DateTime.now(),
+            );
+          }
 
           // 将API响应数据转换为MaterialItem列表
           final materialItems =
@@ -679,7 +699,6 @@ class ApiMeetingProcessService implements MeetingProcessService {
                 }
 
                 // 构建文件URL
-                final String filePath = file['filePath'];
                 final String fileId = file['fileId'].toString();
                 final String fileUrl =
                     '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/$fileId';
