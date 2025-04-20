@@ -15,7 +15,7 @@ final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {
   final meetingService = ref.watch(meetingServiceProvider);
 
   // 根据环境配置决定使用模拟服务还是API服务
-  final bool useApiService = false; // 可以根据需要在这里切换
+  final bool useApiService = true; // 更改为true，使用API服务
 
   if (useApiService) {
     return ApiMeetingProcessService(meetingService);
@@ -26,8 +26,8 @@ final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {
 
 /// 会议服务提供者
 final meetingServiceProvider = Provider<MeetingService>((ref) {
-  // 目前使用模拟服务，后续可替换为真实API服务
-  return MockMeetingService();
+  // 使用真实API服务
+  return ApiMeetingService();
 });
 
 ///--------------------- 会议议程相关 ---------------------///

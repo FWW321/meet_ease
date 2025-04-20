@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'dart:io';
 import '../constants/app_constants.dart';
 import '../services/meeting_service.dart';
+import 'package:http/http.dart' as http;
+import '../utils/http_utils.dart';
 
 /// 会议过程管理服务接口
 abstract class MeetingProcessService {
@@ -622,7 +624,115 @@ class ApiMeetingProcessService implements MeetingProcessService {
 
   @override
   Future<MeetingMaterials> getMeetingMaterials(String meetingId) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 请求会议文件列表
+      final response = await client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/meeting/file/list/$meetingId'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final fileList = responseData['data'] as List<dynamic>;
+
+          // 将API响应数据转换为MaterialItem列表
+          final materialItems =
+              fileList.map<MaterialItem>((file) {
+                // 根据文件类型确定MaterialType
+                MaterialType fileType = MaterialType.other;
+                final String fileExt =
+                    file['fileType'].toString().toLowerCase();
+
+                if ([
+                  '.pdf',
+                  '.doc',
+                  '.docx',
+                  '.txt',
+                  '.xls',
+                  '.xlsx',
+                ].contains(fileExt)) {
+                  fileType = MaterialType.document;
+                } else if ([
+                  '.jpg',
+                  '.jpeg',
+                  '.png',
+                  '.gif',
+                  '.webp',
+                ].contains(fileExt)) {
+                  fileType = MaterialType.image;
+                } else if ([
+                  '.mp4',
+                  '.mov',
+                  '.avi',
+                  '.mkv',
+                  '.webm',
+                ].contains(fileExt)) {
+                  fileType = MaterialType.video;
+                } else if (['.ppt', '.pptx', '.key'].contains(fileExt)) {
+                  fileType = MaterialType.presentation;
+                }
+
+                // 构建文件URL
+                final String filePath = file['filePath'];
+                final String fileId = file['fileId'].toString();
+                final String fileUrl =
+                    '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/$fileId';
+
+                // 构建缩略图URL（如果是图片或视频类型）
+                String? thumbnailUrl;
+                if (fileType == MaterialType.image ||
+                    fileType == MaterialType.video) {
+                  thumbnailUrl = fileUrl;
+                }
+
+                // 解析上传时间
+                DateTime? uploadTime;
+                if (file['uploadTime'] != null) {
+                  try {
+                    uploadTime = DateTime.parse(file['uploadTime']);
+                  } catch (e) {
+                    // 忽略解析错误
+                  }
+                }
+
+                return MaterialItem(
+                  id: file['fileId'].toString(),
+                  title: file['fileName'],
+                  description: null, // API没有提供文件描述
+                  type: fileType,
+                  url: fileUrl,
+                  thumbnailUrl: thumbnailUrl,
+                  fileSize: file['fileSize'],
+                  uploaderId: file['uploaderId']?.toString(),
+                  uploaderName: null, // API没有提供上传者姓名
+                  uploadTime: uploadTime,
+                );
+              }).toList();
+
+          // 返回会议资料集合
+          return MeetingMaterials(
+            meetingId: meetingId,
+            items: materialItems,
+            updatedAt: DateTime.now(),
+          );
+        } else {
+          final message = responseData['message'] ?? '获取会议资料失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '获取会议资料请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('获取会议资料时出错: $e');
+    }
   }
 
   @override

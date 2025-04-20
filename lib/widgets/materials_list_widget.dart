@@ -7,6 +7,14 @@ import '../providers/meeting_process_providers.dart';
 import '../constants/app_constants.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show File, Platform, Process, Directory;
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import '../utils/http_utils.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:share_plus/share_plus.dart';
 
 /// 会议资料列表组件
 class MaterialsListWidget extends ConsumerWidget {
@@ -499,48 +507,88 @@ class MaterialsListWidget extends ConsumerWidget {
                                     uploaderName = userData['name'] ?? '';
                                   }
 
-                                  // 创建新的资料对象
-                                  final newMaterial = models.MaterialItem(
-                                    id:
-                                        'temp_${DateTime.now().millisecondsSinceEpoch}',
-                                    title: titleController.text,
-                                    description:
-                                        descriptionController.text.isEmpty
-                                            ? null
-                                            : descriptionController.text,
-                                    type: selectedType,
-                                    url: selectedFile!.path!, // 本地文件路径
-                                    thumbnailUrl:
-                                        selectedType ==
-                                                    models.MaterialType.image ||
-                                                selectedType ==
-                                                    models.MaterialType.video
-                                            ? selectedFile!.path!
-                                            : null,
-                                    fileSize: selectedFile!.size,
-                                    uploaderId: uploaderId,
-                                    uploaderName: uploaderName,
-                                    uploadTime: DateTime.now(),
+                                  // 直接创建HTTP客户端，调用上传文件的API
+                                  final client = http.Client();
+                                  final request = http.MultipartRequest(
+                                    'POST',
+                                    Uri.parse(
+                                      '${AppConstants.apiBaseUrl}/meeting/file/upload',
+                                    ),
                                   );
 
-                                  // 添加资料
-                                  final notifier = ref.read(
-                                    meetingMaterialsNotifierProvider(
-                                      meetingId,
-                                    ).notifier,
+                                  // 添加文件
+                                  request.files.add(
+                                    await http.MultipartFile.fromPath(
+                                      'file',
+                                      selectedFile!.path!,
+                                      filename: selectedFile!.name,
+                                    ),
                                   );
-                                  await notifier.addMaterial(newMaterial);
 
-                                  // 关闭加载指示器
-                                  Navigator.of(context).pop();
-
-                                  // 关闭对话框
-                                  Navigator.of(context).pop();
-
-                                  // 显示成功消息
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('资料上传成功')),
+                                  // 添加请求头
+                                  request.headers.addAll(
+                                    HttpUtils.createHeaders(),
                                   );
+
+                                  // 添加其他字段
+                                  request.fields['meetingId'] = meetingId;
+                                  request.fields['uploaderId'] = uploaderId;
+
+                                  // 发送请求
+                                  final streamedResponse = await request.send();
+                                  final response = await http
+                                      .Response.fromStream(streamedResponse);
+
+                                  // 处理响应
+                                  if (response.statusCode == 200) {
+                                    final responseData =
+                                        HttpUtils.decodeResponse(response);
+
+                                    if (responseData['code'] == 200) {
+                                      // 上传成功后刷新列表
+                                      ref.invalidate(
+                                        meetingMaterialsNotifierProvider(
+                                          meetingId,
+                                        ),
+                                      );
+
+                                      // 关闭加载指示器
+                                      Navigator.of(context).pop();
+
+                                      // 关闭对话框
+                                      Navigator.of(context).pop();
+
+                                      // 显示成功消息
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(content: Text('资料上传成功')),
+                                      );
+                                    } else {
+                                      // 关闭加载指示器
+                                      Navigator.of(context).pop();
+
+                                      final message =
+                                          responseData['message'] ?? '资料上传失败';
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(content: Text(message)),
+                                      );
+                                    }
+                                  } else {
+                                    // 关闭加载指示器
+                                    Navigator.of(context).pop();
+
+                                    // 显示错误消息
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          '上传失败: ${response.statusCode}',
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 } catch (e) {
                                   // 关闭加载指示器
                                   Navigator.of(context).pop();
@@ -593,19 +641,391 @@ class MaterialsListWidget extends ConsumerWidget {
   }
 
   // 打开资料
-  void _openMaterial(BuildContext context, models.MaterialItem material) {
-    // TODO: 实现打开资料的功能，可以使用url_launcher包
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('正在打开: ${material.title}')));
+  void _openMaterial(BuildContext context, models.MaterialItem material) async {
+    try {
+      // 构造正确的文件URL
+      final String fileUrl =
+          '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+      final Uri url = Uri.parse(fileUrl);
+      final bool canLaunch = await canLaunchUrl(url);
+
+      if (canLaunch) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        // 无法打开URL时显示错误
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('无法打开: ${material.title}')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('打开文件时出错: $e')));
+    }
+  }
+
+  // 请求存储权限
+  Future<bool> _requestStoragePermission(BuildContext context) async {
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      // 非移动平台不需要请求权限
+      return true;
+    }
+
+    if (Platform.isAndroid) {
+      // Android 13+需要照片和视频权限
+      try {
+        // 先检查是否永久拒绝了权限
+        if (await Permission.photos.isPermanentlyDenied ||
+            await Permission.videos.isPermanentlyDenied) {
+          // 如果任一权限被永久拒绝，引导用户去设置页面开启权限
+          return _showSettingsDialog(context, '照片和视频');
+        }
+
+        // 尝试请求照片权限
+        final photosStatus = await Permission.photos.request();
+        if (!photosStatus.isGranted) {
+          // 用户拒绝了权限，但未永久拒绝，不显示对话框，直接返回失败
+          return false;
+        }
+
+        // 尝试请求视频权限
+        final videosStatus = await Permission.videos.request();
+        if (!videosStatus.isGranted) {
+          // 用户拒绝了权限，但未永久拒绝，不显示对话框，直接返回失败
+          return false;
+        }
+
+        // 所有权限都已获取
+        return true;
+      } catch (e) {
+        debugPrint('请求权限出错: $e');
+        // 出错时尝试请求存储权限（兜底方案）
+        final status = await Permission.storage.request();
+        return status.isGranted;
+      }
+    } else if (Platform.isIOS) {
+      // iOS请求照片权限
+      if (await Permission.photos.isPermanentlyDenied) {
+        // 永久拒绝时引导用户去设置
+        return _showSettingsDialog(context, '照片访问');
+      }
+
+      final status = await Permission.photos.request();
+      return status.isGranted;
+    }
+
+    return true;
+  }
+
+  // 显示设置对话框
+  Future<bool> _showSettingsDialog(
+    BuildContext context,
+    String permissionName,
+  ) async {
+    final bool? goToSettings = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('需要权限'),
+            content: Text('下载文件需要$permissionName权限，请在设置中开启'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('前往设置'),
+              ),
+            ],
+          ),
+    );
+
+    if (goToSettings == true) {
+      await openAppSettings();
+    }
+
+    return false;
   }
 
   // 下载资料
-  void _downloadMaterial(BuildContext context, models.MaterialItem material) {
-    // TODO: 实现下载资料的功能
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('正在下载: ${material.title}')));
+  void _downloadMaterial(
+    BuildContext context,
+    models.MaterialItem material,
+  ) async {
+    try {
+      // 在Web平台上，直接打开URL即可
+      if (kIsWeb) {
+        // 构造正确的下载URL
+        final String downloadUrl =
+            '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+        await launchUrl(Uri.parse(downloadUrl));
+        return;
+      }
+
+      // 请求存储权限
+      if (!await _requestStoragePermission(context)) {
+        return; // 如果权限被拒绝，中止下载
+      }
+
+      // 显示加载指示器
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 16),
+              Text('正在下载: ${material.title}'),
+            ],
+          ),
+        ),
+      );
+
+      // 获取系统下载目录
+      final String downloadPath = await _getDownloadPath();
+
+      // 处理文件名重复问题
+      final String originalFilename = material.title;
+      String filePath = '$downloadPath/$originalFilename';
+
+      // 检查文件是否已存在，如果存在则添加编号
+      final file = File(filePath);
+      if (await file.exists()) {
+        // 分离文件名和扩展名
+        final int lastDotIndex = originalFilename.lastIndexOf('.');
+        String nameWithoutExtension;
+        String extension;
+
+        if (lastDotIndex != -1) {
+          nameWithoutExtension = originalFilename.substring(0, lastDotIndex);
+          extension = originalFilename.substring(lastDotIndex);
+        } else {
+          nameWithoutExtension = originalFilename;
+          extension = '';
+        }
+
+        // 尝试查找一个可用的文件名，最多尝试100次
+        int counter = 1;
+        String newFilename;
+        File newFile;
+
+        do {
+          newFilename = '$nameWithoutExtension($counter)$extension';
+          filePath = '$downloadPath/$newFilename';
+          newFile = File(filePath);
+          counter++;
+        } while (await newFile.exists() && counter <= 100);
+      }
+
+      // 确保目录存在
+      final directory = File(filePath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      // 构造正确的下载URL
+      final String downloadUrl =
+          '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+
+      // 下载文件
+      final response = await http.get(Uri.parse(downloadUrl));
+
+      // 写入文件
+      await File(filePath).writeAsBytes(response.bodyBytes);
+
+      // 获取下载后的文件名
+      final downloadedFilename = filePath.split('/').last;
+
+      // 显示成功消息，包含文件路径，并提供打开选项
+      scaffoldMessenger.hideCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('已下载: $downloadedFilename'),
+              const SizedBox(height: 4),
+              Text(
+                '路径: $filePath',
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: '打开',
+            onPressed: () {
+              _openDownloadedFile(filePath, context);
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      // 显示错误消息
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
+    }
+  }
+
+  // 打开已下载的文件
+  void _openDownloadedFile(String filePath, BuildContext context) {
+    try {
+      final file = File(filePath);
+
+      if (!file.existsSync()) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('文件不存在或已被移动')));
+        return;
+      }
+
+      // 显示选项菜单
+      showModalBottomSheet(
+        context: context,
+        builder:
+            (context) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.folder_open),
+                    title: const Text('打开文件所在文件夹'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openFileLocation(filePath);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.share),
+                    title: const Text('分享文件'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _shareFile(filePath, context);
+                    },
+                  ),
+                ],
+              ),
+            ),
+      );
+    } catch (e) {
+      debugPrint('处理文件失败: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('处理文件失败: $e')));
+    }
+  }
+
+  // 分享文件
+  Future<void> _shareFile(String filePath, BuildContext context) async {
+    try {
+      // 使用最基本的分享方法
+      await Share.share('文件路径: $filePath');
+      debugPrint('文件分享操作完成');
+    } catch (e) {
+      debugPrint('分享文件失败: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('分享文件失败: $e')));
+    }
+  }
+
+  // 获取系统下载目录路径
+  Future<String> _getDownloadPath() async {
+    try {
+      if (Platform.isAndroid) {
+        // Android: 使用公共下载目录
+        // 直接使用公共路径，需要已经有存储权限
+        const downloadPath = '/storage/emulated/0/Download';
+        final downloadDir = Directory(downloadPath);
+
+        // 确保目录存在
+        if (!await downloadDir.exists()) {
+          await downloadDir.create(recursive: true);
+        }
+        return downloadPath;
+      } else if (Platform.isWindows) {
+        // Windows: 使用用户下载目录
+        return '${Platform.environment['USERPROFILE']}\\Downloads';
+      } else if (Platform.isMacOS || Platform.isLinux) {
+        // macOS/Linux: 使用用户下载目录
+        return '${Platform.environment['HOME']}/Downloads';
+      }
+
+      // 其他平台或回退策略: 使用应用文档目录
+      final directory = await getApplicationDocumentsDirectory();
+      final downloadsDirectory = Directory('${directory.path}/Downloads');
+      if (!await downloadsDirectory.exists()) {
+        await downloadsDirectory.create(recursive: true);
+      }
+      return downloadsDirectory.path;
+    } catch (e) {
+      // 如果发生任何错误，回退到临时目录
+      final directory = await getTemporaryDirectory();
+      final downloadDir = Directory('${directory.path}/downloads');
+      if (!await downloadDir.exists()) {
+        await downloadDir.create(recursive: true);
+      }
+      return downloadDir.path;
+    }
+  }
+
+  // 打开文件所在位置
+  Future<void> _openFileLocation(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        debugPrint('文件不存在: $filePath');
+        return;
+      }
+
+      if (Platform.isAndroid) {
+        // 在Android上直接使用系统文件浏览器打开文件夹
+        final directory = file.parent.path;
+
+        // 尝试构建一个文件夹的content URI
+        final contentUri = Uri.parse(
+          'content://com.android.externalstorage.documents/document/primary:${directory.replaceFirst('/storage/emulated/0/', '')}',
+        );
+
+        // 使用ACTION_VIEW打开文件夹
+        if (await canLaunchUrl(contentUri)) {
+          await launchUrl(contentUri, mode: LaunchMode.externalApplication);
+        } else {
+          // 如果无法打开content URI，尝试直接打开文件URI
+          final fileUri = Uri.parse('file://$directory');
+          if (await canLaunchUrl(fileUri)) {
+            await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+          } else {
+            debugPrint('无法打开文件夹: $directory');
+          }
+        }
+      } else if (Platform.isWindows) {
+        // Windows: 使用explorer打开文件所在文件夹并选中文件
+        await Process.run('explorer.exe', ['/select,', filePath]);
+      } else if (Platform.isMacOS) {
+        // macOS: 使用open -R命令打开文件所在文件夹并选中文件
+        await Process.run('open', ['-R', filePath]);
+      } else if (Platform.isLinux) {
+        // Linux: 尝试使用xdg-open打开文件所在文件夹
+        final directory = file.parent.path;
+        await Process.run('xdg-open', [directory]);
+      } else {
+        // 其他平台: 尝试直接打开文件
+        final uri = Uri.file(filePath);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        }
+      }
+    } catch (e) {
+      debugPrint('打开文件位置失败: $e');
+    }
   }
 
   // 格式化文件大小
