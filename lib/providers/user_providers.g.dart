@@ -170,13 +170,13 @@ class _UserProviderElement extends AutoDisposeFutureProviderElement<User>
   String get userId => (origin as UserProvider).userId;
 }
 
-String _$currentUserIdHash() => r'2c3515c14431a3420b92628f42b85440c86787b0';
+String _$currentUserIdHash() => r'e60b501b1d0dc8be43f3238891cb5477e070371a';
 
 /// 当前用户ID提供者 (通常从本地存储或会话中获取)
 ///
 /// Copied from [currentUserId].
 @ProviderFor(currentUserId)
-final currentUserIdProvider = AutoDisposeProvider<String>.internal(
+final currentUserIdProvider = AutoDisposeFutureProvider<String>.internal(
   currentUserId,
   name: r'currentUserIdProvider',
   debugGetCreateSourceHash:
@@ -189,7 +189,7 @@ final currentUserIdProvider = AutoDisposeProvider<String>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef CurrentUserIdRef = AutoDisposeProviderRef<String>;
+typedef CurrentUserIdRef = AutoDisposeFutureProviderRef<String>;
 String _$authStateHash() => r'33fceb0dde28b06909a44ef5707a318f5e48fe67';
 
 /// 用户登录状态提供者

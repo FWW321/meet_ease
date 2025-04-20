@@ -15,7 +15,10 @@ final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {
   final meetingService = ref.watch(meetingServiceProvider);
 
   // 根据环境配置决定使用模拟服务还是API服务
-  final bool useApiService = true; // 更改为true，使用API服务
+  final bool useApiService = const bool.fromEnvironment(
+    'USE_API_SERVICE',
+    defaultValue: true,
+  );
 
   if (useApiService) {
     return ApiMeetingProcessService(meetingService);

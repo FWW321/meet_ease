@@ -8,17 +8,36 @@ import '../widgets/meeting_password_dialog.dart';
 import 'meeting_process_page.dart';
 import 'meeting_settings_page.dart';
 
-class MeetingDetailPage extends ConsumerWidget {
+class MeetingDetailPage extends ConsumerStatefulWidget {
   final String meetingId;
 
   const MeetingDetailPage({required this.meetingId, super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final meetingAsync = ref.watch(meetingDetailProvider(meetingId));
+  ConsumerState<MeetingDetailPage> createState() => _MeetingDetailPageState();
+}
 
-    // 获取当前用户ID
-    final currentUserId = ref.watch(currentUserIdProvider);
+class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
+  String? currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserId();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final userId = await ref.read(currentUserIdProvider.future);
+    if (mounted) {
+      setState(() {
+        currentUserId = userId;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final meetingAsync = ref.watch(meetingDetailProvider(widget.meetingId));
 
     return Scaffold(
       appBar: AppBar(
@@ -28,12 +47,13 @@ class MeetingDetailPage extends ConsumerWidget {
           meetingAsync.when(
             data: (meeting) {
               // 只有创建者可以看到更多操作按钮
-              if (meeting.isCreatorOnly(currentUserId)) {
+              if (currentUserId != null &&
+                  meeting.isCreatorOnly(currentUserId!)) {
                 return PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'cancel' &&
                         meeting.status == MeetingStatus.upcoming) {
-                      _showCancelConfirmDialog(context, ref, currentUserId);
+                      _showCancelConfirmDialog(context, ref, currentUserId!);
                     }
                   },
                   itemBuilder: (context) {
@@ -63,7 +83,8 @@ class MeetingDetailPage extends ConsumerWidget {
       body: meetingAsync.when(
         data: (meeting) {
           // 检查用户是否被拉黑
-          if (meeting.blacklist.contains(currentUserId)) {
+          if (currentUserId != null &&
+              meeting.blacklist.contains(currentUserId)) {
             return const Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -82,7 +103,8 @@ class MeetingDetailPage extends ConsumerWidget {
           }
 
           // 检查用户是否可以管理会议
-          final canManageMeeting = meeting.canUserManage(currentUserId);
+          final canManageMeeting =
+              currentUserId != null && meeting.canUserManage(currentUserId!);
 
           // 检查会议是否可以设置（未结束的会议）
           final canConfigureMeeting =
@@ -91,7 +113,10 @@ class MeetingDetailPage extends ConsumerWidget {
               canManageMeeting;
 
           // 获取当前用户的权限
-          final userPermission = meeting.getUserPermission(currentUserId);
+          final userPermission =
+              currentUserId != null
+                  ? meeting.getUserPermission(currentUserId!)
+                  : MeetingPermission.participant;
 
           // 检查会议是否已取消
           final isCancelled = meeting.status == MeetingStatus.cancelled;
@@ -164,7 +189,7 @@ class MeetingDetailPage extends ConsumerWidget {
               ]),
 
               // 会议参与者（显示创建者和管理员标识）
-              _buildParticipantsList(context, ref, meeting),
+              _buildParticipantsList(context, meeting),
 
               // 如果会议已取消，显示取消原因
               if (isCancelled)
@@ -211,7 +236,7 @@ class MeetingDetailPage extends ConsumerWidget {
                 ElevatedButton.icon(
                   icon: const Icon(Icons.admin_panel_settings),
                   label: const Text('权限管理'),
-                  onPressed: () => _navigateToSettings(context, currentUserId),
+                  onPressed: () => _navigateToSettings(context),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -250,13 +275,15 @@ class MeetingDetailPage extends ConsumerWidget {
   }
 
   // 导航到权限管理页面
-  void _navigateToSettings(BuildContext context, String currentUserId) {
+  void _navigateToSettings(BuildContext context) {
+    if (currentUserId == null) return;
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
             (context) => MeetingSettingsPage(
-              meetingId: meetingId,
-              currentUserId: currentUserId,
+              meetingId: widget.meetingId,
+              currentUserId: currentUserId!,
             ),
       ),
     );
@@ -281,7 +308,8 @@ class MeetingDetailPage extends ConsumerWidget {
       final passwordValid = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => MeetingPasswordDialog(meetingId: meetingId),
+        builder:
+            (context) => MeetingPasswordDialog(meetingId: widget.meetingId),
       );
 
       // 如果密码验证失败或用户取消，则不进入会议
@@ -296,22 +324,22 @@ class MeetingDetailPage extends ConsumerWidget {
         context,
         MaterialPageRoute(
           builder:
-              (context) =>
-                  MeetingProcessPage(meetingId: meetingId, meeting: meeting),
+              (context) => MeetingProcessPage(
+                meetingId: widget.meetingId,
+                meeting: meeting,
+              ),
         ),
       );
     }
   }
 
   // 构建会议参与者列表
-  Widget _buildParticipantsList(
-    BuildContext context,
-    WidgetRef ref,
-    Meeting meeting,
-  ) {
-    final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
-    final currentUserId = ref.watch(currentUserIdProvider);
-    final canManageMeeting = meeting.canUserManage(currentUserId);
+  Widget _buildParticipantsList(BuildContext context, Meeting meeting) {
+    final participantsAsync = ref.watch(
+      meetingParticipantsProvider(widget.meetingId),
+    );
+    final canManageMeeting =
+        currentUserId != null && meeting.canUserManage(currentUserId!);
 
     // 决定标题文字
     final titleText =
@@ -550,10 +578,13 @@ class MeetingDetailPage extends ConsumerWidget {
                   try {
                     // 调用取消会议服务
                     final meetingService = ref.read(meetingServiceProvider);
-                    await meetingService.cancelMeeting(meetingId, creatorId);
+                    await meetingService.cancelMeeting(
+                      widget.meetingId,
+                      creatorId,
+                    );
 
                     // 刷新会议详情
-                    ref.invalidate(meetingDetailProvider(meetingId));
+                    ref.invalidate(meetingDetailProvider(widget.meetingId));
 
                     if (context.mounted) {
                       // 关闭加载指示器

@@ -7,7 +7,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_providers.dart';
 import '../services/service_providers.dart';
-import '../services/emoji_service.dart';
 
 /// 优化的聊天组件，作为会议中的主要内容
 class ChatWidget extends HookConsumerWidget {
@@ -321,7 +320,7 @@ class ChatWidget extends HookConsumerWidget {
     }
 
     // 构建表情选择器 - 移到类方法中，接收参数
-    Widget _buildEmojiPicker(
+    Widget buildEmojiPicker(
       Map<String, List<String>> emojisData,
       ValueNotifier<String> selectedCategory,
       Function(String) onEmojiSelected,
@@ -718,7 +717,7 @@ class ChatWidget extends HookConsumerWidget {
 
         // 表情选择器 - 当键盘不可见且启用表情选择器时显示
         if (showEmojiPicker.value && !isKeyboardVisible.value)
-          _buildEmojiPicker(
+          buildEmojiPicker(
             emojisData.value,
             selectedEmojiCategory,
             insertEmoji,
@@ -818,7 +817,14 @@ class ChatWidget extends HookConsumerWidget {
           color: bubbleColor,
           borderRadius: BorderRadius.circular(18),
         ),
-        child: SelectableText(message.content),
+        child: SelectableText(
+          message.content,
+          style: const TextStyle(
+            fontSize: 16.0,
+            height: 1.4,
+            letterSpacing: 0.2,
+          ),
+        ),
       );
     } else {
       // 语音消息

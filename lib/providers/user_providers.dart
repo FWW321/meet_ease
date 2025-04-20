@@ -28,9 +28,11 @@ Future<User> user(Ref ref, String userId) async {
 
 /// 当前用户ID提供者 (通常从本地存储或会话中获取)
 @riverpod
-String currentUserId(Ref ref) {
-  // 目前返回固定值，实际应用中应该从本地存储或会话中获取
-  return 'user1';
+Future<String> currentUserId(Ref ref) async {
+  final userService = ref.watch(userServiceProvider);
+  final user = await userService.getUserFromLocal();
+  // 如果找不到用户，返回空字符串
+  return user?.id ?? '';
 }
 
 /// 用户登录状态提供者

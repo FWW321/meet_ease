@@ -5,17 +5,15 @@ import '../models/meeting.dart';
 import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
-import '../providers/webrtc_providers.dart';
 import '../widgets/agenda_list_widget.dart';
 import '../widgets/materials_list_widget.dart';
 import '../widgets/notes_list_widget.dart';
 import '../widgets/votes_list_widget.dart';
 import '../widgets/chat_widget.dart';
 import '../widgets/voice_meeting_widget.dart';
-import '../pages/meeting_settings_page.dart';
 
 /// 会议过程管理页面 - 以实时语音为主要内容的界面
-class MeetingProcessPage extends HookConsumerWidget {
+class MeetingProcessPage extends StatefulHookConsumerWidget {
   final String meetingId;
   final Meeting meeting;
 
@@ -26,12 +24,34 @@ class MeetingProcessPage extends HookConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MeetingProcessPage> createState() => _MeetingProcessPageState();
+}
+
+class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
+  String? currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUserId();
+  }
+
+  Future<void> _loadCurrentUserId() async {
+    final userId = await ref.read(currentUserIdProvider.future);
+    if (mounted) {
+      setState(() {
+        currentUserId = userId;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // 是否为已结束的会议
-    final isCompletedMeeting = meeting.status == MeetingStatus.completed;
+    final isCompletedMeeting = widget.meeting.status == MeetingStatus.completed;
 
     // 检查会议是否已取消
-    final isCancelledMeeting = meeting.status == MeetingStatus.cancelled;
+    final isCancelledMeeting = widget.meeting.status == MeetingStatus.cancelled;
 
     // 如果会议已取消，显示无法进入提示并返回
     if (isCancelledMeeting) {
@@ -70,11 +90,10 @@ class MeetingProcessPage extends HookConsumerWidget {
       );
     }
 
-    // 获取当前用户ID
-    final currentUserId = ref.watch(currentUserIdProvider);
-
     // 检查当前用户是否在黑名单中
-    final isBlocked = meeting.blacklist.contains(currentUserId);
+    final isBlocked =
+        currentUserId != null &&
+        widget.meeting.blacklist.contains(currentUserId);
 
     // 如果用户在黑名单中，显示拒绝访问提示
     if (isBlocked) {
@@ -104,8 +123,11 @@ class MeetingProcessPage extends HookConsumerWidget {
       );
     }
 
+    // 使用hooks
     // 签到状态
-    final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
+    final signInStatusAsync = ref.watch(
+      meetingSignInProvider(widget.meetingId),
+    );
 
     // 是否显示签到对话框
     final isShowingSignInDialog = useState(false);
@@ -114,7 +136,9 @@ class MeetingProcessPage extends HookConsumerWidget {
     final selectedFeatureIndex = useState(-1);
 
     // 获取参会人员列表
-    final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
+    final participantsAsync = ref.watch(
+      meetingParticipantsProvider(widget.meetingId),
+    );
 
     // 功能选项列表
     final features = [
@@ -156,7 +180,7 @@ class MeetingProcessPage extends HookConsumerWidget {
     List<Widget> buildActions() {
       return [
         // 签到按钮 - 仅在进行中且未签到的会议显示
-        if (meeting.status == MeetingStatus.ongoing)
+        if (widget.meeting.status == MeetingStatus.ongoing)
           signInStatusAsync.when(
             data:
                 (isSignedIn) =>
@@ -192,7 +216,9 @@ class MeetingProcessPage extends HookConsumerWidget {
                   color: Colors.red,
                   tooltip: '签到状态获取失败',
                   onPressed:
-                      () => ref.invalidate(meetingSignInProvider(meetingId)),
+                      () => ref.invalidate(
+                        meetingSignInProvider(widget.meetingId),
+                      ),
                 ),
           ),
 
@@ -208,13 +234,13 @@ class MeetingProcessPage extends HookConsumerWidget {
           ),
 
         // 显示用户权限徽章
-        if (!isCompletedMeeting)
+        if (!isCompletedMeeting && currentUserId != null)
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: Chip(
               label: Text(
                 getMeetingPermissionText(
-                  meeting.getUserPermission(currentUserId),
+                  widget.meeting.getUserPermission(currentUserId!),
                 ),
               ),
               backgroundColor: Colors.blue.shade100,
@@ -242,8 +268,9 @@ class MeetingProcessPage extends HookConsumerWidget {
               );
 
               // 创建者可以结束进行中的会议
-              if (meeting.isCreatorOnly(currentUserId) &&
-                  meeting.status == MeetingStatus.ongoing) {
+              if (currentUserId != null &&
+                  widget.meeting.isCreatorOnly(currentUserId!) &&
+                  widget.meeting.status == MeetingStatus.ongoing) {
                 menuItems.add(
                   const PopupMenuItem(
                     value: 'end_meeting',
@@ -267,7 +294,9 @@ class MeetingProcessPage extends HookConsumerWidget {
                 // 实现邀请参会者功能
                 break;
               case 'end_meeting':
-                _showEndMeetingConfirmDialog(context, ref, currentUserId);
+                if (currentUserId != null) {
+                  _showEndMeetingConfirmDialog(context, ref, currentUserId!);
+                }
                 break;
               case 'exit':
                 Navigator.of(context).pop();
@@ -291,7 +320,10 @@ class MeetingProcessPage extends HookConsumerWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(meeting.title), actions: buildActions()),
+      appBar: AppBar(
+        title: Text(widget.meeting.title),
+        actions: buildActions(),
+      ),
       body: Stack(
         children: [
           // 主体内容 - 实时语音通话或历史记录
@@ -301,8 +333,8 @@ class MeetingProcessPage extends HookConsumerWidget {
                 isCompletedMeeting
                     ? _buildCompletedMeetingView(ref)
                     : VoiceMeetingWidget(
-                      meetingId: meetingId,
-                      userId: currentUserId,
+                      meetingId: widget.meetingId,
+                      userId: currentUserId ?? '',
                       userName: '当前用户', // 替换为实际用户名
                     ),
           ),
@@ -423,7 +455,9 @@ class MeetingProcessPage extends HookConsumerWidget {
   // 构建已结束会议的主视图
   Widget _buildCompletedMeetingView(WidgetRef ref) {
     // 获取签到状态
-    final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
+    final signInStatusAsync = ref.watch(
+      meetingSignInProvider(widget.meetingId),
+    );
 
     return Column(
       children: [
@@ -454,7 +488,7 @@ class MeetingProcessPage extends HookConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                '会议结束时间：${meeting.endTime.toString().substring(0, 16)}',
+                '会议结束时间：${widget.meeting.endTime.toString().substring(0, 16)}',
                 style: const TextStyle(color: Colors.grey),
               ),
               const SizedBox(height: 12),
@@ -582,22 +616,22 @@ class MeetingProcessPage extends HookConsumerWidget {
   Widget _buildFeaturePanel(
     int index, {
     bool isReadOnly = false,
-    required String currentUserId,
+    required String? currentUserId,
     required AsyncValue<List<User>> participants,
     required WidgetRef ref,
   }) {
     // 功能列表
     final functionWidgets = [
       ChatWidget(
-        meetingId: meetingId,
+        meetingId: widget.meetingId,
         isReadOnly: isReadOnly,
-        userId: currentUserId,
+        userId: currentUserId ?? '',
         userName: '当前用户', // 替换为实际用户名
       ),
-      AgendaListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
-      MaterialsListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
-      NotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
-      VotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+      AgendaListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
+      MaterialsListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
+      NotesListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
+      VotesListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
     ];
 
     if (index >= 0 && index < functionWidgets.length) {
@@ -618,22 +652,28 @@ class MeetingProcessPage extends HookConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildInfoRow('标题', meeting.title),
+                _buildInfoRow('标题', widget.meeting.title),
                 _buildInfoRow(
                   '开始时间',
-                  meeting.startTime.toString().substring(0, 16),
+                  widget.meeting.startTime.toString().substring(0, 16),
                 ),
                 _buildInfoRow(
                   '结束时间',
-                  meeting.endTime.toString().substring(0, 16),
+                  widget.meeting.endTime.toString().substring(0, 16),
                 ),
-                _buildInfoRow('地点', meeting.location),
-                _buildInfoRow('状态', getMeetingStatusText(meeting.status)),
-                _buildInfoRow('类型', getMeetingTypeText(meeting.type)),
-                _buildInfoRow('组织者', meeting.organizerName),
-                if (meeting.description != null)
-                  _buildInfoRow('描述', meeting.description!),
-                _buildInfoRow('参与人数', meeting.participantCount.toString()),
+                _buildInfoRow('地点', widget.meeting.location),
+                _buildInfoRow(
+                  '状态',
+                  getMeetingStatusText(widget.meeting.status),
+                ),
+                _buildInfoRow('类型', getMeetingTypeText(widget.meeting.type)),
+                _buildInfoRow('组织者', widget.meeting.organizerName),
+                if (widget.meeting.description != null)
+                  _buildInfoRow('描述', widget.meeting.description!),
+                _buildInfoRow(
+                  '参与人数',
+                  widget.meeting.participantCount.toString(),
+                ),
               ],
             ),
             actions: [
@@ -663,11 +703,11 @@ class MeetingProcessPage extends HookConsumerWidget {
                 const Text('确认签到本次会议吗？'),
                 const SizedBox(height: 16),
                 Text(
-                  meeting.title,
+                  widget.meeting.title,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  '开始时间：${meeting.startTime.toString().substring(0, 16)}',
+                  '开始时间：${widget.meeting.startTime.toString().substring(0, 16)}',
                   style: const TextStyle(color: Colors.grey),
                 ),
               ],
@@ -683,7 +723,7 @@ class MeetingProcessPage extends HookConsumerWidget {
               Consumer(
                 builder: (context, ref, child) {
                   final signInAsyncValue = ref.watch(
-                    meetingSignInProvider(meetingId),
+                    meetingSignInProvider(widget.meetingId),
                   );
                   final isLoading = signInAsyncValue.isLoading;
 
@@ -694,7 +734,9 @@ class MeetingProcessPage extends HookConsumerWidget {
                             : () async {
                               await ref
                                   .read(
-                                    meetingSignInProvider(meetingId).notifier,
+                                    meetingSignInProvider(
+                                      widget.meetingId,
+                                    ).notifier,
                                   )
                                   .signIn();
                               if (context.mounted) {
@@ -767,10 +809,13 @@ class MeetingProcessPage extends HookConsumerWidget {
                   try {
                     // 调用结束会议服务
                     final meetingService = ref.read(meetingServiceProvider);
-                    await meetingService.endMeeting(meetingId, currentUserId);
+                    await meetingService.endMeeting(
+                      widget.meetingId,
+                      currentUserId,
+                    );
 
                     // 刷新会议详情
-                    ref.invalidate(meetingDetailProvider(meetingId));
+                    ref.invalidate(meetingDetailProvider(widget.meetingId));
 
                     if (context.mounted) {
                       // 关闭加载指示器

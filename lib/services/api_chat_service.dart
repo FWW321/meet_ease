@@ -18,13 +18,16 @@ class ApiChatService implements ChatService {
       final response = await http
           .get(
             Uri.parse('${AppConstants.apiBaseUrl}/chat/messages/$meetingId'),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
           )
           .timeout(Duration(milliseconds: AppConstants.apiTimeout));
 
       print('API响应: 状态码=${response.statusCode}');
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
+        final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
         print('API响应内容: $jsonResponse');
 
         if (jsonResponse['code'] == 200) {
@@ -48,7 +51,9 @@ class ApiChatService implements ChatService {
           throw Exception('获取消息失败: ${jsonResponse['message']}');
         }
       } else {
-        print('HTTP错误: ${response.statusCode}, 响应内容: ${response.body}');
+        print(
+          'HTTP错误: ${response.statusCode}, 响应内容: ${utf8.decode(response.bodyBytes)}',
+        );
         throw Exception('获取消息失败: ${response.statusCode}');
       }
     } catch (e) {
@@ -66,22 +71,27 @@ class ApiChatService implements ChatService {
     String? senderAvatar,
   }) async {
     try {
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'userId': senderId,
+        'senderName': senderName,
+        'content': content,
+        'messageType': 'CHAT',
+      });
+
       final response = await http
           .post(
             Uri.parse('${AppConstants.apiBaseUrl}/chat/send'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'meetingId': meetingId,
-              'userId': senderId,
-              'senderName': senderName,
-              'content': content,
-              'messageType': 'CHAT',
-            }),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: requestBody,
           )
           .timeout(Duration(milliseconds: AppConstants.apiTimeout));
 
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
+        final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
         if (jsonResponse['code'] == 200) {
           final messageJson = jsonResponse['data'];
           final message = ChatMessage.fromJson(messageJson);
@@ -110,25 +120,30 @@ class ApiChatService implements ChatService {
     String? senderAvatar,
   }) async {
     try {
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'userId': senderId,
+        'senderName': senderName,
+        'content': jsonEncode({
+          'voiceUrl': voiceUrl,
+          'voiceDuration': voiceDuration.inSeconds,
+        }),
+        'messageType': 'VOICE',
+      });
+
       final response = await http
           .post(
             Uri.parse('${AppConstants.apiBaseUrl}/chat/send'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'meetingId': meetingId,
-              'userId': senderId,
-              'senderName': senderName,
-              'content': jsonEncode({
-                'voiceUrl': voiceUrl,
-                'voiceDuration': voiceDuration.inSeconds,
-              }),
-              'messageType': 'VOICE',
-            }),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: requestBody,
           )
           .timeout(Duration(milliseconds: AppConstants.apiTimeout));
 
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
+        final jsonResponse = jsonDecode(utf8.decode(response.bodyBytes));
         if (jsonResponse['code'] == 200) {
           final messageJson = jsonResponse['data'];
           final message = ChatMessage.fromJson(messageJson);
@@ -153,7 +168,10 @@ class ApiChatService implements ChatService {
       await http
           .post(
             Uri.parse('${AppConstants.apiBaseUrl}/chat/read'),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
             body: jsonEncode({'messageId': messageId, 'userId': userId}),
           )
           .timeout(Duration(milliseconds: AppConstants.apiTimeout));

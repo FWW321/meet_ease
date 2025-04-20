@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:convert' show utf8;
+import 'dart:convert' show base64;
 
 /// 聊天消息类型枚举
 enum ChatMessageType {
@@ -72,10 +74,24 @@ class ChatMessage {
       final messageTypeStr = json['messageType']?.toString() ?? 'CHAT';
       final messageType = messageTypeFromString(messageTypeStr);
 
-      // 解析内容
+      // 解析内容 - 确保使用正确的UTF-8编码
       var content = '';
       if (json['content'] != null) {
         content = json['content'].toString();
+        // 尝试处理可能的编码问题
+        try {
+          // 如果内容看起来是Base64编码的UTF-8字符串，尝试解码
+          if (RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(content) &&
+              content.length % 4 == 0) {
+            final decoded = utf8.decode(base64.decode(content));
+            if (decoded.isNotEmpty) {
+              content = decoded;
+            }
+          }
+        } catch (e) {
+          print('尝试解码内容失败，保持原始内容: $e');
+          // 保持原始内容
+        }
       }
 
       Duration? voiceDuration;
