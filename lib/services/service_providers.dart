@@ -1,5 +1,6 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'chat_service.dart';
+import 'api_chat_service.dart';
 import 'meeting_process_service.dart';
 import 'speech_request_service.dart';
 import 'webrtc_service.dart';
@@ -23,7 +24,7 @@ final speechRequestServiceProvider = Provider<SpeechRequestService>((ref) {
 
 // 聊天服务提供者
 final chatServiceProvider = Provider<ChatService>((ref) {
-  return MockChatService();
+  return ApiChatService();
 });
 
 // WebRTC服务提供者

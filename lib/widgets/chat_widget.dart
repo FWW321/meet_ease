@@ -52,6 +52,16 @@ class ChatWidget extends HookConsumerWidget {
     // 聚焦节点
     final focusNode = useFocusNode();
 
+    // 是否正在加载历史消息
+    final isLoadingHistory = useState(false);
+
+    // 使用useEffect在组件第一次加载时加载历史消息
+    useEffect(() {
+      // 强制刷新消息列表
+      ref.invalidate(meetingMessagesProvider(meetingId));
+      return null;
+    }, []);
+
     // 监听焦点变化，隐藏表情选择器
     useEffect(() {
       void onFocusChange() {
@@ -99,6 +109,9 @@ class ChatWidget extends HookConsumerWidget {
 
         // 滚动到底部
         scrollToBottom();
+
+        // 刷新聊天消息列表
+        ref.invalidate(meetingMessagesProvider(meetingId));
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(
@@ -232,106 +245,116 @@ class ChatWidget extends HookConsumerWidget {
                 }
               });
 
-              return Stack(
-                children: [
-                  ListView.builder(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messages[index];
-                      final previousMessage =
-                          index > 0 ? messages[index - 1] : null;
+              return RefreshIndicator(
+                onRefresh: () async {
+                  // 下拉刷新重新加载消息
+                  isLoadingHistory.value = true;
+                  try {
+                    ref.invalidate(meetingMessagesProvider(meetingId));
+                    await ref.read(meetingMessagesProvider(meetingId).future);
+                  } finally {
+                    isLoadingHistory.value = false;
+                  }
+                },
+                child: Stack(
+                  children: [
+                    ListView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        final previousMessage =
+                            index > 0 ? messages[index - 1] : null;
 
-                      // 是否需要显示日期分隔
-                      final showDate =
-                          showDateSeparator.value &&
-                          (previousMessage == null ||
-                              !_isSameDay(
-                                previousMessage.timestamp,
-                                message.timestamp,
-                              ));
+                        // 是否需要显示日期分隔
+                        final showDate =
+                            showDateSeparator.value &&
+                            (previousMessage == null ||
+                                !_isSameDay(
+                                  message.timestamp,
+                                  previousMessage.timestamp,
+                                ));
 
-                      // 是否需要显示头像和昵称（同一用户连续发言只显示一次）
-                      final showSenderInfo =
-                          previousMessage == null ||
-                          previousMessage.senderId != message.senderId ||
-                          message.timestamp
-                                  .difference(previousMessage.timestamp)
-                                  .inMinutes >
-                              5;
+                        // 是否为当前用户发送的消息
+                        final isCurrentUser = message.senderId == userId;
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 日期分隔
-                          if (showDate) _buildDateSeparator(message.timestamp),
+                        return Column(
+                          children: [
+                            // 显示日期分隔线
+                            if (showDate)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 8.0,
+                                  bottom: 16.0,
+                                ),
+                                child: _buildDateSeparator(message.timestamp),
+                              ),
 
-                          // 消息项
-                          _buildMessageItem(
-                            context,
-                            message,
-                            showSenderInfo: showSenderInfo,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-
-                  // 回到底部按钮
-                  Positioned(
-                    right: 16,
-                    bottom: 16,
-                    child: AnimatedBuilder(
-                      animation: scrollController,
-                      builder: (context, _) {
-                        if (!scrollController.hasClients) {
-                          return const SizedBox.shrink();
-                        }
-
-                        // 只有滚动位置距离底部超过200才显示按钮
-                        final showButton =
-                            scrollController.position.pixels <
-                            scrollController.position.maxScrollExtent - 200;
-
-                        return AnimatedOpacity(
-                          opacity: showButton ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 200),
-                          child:
-                              showButton
-                                  ? FloatingActionButton.small(
-                                    onPressed: scrollToBottom,
-                                    backgroundColor: Colors.white,
-                                    elevation: 4,
-                                    child: const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: Colors.grey,
-                                    ),
-                                  )
-                                  : const SizedBox.shrink(),
+                            // 消息气泡
+                            _buildMessageBubble(
+                              context,
+                              message,
+                              isCurrentUser,
+                            ),
+                          ],
                         );
                       },
                     ),
-                  ),
-                ],
+
+                    // 加载历史消息指示器
+                    if (isLoadingHistory.value)
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: LinearProgressIndicator(),
+                      ),
+                  ],
+                ),
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
-                (error, stackTrace) => Center(
-                  child: SelectableText.rich(
-                    TextSpan(
-                      children: [
-                        const TextSpan(
-                          text: '获取消息失败\n',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
+                (error, _) => Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Text(
+                          '加载消息失败，请检查网络连接后重试',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      if (error != null)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            error.toString().replaceAll('Exception:', ''),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        TextSpan(text: error.toString()),
-                      ],
-                    ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          ref.invalidate(meetingMessagesProvider(meetingId));
+                        },
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('重新加载'),
+                      ),
+                    ],
                   ),
                 ),
           ),
@@ -514,113 +537,73 @@ class ChatWidget extends HookConsumerWidget {
     );
   }
 
-  // 构建消息项
-  Widget _buildMessageItem(
+  // 构建消息气泡(用于消息列表)
+  Widget _buildMessageBubble(
     BuildContext context,
-    ChatMessage message, {
-    bool showSenderInfo = true,
-  }) {
-    final isMyMessage = message.senderId == userId;
+    ChatMessage message,
+    bool isCurrentUser,
+  ) {
     final timeFormat = DateFormat('HH:mm');
     final time = timeFormat.format(message.timestamp);
 
     // 自定义气泡颜色
     final bubbleColor =
-        isMyMessage ? Colors.blue.shade100 : Colors.grey.shade100;
-
-    // 文本方向
-    final direction =
-        isMyMessage ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+        isCurrentUser ? Colors.blue.shade100 : Colors.grey.shade100;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(
-        crossAxisAlignment: direction,
+      child: Row(
+        mainAxisAlignment:
+            isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 发送者信息（仅对他人消息显示）
-          if (showSenderInfo && !isMyMessage)
-            Padding(
-              padding: const EdgeInsets.only(left: 48, bottom: 4),
-              child: Text(
-                message.senderName,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ),
+          // 左侧头像（非当前用户的消息）
+          if (!isCurrentUser) _buildAvatar(message),
+
+          const SizedBox(width: 8),
 
           // 消息内容
-          Row(
-            mainAxisAlignment:
-                isMyMessage ? MainAxisAlignment.end : MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Column(
+            crossAxisAlignment:
+                isCurrentUser
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
             children: [
-              // 左侧头像（仅对他人消息显示）
-              if (!isMyMessage)
-                if (showSenderInfo)
-                  _buildAvatar(message)
-                else
-                  const SizedBox(width: 40),
-
-              const SizedBox(width: 8),
+              // 发送者名称（非当前用户的消息）
+              if (!isCurrentUser)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, bottom: 2),
+                  child: Text(
+                    message.senderName,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
 
               // 消息气泡
-              Column(
-                crossAxisAlignment: direction,
-                children: [
-                  _buildMessageBubble(message, bubbleColor),
+              _buildMessageContent(message, bubbleColor),
 
-                  // 时间显示
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: 4,
-                      right: isMyMessage ? 0 : 4,
-                      left: isMyMessage ? 4 : 0,
-                    ),
-                    child: Text(
-                      time,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
-                  ),
-                ],
+              // 消息时间
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  time,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                ),
               ),
-
-              const SizedBox(width: 8),
-
-              // 右侧头像（仅对自己的消息显示）
-              if (isMyMessage)
-                if (showSenderInfo)
-                  _buildAvatar(message)
-                else
-                  const SizedBox(width: 40),
             ],
           ),
+
+          const SizedBox(width: 8),
+
+          // 右侧头像（当前用户的消息）
+          if (isCurrentUser) _buildAvatar(message),
         ],
       ),
     );
   }
 
-  // 构建头像
-  Widget _buildAvatar(ChatMessage message) {
-    return CircleAvatar(
-      radius: 20,
-      backgroundColor: Colors.blue.shade200,
-      backgroundImage:
-          message.senderAvatar != null
-              ? NetworkImage(message.senderAvatar!) as ImageProvider
-              : null,
-      child:
-          message.senderAvatar == null
-              ? Text(
-                message.senderName.isNotEmpty
-                    ? message.senderName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(color: Colors.white),
-              )
-              : null,
-    );
-  }
-
-  // 构建消息气泡
-  Widget _buildMessageBubble(ChatMessage message, Color bubbleColor) {
+  // 构建消息内容
+  Widget _buildMessageContent(ChatMessage message, Color bubbleColor) {
     if (message.isTextMessage) {
       // 文本消息
       return Container(
@@ -658,6 +641,27 @@ class ChatWidget extends HookConsumerWidget {
         ),
       );
     }
+  }
+
+  // 构建头像
+  Widget _buildAvatar(ChatMessage message) {
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: Colors.blue.shade200,
+      backgroundImage:
+          message.senderAvatar != null
+              ? NetworkImage(message.senderAvatar!) as ImageProvider
+              : null,
+      child:
+          message.senderAvatar == null
+              ? Text(
+                message.senderName.isNotEmpty
+                    ? message.senderName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(color: Colors.white),
+              )
+              : null,
+    );
   }
 
   // 构建日期分隔
