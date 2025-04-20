@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -73,6 +74,12 @@ class ChatWidget extends HookConsumerWidget {
 
     // 是否显示表情选择器
     final showEmojiPicker = useState(false);
+
+    // 表情选择器高度 - 屏幕高度的30%，但不超过250
+    final emojiPickerHeight = math.min(
+      MediaQuery.of(context).size.height * 0.3,
+      250.0,
+    );
 
     // 当前选中的表情分类
     final selectedEmojiCategory = useState<String>('笑脸');
@@ -313,16 +320,18 @@ class ChatWidget extends HookConsumerWidget {
       // focusNode.requestFocus();
     }
 
-    // 构建表情选择器
-    Widget buildEmojiPicker() {
+    // 构建表情选择器 - 移到类方法中，接收参数
+    Widget _buildEmojiPicker(
+      Map<String, List<String>> emojisData,
+      ValueNotifier<String> selectedCategory,
+      Function(String) onEmojiSelected,
+      double maxHeight,
+    ) {
       // 获取当前选中分类的表情
-      final currentEmojis = emojisData.value[selectedEmojiCategory.value] ?? [];
-
-      // 使用固定高度模拟键盘高度
-      const emojiKeyboardHeight = 250.0;
+      final currentEmojis = emojisData[selectedCategory.value] ?? [];
 
       return Container(
-        height: emojiKeyboardHeight,
+        constraints: BoxConstraints(maxHeight: maxHeight),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -333,89 +342,94 @@ class ChatWidget extends HookConsumerWidget {
             ),
           ],
         ),
-        child: Column(
-          children: [
-            // 表情网格
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  childAspectRatio: 1.0,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: currentEmojis.length,
-                itemBuilder: (context, index) {
-                  return InkWell(
-                    onTap: () => insertEmoji(currentEmojis[index]),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Center(
-                      child: Text(
-                        currentEmojis[index],
-                        style: const TextStyle(fontSize: 24),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 表情网格
+              Flexible(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.all(8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 8,
+                    childAspectRatio: 1.0,
+                    mainAxisSpacing: 4,
+                    crossAxisSpacing: 4,
+                  ),
+                  itemCount: currentEmojis.length,
+                  itemBuilder: (context, index) {
+                    return InkWell(
+                      onTap: () => onEmojiSelected(currentEmojis[index]),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Center(
+                        child: Text(
+                          currentEmojis[index],
+                          style: const TextStyle(fontSize: 24),
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // 分类选项卡 - 移到底部
-            Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                    );
+                  },
                 ),
               ),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                children:
-                    emojisData.value.keys.map((category) {
-                      final isSelected =
-                          selectedEmojiCategory.value == category;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Center(
-                          child: InkWell(
-                            onTap: () => selectedEmojiCategory.value = category,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    isSelected
-                                        ? Colors.blue.shade100
-                                        : Colors.transparent,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                category,
-                                style: TextStyle(
-                                  fontSize: 14,
+
+              // 分类选项卡 - 移到底部
+              Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                  ),
+                ),
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children:
+                      emojisData.keys.map((category) {
+                        final isSelected = selectedCategory.value == category;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Center(
+                            child: InkWell(
+                              onTap: () => selectedCategory.value = category,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
                                   color:
                                       isSelected
-                                          ? Colors.blue
-                                          : Colors.grey.shade700,
-                                  fontWeight:
-                                      isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                          ? Colors.blue.shade100
+                                          : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  category,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color:
+                                        isSelected
+                                            ? Colors.blue
+                                            : Colors.grey.shade700,
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -704,7 +718,12 @@ class ChatWidget extends HookConsumerWidget {
 
         // 表情选择器 - 当键盘不可见且启用表情选择器时显示
         if (showEmojiPicker.value && !isKeyboardVisible.value)
-          buildEmojiPicker(),
+          _buildEmojiPicker(
+            emojisData.value,
+            selectedEmojiCategory,
+            insertEmoji,
+            emojiPickerHeight,
+          ),
 
         // 只读模式提示
         if (isReadOnly)
