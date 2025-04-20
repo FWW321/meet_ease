@@ -508,7 +508,6 @@ class MaterialsListWidget extends ConsumerWidget {
                                   }
 
                                   // 直接创建HTTP客户端，调用上传文件的API
-                                  final client = http.Client();
                                   final request = http.MultipartRequest(
                                     'POST',
                                     Uri.parse(
@@ -533,11 +532,15 @@ class MaterialsListWidget extends ConsumerWidget {
                                   // 添加其他字段
                                   request.fields['meetingId'] = meetingId;
                                   request.fields['uploaderId'] = uploaderId;
+                                  request.fields['uploaderName'] = uploaderName;
 
                                   // 发送请求
                                   final streamedResponse = await request.send();
                                   final response = await http
                                       .Response.fromStream(streamedResponse);
+
+                                  // 确保widget仍然挂载在树上
+                                  if (!context.mounted) return;
 
                                   // 处理响应
                                   if (response.statusCode == 200) {
@@ -590,6 +593,9 @@ class MaterialsListWidget extends ConsumerWidget {
                                     );
                                   }
                                 } catch (e) {
+                                  // 确保widget仍然挂载在树上
+                                  if (!context.mounted) return;
+
                                   // 关闭加载指示器
                                   Navigator.of(context).pop();
 
@@ -645,9 +651,11 @@ class MaterialsListWidget extends ConsumerWidget {
     try {
       // 构造正确的文件URL
       final String fileUrl =
-          '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
       final Uri url = Uri.parse(fileUrl);
       final bool canLaunch = await canLaunchUrl(url);
+
+      if (!context.mounted) return;
 
       if (canLaunch) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -658,6 +666,8 @@ class MaterialsListWidget extends ConsumerWidget {
         ).showSnackBar(SnackBar(content: Text('无法打开: ${material.title}')));
       }
     } catch (e) {
+      if (!context.mounted) return;
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('打开文件时出错: $e')));
@@ -678,6 +688,7 @@ class MaterialsListWidget extends ConsumerWidget {
         if (await Permission.photos.isPermanentlyDenied ||
             await Permission.videos.isPermanentlyDenied) {
           // 如果任一权限被永久拒绝，引导用户去设置页面开启权限
+          if (!context.mounted) return false;
           return _showSettingsDialog(context, '照片和视频');
         }
 
@@ -707,6 +718,7 @@ class MaterialsListWidget extends ConsumerWidget {
       // iOS请求照片权限
       if (await Permission.photos.isPermanentlyDenied) {
         // 永久拒绝时引导用户去设置
+        if (!context.mounted) return false;
         return _showSettingsDialog(context, '照片访问');
       }
 
@@ -722,6 +734,8 @@ class MaterialsListWidget extends ConsumerWidget {
     BuildContext context,
     String permissionName,
   ) async {
+    if (!context.mounted) return false;
+
     final bool? goToSettings = await showDialog<bool>(
       context: context,
       builder:
@@ -741,6 +755,8 @@ class MaterialsListWidget extends ConsumerWidget {
           ),
     );
 
+    if (!context.mounted) return false;
+
     if (goToSettings == true) {
       await openAppSettings();
     }
@@ -758,7 +774,7 @@ class MaterialsListWidget extends ConsumerWidget {
       if (kIsWeb) {
         // 构造正确的下载URL
         final String downloadUrl =
-            '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+            '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
         await launchUrl(Uri.parse(downloadUrl));
         return;
       }
@@ -767,6 +783,8 @@ class MaterialsListWidget extends ConsumerWidget {
       if (!await _requestStoragePermission(context)) {
         return; // 如果权限被拒绝，中止下载
       }
+
+      if (!context.mounted) return;
 
       // 显示加载指示器
       final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -830,13 +848,15 @@ class MaterialsListWidget extends ConsumerWidget {
 
       // 构造正确的下载URL
       final String downloadUrl =
-          '${AppConstants.apiBaseUrl}/meeting/file/download/${meetingId}/${material.id}';
+          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
 
       // 下载文件
       final response = await http.get(Uri.parse(downloadUrl));
 
       // 写入文件
       await File(filePath).writeAsBytes(response.bodyBytes);
+
+      if (!context.mounted) return;
 
       // 获取下载后的文件名
       final downloadedFilename = filePath.split('/').last;
@@ -867,6 +887,8 @@ class MaterialsListWidget extends ConsumerWidget {
         ),
       );
     } catch (e) {
+      if (!context.mounted) return;
+
       // 显示错误消息
       ScaffoldMessenger.of(
         context,
@@ -890,7 +912,7 @@ class MaterialsListWidget extends ConsumerWidget {
       showModalBottomSheet(
         context: context,
         builder:
-            (context) => SafeArea(
+            (buildContext) => SafeArea(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -898,7 +920,7 @@ class MaterialsListWidget extends ConsumerWidget {
                     leading: const Icon(Icons.folder_open),
                     title: const Text('打开文件所在文件夹'),
                     onTap: () {
-                      Navigator.pop(context);
+                      Navigator.pop(buildContext);
                       _openFileLocation(filePath);
                     },
                   ),
@@ -906,8 +928,10 @@ class MaterialsListWidget extends ConsumerWidget {
                     leading: const Icon(Icons.share),
                     title: const Text('分享文件'),
                     onTap: () {
-                      Navigator.pop(context);
-                      _shareFile(filePath, context);
+                      Navigator.pop(buildContext);
+                      if (context.mounted) {
+                        _shareFile(filePath, context);
+                      }
                     },
                   ),
                 ],
@@ -927,8 +951,12 @@ class MaterialsListWidget extends ConsumerWidget {
     try {
       // 使用最基本的分享方法
       await Share.share('文件路径: $filePath');
+
+      if (!context.mounted) return;
       debugPrint('文件分享操作完成');
     } catch (e) {
+      if (!context.mounted) return;
+
       debugPrint('分享文件失败: $e');
       ScaffoldMessenger.of(
         context,
