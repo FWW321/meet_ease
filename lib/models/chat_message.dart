@@ -6,6 +6,7 @@ import 'dart:convert' show base64;
 enum ChatMessageType {
   text, // 文字消息
   voice, // 语音消息
+  system, // 系统消息
 }
 
 // 将服务器API返回的messageType字符串转换为枚举
@@ -15,6 +16,8 @@ ChatMessageType messageTypeFromString(String type) {
       return ChatMessageType.text;
     case 'VOICE':
       return ChatMessageType.voice;
+    case 'SYSTEM':
+      return ChatMessageType.system;
     default:
       return ChatMessageType.text;
   }
@@ -212,4 +215,7 @@ class ChatMessage {
 
   // 判断是否为语音消息
   bool get isVoiceMessage => type == ChatMessageType.voice;
+
+  // 判断是否为系统消息
+  bool get isSystemMessage => type == ChatMessageType.system;
 }

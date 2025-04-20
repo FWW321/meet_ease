@@ -30,6 +30,31 @@ class ChatWidget extends HookConsumerWidget {
     // 获取当前登录用户ID（从用户服务中）
     final currentUserId = useState<String?>(null);
 
+    // WebSocket连接状态
+    final isWebSocketConnected = ref.watch(webSocketConnectedProvider);
+
+    // WebSocket消息流
+    final webSocketMessages = ref.watch(webSocketMessagesProvider);
+
+    // 本地消息列表（用于保存接收到的WebSocket消息）
+    final localMessages = useState<List<ChatMessage>>([]);
+
+    // 滚动控制器
+    final scrollController = useScrollController();
+
+    // 滚动到底部的函数
+    void scrollToBottom() {
+      Timer(const Duration(milliseconds: 300), () {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+
     // 使用useEffect获取当前用户ID
     useEffect(() {
       Future<void> fetchCurrentUserId() async {
@@ -50,6 +75,24 @@ class ChatWidget extends HookConsumerWidget {
       return null;
     }, []);
 
+    // 处理接收到的WebSocket消息
+    useEffect(() {
+      webSocketMessages.whenData((message) {
+        try {
+          final chatMessage = ChatMessage.fromJson(message);
+          // 添加到本地消息列表
+          localMessages.value = [...localMessages.value, chatMessage];
+
+          // 滚动到底部
+          scrollToBottom();
+        } catch (e) {
+          print('处理WebSocket消息失败: $e');
+        }
+      });
+
+      return null;
+    }, [webSocketMessages]);
+
     // 消息列表
     final messagesAsync = ref.watch(meetingMessagesProvider(meetingId));
 
@@ -67,9 +110,6 @@ class ChatWidget extends HookConsumerWidget {
 
     // 文本控制器
     final textController = useTextEditingController();
-
-    // 滚动控制器
-    final scrollController = useScrollController();
 
     // 是否显示表情选择器
     final showEmojiPicker = useState(false);
@@ -177,42 +217,21 @@ class ChatWidget extends HookConsumerWidget {
       }
     }
 
-    // 滚动到底部
-    void scrollToBottom() {
-      Timer(const Duration(milliseconds: 300), () {
-        if (scrollController.hasClients) {
-          scrollController.animateTo(
-            scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
-
     // 处理发送文本消息
     Future<void> sendTextMessage() async {
       final text = textController.text.trim();
       if (text.isEmpty) return;
 
       try {
-        await ref.read(
-          sendTextMessageProvider({
-            'meetingId': meetingId,
-            'senderId': userId,
-            'senderName': userName,
-            'content': text,
-            'senderAvatar': userAvatar,
-          }).future,
-        );
+        // 使用WebSocket发送消息
+        final sendMessage = ref.read(webSocketSendMessageProvider);
+        await sendMessage(text);
 
+        // 清除输入框
         textController.clear();
 
         // 滚动到底部
         scrollToBottom();
-
-        // 刷新聊天消息列表
-        ref.invalidate(meetingMessagesProvider(meetingId));
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(
@@ -439,7 +458,15 @@ class ChatWidget extends HookConsumerWidget {
         Expanded(
           child: messagesAsync.when(
             data: (messages) {
-              if (messages.isEmpty) {
+              // 合并历史消息和WebSocket实时消息
+              final combinedMessages = [...messages, ...localMessages.value];
+
+              // 按时间排序
+              combinedMessages.sort(
+                (a, b) => a.timestamp.compareTo(b.timestamp),
+              );
+
+              if (combinedMessages.isEmpty) {
                 return const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -487,11 +514,11 @@ class ChatWidget extends HookConsumerWidget {
                     ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.all(16),
-                      itemCount: messages.length,
+                      itemCount: combinedMessages.length,
                       itemBuilder: (context, index) {
-                        final message = messages[index];
+                        final message = combinedMessages[index];
                         final previousMessage =
-                            index > 0 ? messages[index - 1] : null;
+                            index > 0 ? combinedMessages[index - 1] : null;
 
                         // 是否需要显示日期分隔
                         final showDate =
@@ -506,6 +533,23 @@ class ChatWidget extends HookConsumerWidget {
                         final realCurrentUserId = currentUserId.value ?? userId;
                         final isSentByMe =
                             message.senderId == realCurrentUserId;
+
+                        // 系统消息特殊处理
+                        if (message.isSystemMessage) {
+                          return Column(
+                            children: [
+                              if (showDate)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    top: 8.0,
+                                    bottom: 16.0,
+                                  ),
+                                  child: _buildDateSeparator(message.timestamp),
+                                ),
+                              _buildSystemMessage(message),
+                            ],
+                          );
+                        }
 
                         return Column(
                           children: [
@@ -908,5 +952,22 @@ class ChatWidget extends HookConsumerWidget {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+
+  // 构建系统消息
+  Widget _buildSystemMessage(ChatMessage message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        message.content,
+        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 }

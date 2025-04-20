@@ -5,6 +5,7 @@ import '../models/meeting.dart';
 import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
+import '../providers/chat_providers.dart';
 import '../widgets/agenda_list_widget.dart';
 import '../widgets/materials_list_widget.dart';
 import '../widgets/notes_list_widget.dart';
@@ -34,6 +35,12 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
   void initState() {
     super.initState();
     _loadCurrentUserId();
+  }
+
+  @override
+  void dispose() {
+    // 在页面销毁时断开WebSocket连接的代码移除，因为已在MeetingDetailPage处理
+    super.dispose();
   }
 
   Future<void> _loadCurrentUserId() async {

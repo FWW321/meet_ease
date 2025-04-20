@@ -7,9 +7,15 @@ import 'webrtc_service.dart';
 import 'user_service.dart';
 import 'api_user_service.dart';
 import 'emoji_service.dart';
+import 'websocket_service.dart';
 
 // 重新导出表情服务提供者
 export 'emoji_service.dart';
+
+// API基础URL提供者（同时用于HTTP和WebSocket）
+final apiBaseUrlProvider = Provider<String>((ref) {
+  return 'ws://fwwhub.fun:8080/websocket';
+});
 
 // 用户服务提供者
 final userServiceProvider = Provider<UserService>((ref) {
@@ -34,4 +40,10 @@ final chatServiceProvider = Provider<ChatService>((ref) {
 // WebRTC服务提供者
 final webRTCServiceProvider = Provider<WebRTCService>((ref) {
   return MockWebRTCService();
+});
+
+// WebSocket服务提供者
+final webSocketServiceProvider = Provider<WebSocketService>((ref) {
+  final baseUrl = ref.watch(apiBaseUrlProvider);
+  return WebSocketService(baseUrl: baseUrl);
 });
