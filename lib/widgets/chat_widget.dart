@@ -79,6 +79,18 @@ class ChatWidget extends HookConsumerWidget {
     // 聚焦节点
     final focusNode = useFocusNode();
 
+    // 是否有键盘显示
+    final isKeyboardVisible = useState(false);
+
+    // 获取键盘高度
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+
+    // 更新键盘可见状态
+    useEffect(() {
+      isKeyboardVisible.value = keyboardHeight > 0;
+      return null;
+    }, [keyboardHeight]);
+
     // 是否正在加载历史消息
     final isLoadingHistory = useState(false);
 
@@ -89,9 +101,11 @@ class ChatWidget extends HookConsumerWidget {
       return null;
     }, []);
 
-    // 监听焦点变化，隐藏表情选择器
+    // 监听焦点变化
     useEffect(() {
       void onFocusChange() {
+        // 当输入框获得焦点时，隐藏表情选择器
+        // 确保键盘和表情选择器不会同时显示
         if (focusNode.hasFocus) {
           showEmojiPicker.value = false;
         }
@@ -102,6 +116,35 @@ class ChatWidget extends HookConsumerWidget {
         focusNode.removeListener(onFocusChange);
       };
     }, [focusNode]);
+
+    // 确保输入框在初始化后正确显示光标
+    useEffect(() {
+      // 延迟一下再设置焦点，避免与其他UI操作冲突
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!isReadOnly && !isRecording.value && context.mounted) {
+          focusNode.requestFocus();
+        }
+      });
+      return null;
+    }, []);
+
+    // 处理表情按钮点击
+    void handleEmojiButtonClick() {
+      // 如果表情选择器已经显示，隐藏它并显示键盘
+      if (showEmojiPicker.value) {
+        showEmojiPicker.value = false;
+        // 短暂延迟后请求焦点，以确保UI状态更新
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (context.mounted) {
+            focusNode.requestFocus(); // 显示键盘
+          }
+        });
+      } else {
+        // 如果表情选择器未显示，隐藏键盘并显示表情选择器
+        showEmojiPicker.value = true;
+        focusNode.unfocus(); // 隐藏键盘
+      }
+    }
 
     // 滚动到底部
     void scrollToBottom() {
@@ -223,15 +266,26 @@ class ChatWidget extends HookConsumerWidget {
 
     // 添加表情到输入框
     void insertEmoji(String emoji) {
+      // 确保选中文本的开始和结束位置有效
+      final selection =
+          textController.selection.isValid
+              ? textController.selection
+              : TextSelection.collapsed(offset: textController.text.length);
+
       final text = textController.text;
-      final selection = textController.selection;
       final newText = text.replaceRange(selection.start, selection.end, emoji);
+
+      // 更新文本和光标位置
       textController.value = TextEditingValue(
         text: newText,
         selection: TextSelection.collapsed(
           offset: selection.baseOffset + emoji.length,
         ),
       );
+
+      // 确保输入框获得焦点并显示光标
+      // 为保持表情选择器显示，这里不要请求焦点
+      // focusNode.requestFocus();
     }
 
     // 构建表情选择器
@@ -239,27 +293,56 @@ class ChatWidget extends HookConsumerWidget {
       // 获取当前选中分类的表情
       final emojis = _emojisByCategory[selectedEmojiCategory.value] ?? [];
 
+      // 使用固定高度模拟键盘高度
+      const emojiKeyboardHeight = 250.0;
+
       return Container(
-        height: 250,
+        height: emojiKeyboardHeight,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(26),
-              offset: const Offset(0, -1),
-              blurRadius: 3,
+              offset: const Offset(0, -3),
+              blurRadius: 5,
             ),
           ],
         ),
         child: Column(
           children: [
-            // 分类选项卡
+            // 表情网格
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
+                  childAspectRatio: 1.0,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                ),
+                itemCount: emojis.length,
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () => insertEmoji(emojis[index]),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Center(
+                      child: Text(
+                        emojis[index],
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // 分类选项卡 - 移到底部
             Container(
               height: 40,
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
                 border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                  top: BorderSide(color: Colors.grey.shade300, width: 0.5),
                 ),
               ),
               child: ListView(
@@ -305,32 +388,6 @@ class ChatWidget extends HookConsumerWidget {
                         ),
                       );
                     }).toList(),
-              ),
-            ),
-
-            // 表情网格
-            Expanded(
-              child: GridView.builder(
-                padding: const EdgeInsets.all(8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  childAspectRatio: 1.0,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: emojis.length,
-                itemBuilder: (context, index) {
-                  return InkWell(
-                    onTap: () => insertEmoji(emojis[index]),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Center(
-                      child: Text(
-                        emojis[index],
-                        style: const TextStyle(fontSize: 24),
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
           ],
@@ -542,9 +599,6 @@ class ChatWidget extends HookConsumerWidget {
             ),
           ),
 
-        // 表情选择器
-        if (showEmojiPicker.value) buildEmojiPicker(),
-
         // 输入框
         if (!isReadOnly)
           Container(
@@ -567,10 +621,7 @@ class ChatWidget extends HookConsumerWidget {
                     Icons.emoji_emotions_outlined,
                     color: showEmojiPicker.value ? Colors.blue : null,
                   ),
-                  onPressed: () {
-                    focusNode.unfocus();
-                    showEmojiPicker.value = !showEmojiPicker.value;
-                  },
+                  onPressed: handleEmojiButtonClick,
                   tooltip: '表情',
                 ),
 
@@ -604,6 +655,12 @@ class ChatWidget extends HookConsumerWidget {
                     maxLines: 5,
                     minLines: 1,
                     textInputAction: TextInputAction.newline,
+                    onTap: () {
+                      // 确保点击输入框时关闭表情选择器
+                      if (showEmojiPicker.value) {
+                        showEmojiPicker.value = false;
+                      }
+                    },
                     onSubmitted:
                         isRecording.value ? null : (_) => sendTextMessage(),
                   ),
@@ -619,6 +676,10 @@ class ChatWidget extends HookConsumerWidget {
               ],
             ),
           ),
+
+        // 表情选择器 - 当键盘不可见且启用表情选择器时显示
+        if (showEmojiPicker.value && !isKeyboardVisible.value)
+          buildEmojiPicker(),
 
         // 只读模式提示
         if (isReadOnly)
