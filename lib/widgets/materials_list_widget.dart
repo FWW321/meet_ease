@@ -104,6 +104,58 @@ class MaterialsListWidget extends ConsumerWidget {
     );
   }
 
+  // 检查文件是否已下载
+  Future<bool> _isFileDownloaded(models.MaterialItem material) async {
+    try {
+      // 在Web平台上总是返回false
+      if (kIsWeb) {
+        return false;
+      }
+
+      // 获取下载路径
+      final String downloadPath = await _getDownloadPath();
+
+      // 检查文件是否存在
+      final String filePath = '$downloadPath/${material.title}';
+      final file = File(filePath);
+
+      // 检查同名带编号的文件
+      if (!await file.exists()) {
+        // 分离文件名和扩展名
+        final int lastDotIndex = material.title.lastIndexOf('.');
+        String nameWithoutExtension;
+        String extension;
+
+        if (lastDotIndex != -1) {
+          nameWithoutExtension = material.title.substring(0, lastDotIndex);
+          extension = material.title.substring(lastDotIndex);
+        } else {
+          nameWithoutExtension = material.title;
+          extension = '';
+        }
+
+        // 最多检查100个可能的文件名
+        for (int counter = 1; counter <= 100; counter++) {
+          final String newFilename =
+              '$nameWithoutExtension($counter)$extension';
+          final String newFilePath = '$downloadPath/$newFilename';
+          final File newFile = File(newFilePath);
+
+          if (await newFile.exists()) {
+            return true; // 找到了一个已下载的文件
+          }
+        }
+
+        return false; // 没有找到任何相关文件
+      }
+
+      return true; // 原始文件名存在
+    } catch (e) {
+      debugPrint('检查文件下载状态出错: $e');
+      return false;
+    }
+  }
+
   // 构建资料项卡片
   Widget _buildMaterialItem(
     BuildContext context,
@@ -118,111 +170,141 @@ class MaterialsListWidget extends ConsumerWidget {
     final typeIcon = _getMaterialTypeIcon(material.type);
     final typeColor = _getMaterialTypeColor(material.type);
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: InkWell(
-        onTap: () => _openMaterial(context, material),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return FutureBuilder<bool>(
+      future: _isFileDownloaded(material),
+      builder: (context, snapshot) {
+        final bool isDownloaded = snapshot.data ?? false;
+
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: InkWell(
+            onTap: () {
+              if (isDownloaded) {
+                // 如果已下载，打开文件所在文件夹
+                _openDownloadedMaterial(context, material, ref);
+              } else {
+                // 如果未下载，则下载文件
+                _downloadMaterial(context, material, ref);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 资料类型图标
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: typeColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Icon(typeIcon, color: typeColor, size: 28),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // 资料信息
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          material.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 资料类型图标
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: typeColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        if (material.description != null &&
-                            material.description!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              material.description!,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                              maxLines: 2,
+                        child: Center(
+                          child: Icon(typeIcon, color: typeColor, size: 28),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // 资料信息
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              material.title,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
-                            children: [
-                              if (material.uploaderName != null)
-                                Text(
-                                  '${material.uploaderName} · ',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                            if (material.description != null &&
+                                material.description!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  material.description!,
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              if (material.uploadTime != null)
-                                Text(
-                                  '${dateFormat.format(material.uploadTime!)} · ',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              Text(
-                                fileSizeText,
-                                style: Theme.of(context).textTheme.bodySmall,
                               ),
-                            ],
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  if (material.uploaderName != null)
+                                    Text(
+                                      '${material.uploaderName} · ',
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  if (material.uploadTime != null)
+                                    Text(
+                                      '${dateFormat.format(material.uploadTime!)} · ',
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  Text(
+                                    fileSizeText,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (isDownloaded)
+                          // 如果已下载，显示"已下载"状态
+                          OutlinedButton.icon(
+                            onPressed:
+                                () => _openDownloadedMaterial(
+                                  context,
+                                  material,
+                                  ref,
+                                ),
+                            icon: const Icon(Icons.folder_open),
+                            label: const Text('已下载'),
+                          )
+                        else
+                          // 如果未下载，显示下载按钮
+                          OutlinedButton.icon(
+                            onPressed:
+                                () => _downloadMaterial(context, material, ref),
+                            icon: const Icon(Icons.download),
+                            label: const Text('下载'),
                           ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed:
+                              () => _confirmDeleteMaterial(
+                                context,
+                                ref,
+                                material.id,
+                              ),
+                          tooltip: '删除资料',
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _openMaterial(context, material),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('打开'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => _downloadMaterial(context, material),
-                      icon: const Icon(Icons.download),
-                      label: const Text('下载'),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed:
-                          () =>
-                              _confirmDeleteMaterial(context, ref, material.id),
-                      tooltip: '删除资料',
-                    ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -646,31 +728,201 @@ class MaterialsListWidget extends ConsumerWidget {
     );
   }
 
-  // 打开资料
-  void _openMaterial(BuildContext context, models.MaterialItem material) async {
+  // 处理已下载文件的打开
+  void _openDownloadedMaterial(
+    BuildContext context,
+    models.MaterialItem material,
+    WidgetRef ref,
+  ) async {
     try {
-      // 构造正确的文件URL
-      final String fileUrl =
-          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
-      final Uri url = Uri.parse(fileUrl);
-      final bool canLaunch = await canLaunchUrl(url);
+      // 获取下载路径
+      final String downloadPath = await _getDownloadPath();
+      final String filePath = '$downloadPath/${material.title}';
+      final file = File(filePath);
 
+      if (await file.exists()) {
+        // 文件存在，打开文件所在文件夹
+        await _openFileLocation(filePath);
+        return;
+      }
+
+      // 原文件不存在，检查是否有同名带编号的文件
+      final int lastDotIndex = material.title.lastIndexOf('.');
+      String nameWithoutExtension;
+      String extension;
+
+      if (lastDotIndex != -1) {
+        nameWithoutExtension = material.title.substring(0, lastDotIndex);
+        extension = material.title.substring(lastDotIndex);
+      } else {
+        nameWithoutExtension = material.title;
+        extension = '';
+      }
+
+      // 尝试查找文件
+      for (int counter = 1; counter <= 100; counter++) {
+        final String newFilename = '$nameWithoutExtension($counter)$extension';
+        final String newFilePath = '$downloadPath/$newFilename';
+        final File newFile = File(newFilePath);
+
+        if (await newFile.exists()) {
+          // 找到文件，打开文件所在文件夹
+          await _openFileLocation(newFilePath);
+          return;
+        }
+      }
+
+      // 没有找到文件，可能已被移动或删除
       if (!context.mounted) return;
 
-      if (canLaunch) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        // 无法打开URL时显示错误
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('无法打开: ${material.title}')));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('文件不存在或已被移动，请重新下载')));
     } catch (e) {
       if (!context.mounted) return;
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('打开文件时出错: $e')));
+      ).showSnackBar(SnackBar(content: Text('打开文件位置失败: $e')));
+    }
+  }
+
+  // 下载资料
+  void _downloadMaterial(
+    BuildContext context,
+    models.MaterialItem material,
+    WidgetRef ref,
+  ) async {
+    try {
+      // 在Web平台上，直接打开URL即可下载
+      if (kIsWeb) {
+        // 构造正确的下载URL
+        final String downloadUrl =
+            '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
+        await launchUrl(Uri.parse(downloadUrl));
+        return;
+      }
+
+      // 请求存储权限
+      if (!await _requestStoragePermission(context)) {
+        return; // 如果权限被拒绝，中止下载
+      }
+
+      if (!context.mounted) return;
+
+      // 显示加载指示器
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 16),
+              Text('正在下载: ${material.title}'),
+            ],
+          ),
+          duration: const Duration(seconds: 30), // 设置较长的显示时间
+        ),
+      );
+
+      // 获取系统下载目录
+      final String downloadPath = await _getDownloadPath();
+
+      // 处理文件名重复问题
+      final String originalFilename = material.title;
+      String filePath = '$downloadPath/$originalFilename';
+
+      // 检查文件是否已存在，如果存在则添加编号
+      final file = File(filePath);
+      if (await file.exists()) {
+        // 分离文件名和扩展名
+        final int lastDotIndex = originalFilename.lastIndexOf('.');
+        String nameWithoutExtension;
+        String extension;
+
+        if (lastDotIndex != -1) {
+          nameWithoutExtension = originalFilename.substring(0, lastDotIndex);
+          extension = originalFilename.substring(lastDotIndex);
+        } else {
+          nameWithoutExtension = originalFilename;
+          extension = '';
+        }
+
+        // 尝试查找一个可用的文件名，最多尝试100次
+        int counter = 1;
+        String newFilename;
+        File newFile;
+
+        do {
+          newFilename = '$nameWithoutExtension($counter)$extension';
+          filePath = '$downloadPath/$newFilename';
+          newFile = File(filePath);
+          counter++;
+        } while (await newFile.exists() && counter <= 100);
+      }
+
+      // 确保目录存在
+      final directory = File(filePath).parent;
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      // 构造正确的下载URL
+      final String downloadUrl =
+          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
+
+      // 下载文件
+      final response = await http.get(Uri.parse(downloadUrl));
+
+      // 写入文件
+      await File(filePath).writeAsBytes(response.bodyBytes);
+
+      if (!context.mounted) return;
+
+      // 获取下载后的文件名
+      final downloadedFilename = filePath.split('/').last;
+
+      // 显示成功消息，包含文件路径，并提供打开选项
+      scaffoldMessenger.hideCurrentSnackBar();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('已下载: $downloadedFilename'),
+              const SizedBox(height: 4),
+              Text(
+                '路径: $filePath',
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          action: SnackBarAction(
+            label: '打开',
+            onPressed: () {
+              _openFileLocation(filePath);
+            },
+          ),
+        ),
+      );
+
+      // 刷新当前材料列表状态
+      if (ref != null) {
+        ref.invalidate(meetingMaterialsNotifierProvider(meetingId));
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      // 显示错误消息
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
     }
   }
 
@@ -762,206 +1014,6 @@ class MaterialsListWidget extends ConsumerWidget {
     }
 
     return false;
-  }
-
-  // 下载资料
-  void _downloadMaterial(
-    BuildContext context,
-    models.MaterialItem material,
-  ) async {
-    try {
-      // 在Web平台上，直接打开URL即可
-      if (kIsWeb) {
-        // 构造正确的下载URL
-        final String downloadUrl =
-            '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
-        await launchUrl(Uri.parse(downloadUrl));
-        return;
-      }
-
-      // 请求存储权限
-      if (!await _requestStoragePermission(context)) {
-        return; // 如果权限被拒绝，中止下载
-      }
-
-      if (!context.mounted) return;
-
-      // 显示加载指示器
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 16),
-              Text('正在下载: ${material.title}'),
-            ],
-          ),
-        ),
-      );
-
-      // 获取系统下载目录
-      final String downloadPath = await _getDownloadPath();
-
-      // 处理文件名重复问题
-      final String originalFilename = material.title;
-      String filePath = '$downloadPath/$originalFilename';
-
-      // 检查文件是否已存在，如果存在则添加编号
-      final file = File(filePath);
-      if (await file.exists()) {
-        // 分离文件名和扩展名
-        final int lastDotIndex = originalFilename.lastIndexOf('.');
-        String nameWithoutExtension;
-        String extension;
-
-        if (lastDotIndex != -1) {
-          nameWithoutExtension = originalFilename.substring(0, lastDotIndex);
-          extension = originalFilename.substring(lastDotIndex);
-        } else {
-          nameWithoutExtension = originalFilename;
-          extension = '';
-        }
-
-        // 尝试查找一个可用的文件名，最多尝试100次
-        int counter = 1;
-        String newFilename;
-        File newFile;
-
-        do {
-          newFilename = '$nameWithoutExtension($counter)$extension';
-          filePath = '$downloadPath/$newFilename';
-          newFile = File(filePath);
-          counter++;
-        } while (await newFile.exists() && counter <= 100);
-      }
-
-      // 确保目录存在
-      final directory = File(filePath).parent;
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-
-      // 构造正确的下载URL
-      final String downloadUrl =
-          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
-
-      // 下载文件
-      final response = await http.get(Uri.parse(downloadUrl));
-
-      // 写入文件
-      await File(filePath).writeAsBytes(response.bodyBytes);
-
-      if (!context.mounted) return;
-
-      // 获取下载后的文件名
-      final downloadedFilename = filePath.split('/').last;
-
-      // 显示成功消息，包含文件路径，并提供打开选项
-      scaffoldMessenger.hideCurrentSnackBar();
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('已下载: $downloadedFilename'),
-              const SizedBox(height: 4),
-              Text(
-                '路径: $filePath',
-                style: const TextStyle(fontSize: 12),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-          action: SnackBarAction(
-            label: '打开',
-            onPressed: () {
-              _openDownloadedFile(filePath, context);
-            },
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-
-      // 显示错误消息
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
-    }
-  }
-
-  // 打开已下载的文件
-  void _openDownloadedFile(String filePath, BuildContext context) {
-    try {
-      final file = File(filePath);
-
-      if (!file.existsSync()) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('文件不存在或已被移动')));
-        return;
-      }
-
-      // 显示选项菜单
-      showModalBottomSheet(
-        context: context,
-        builder:
-            (buildContext) => SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.folder_open),
-                    title: const Text('打开文件所在文件夹'),
-                    onTap: () {
-                      Navigator.pop(buildContext);
-                      _openFileLocation(filePath);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.share),
-                    title: const Text('分享文件'),
-                    onTap: () {
-                      Navigator.pop(buildContext);
-                      if (context.mounted) {
-                        _shareFile(filePath, context);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-      );
-    } catch (e) {
-      debugPrint('处理文件失败: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('处理文件失败: $e')));
-    }
-  }
-
-  // 分享文件
-  Future<void> _shareFile(String filePath, BuildContext context) async {
-    try {
-      // 使用最基本的分享方法
-      await Share.share('文件路径: $filePath');
-
-      if (!context.mounted) return;
-      debugPrint('文件分享操作完成');
-    } catch (e) {
-      if (!context.mounted) return;
-
-      debugPrint('分享文件失败: $e');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('分享文件失败: $e')));
-    }
   }
 
   // 获取系统下载目录路径
