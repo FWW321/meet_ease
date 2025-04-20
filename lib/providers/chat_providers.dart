@@ -8,10 +8,10 @@ final webSocketMessagesProvider =
     StreamProvider.autoDispose<Map<String, dynamic>>((ref) {
       final webSocketService = ref.watch(webSocketServiceProvider);
 
-      // 确保在提供者被销毁时关闭WebSocket连接
-      ref.onDispose(() {
-        webSocketService.disconnect();
-      });
+      // 不在这里断开WebSocket连接，连接生命周期由MeetingDetailPage控制
+      // ref.onDispose(() {
+      //   webSocketService.disconnect();
+      // });
 
       return webSocketService.messageStream;
     });
