@@ -25,122 +25,126 @@ class ChatEmojiPicker extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 获取当前选中分类的表情
-    final currentEmojis = emojisData[selectedCategory.value] ?? [];
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeInOut,
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      decoration: BoxDecoration(
+    // 使用RepaintBoundary隔离表情选择器的渲染，避免与其他组件重绘相互影响
+    return RepaintBoundary(
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(26),
-            offset: const Offset(0, -3),
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 表情网格 - 添加缓存以提高性能
-            Flexible(
-              child: GridView.builder(
-                shrinkWrap: true,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.all(8),
-                // 使用缓存提高滚动性能
-                cacheExtent: 500,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 8,
-                  childAspectRatio: 1.0,
-                  mainAxisSpacing: 4,
-                  crossAxisSpacing: 4,
-                ),
-                itemCount: currentEmojis.length,
-                itemBuilder: (context, index) {
-                  return RepaintBoundary(
-                    child: InkWell(
-                      onTap: () => onEmojiSelected(currentEmojis[index]),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Center(
-                        child: Text(
-                          currentEmojis[index],
-                          style: const TextStyle(fontSize: 24),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            // 表情分类选择器
+            _buildCategorySelector(),
 
-            // 分类选项卡
-            _buildCategoryTabs(),
+            // 分隔线
+            Divider(height: 1, thickness: 0.5, color: Colors.grey.shade300),
+
+            // 表情网格
+            Expanded(child: _buildEmojiGrid(context)),
           ],
         ),
       ),
     );
   }
 
-  /// 构建表情分类选项卡
-  Widget _buildCategoryTabs() {
-    return RepaintBoundary(
-      child: Container(
+  /// 构建表情分类选择器
+  Widget _buildCategorySelector() {
+    // 表情分类为空，显示加载中
+    if (emojisData.isEmpty) {
+      return const SizedBox(
         height: 40,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          border: Border(
-            top: BorderSide(color: Colors.grey.shade300, width: 0.5),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
-        child: ListView(
+      );
+    }
+
+    // 分类菜单
+    return SizedBox(
+      height: 40,
+      child: RepaintBoundary(
+        child: ListView.builder(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          // 避免频繁重建
-          cacheExtent: 1000,
-          children:
-              emojisData.keys.map((category) {
-                final isSelected = selectedCategory.value == category;
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Center(
-                    child: InkWell(
-                      onTap: () => selectedCategory.value = category,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected
-                                  ? Colors.blue.shade100
-                                  : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color:
-                                isSelected ? Colors.blue : Colors.grey.shade700,
-                            fontWeight:
-                                isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                          ),
-                        ),
-                      ),
+          itemCount: emojisData.keys.length,
+          itemBuilder: (context, index) {
+            final category = emojisData.keys.elementAt(index);
+            final isSelected = selectedCategory.value == category;
+
+            return InkWell(
+              onTap: () => selectedCategory.value = category,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: isSelected ? Colors.blue : Colors.transparent,
+                      width: 2,
                     ),
                   ),
-                );
-              }).toList(),
+                ),
+                child: Text(
+                  category,
+                  style: TextStyle(
+                    color: isSelected ? Colors.blue : Colors.grey.shade700,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  /// 构建表情网格
+  Widget _buildEmojiGrid(BuildContext context) {
+    // 表情分类为空，返回空白
+    if (emojisData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 获取当前选中分类的表情列表
+    final emojis = emojisData[selectedCategory.value] ?? [];
+
+    // 表情列表为空
+    if (emojis.isEmpty) {
+      return Center(
+        child: Text('暂无表情', style: TextStyle(color: Colors.grey.shade500)),
+      );
+    }
+
+    // 优化：使用网格布局性能更好
+    return RepaintBoundary(
+      child: GridView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 8,
+          childAspectRatio: 1.0,
+          mainAxisSpacing: 4,
+          crossAxisSpacing: 4,
+        ),
+        itemCount: emojis.length,
+        // 使用cacheExtent提高滚动性能
+        cacheExtent: 1000,
+        // 禁用过度滚动效果，提高性能
+        physics: const ClampingScrollPhysics(),
+        itemBuilder: (context, index) {
+          return InkWell(
+            onTap: () => onEmojiSelected(emojis[index]),
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              alignment: Alignment.center,
+              child: Text(emojis[index], style: const TextStyle(fontSize: 24)),
+            ),
+          );
+        },
       ),
     );
   }

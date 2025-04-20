@@ -31,10 +31,21 @@ class MeetingProcessPage extends StatefulHookConsumerWidget {
 class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
   String? currentUserId;
 
+  // 提前创建聊天组件实例，防止每次点击底部菜单时重新创建导致延迟
+  late final ChatWidget _chatWidget;
+
   @override
   void initState() {
     super.initState();
     _loadCurrentUserId();
+
+    // 提前创建聊天组件实例
+    _chatWidget = ChatWidget(
+      meetingId: widget.meetingId,
+      isReadOnly: widget.meeting.status == MeetingStatus.completed,
+      userId: currentUserId ?? '',
+      userName: '当前用户', // 替换为实际用户名
+    );
   }
 
   @override
@@ -627,14 +638,10 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
     required AsyncValue<List<User>> participants,
     required WidgetRef ref,
   }) {
-    // 功能列表
+    // 功能列表 - 使用已创建的聊天组件实例
     final functionWidgets = [
-      ChatWidget(
-        meetingId: widget.meetingId,
-        isReadOnly: isReadOnly,
-        userId: currentUserId ?? '',
-        userName: '当前用户', // 替换为实际用户名
-      ),
+      // 使用已经创建的聊天组件实例，避免每次点击重建
+      _chatWidget,
       AgendaListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
       MaterialsListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
       NotesListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),

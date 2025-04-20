@@ -35,6 +35,18 @@ class ChatWidget extends HookConsumerWidget {
     // 获取当前登录用户ID（从用户服务中）
     final currentUserId = useState<String?>(null);
 
+    // 提前预加载消息列表，避免懒加载导致的卡顿
+    useEffect(() {
+      // 使用微任务确保不阻塞UI
+      Future.microtask(() async {
+        // 预加载消息数据
+        await ref.read(meetingMessagesProvider(meetingId).future);
+        // 预加载表情数据
+        await ref.read(emojisProvider.future);
+      });
+      return null;
+    }, const []);
+
     // WebSocket消息流
     final webSocketMessages = ref.watch(webSocketMessagesProvider);
 
@@ -152,8 +164,11 @@ class ChatWidget extends HookConsumerWidget {
     // 聚焦节点
     final focusNode = useFocusNode();
 
-    // 是否有键盘显示，使用节流防止频繁更新和过度重绘
-    final isKeyboardVisible = useState(false);
+    // 简化键盘状态检测，不再使用定时器和节流
+    final isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    // 记录键盘打开状态，用于表情选择器关闭时恢复
+    final wasKeyboardVisible = useRef<bool>(false);
 
     // 添加键盘优化器
     useEffect(() {
@@ -163,30 +178,6 @@ class ChatWidget extends HookConsumerWidget {
       });
 
       return null;
-    }, const []);
-
-    // 优化键盘呼出时UI的流畅性：添加一个防止重复构建的机制
-    final keyboardUpdateThrottle = useRef<DateTime>(DateTime.now());
-
-    useEffect(() {
-      final keyboardVisibilityTimer = Timer.periodic(
-        const Duration(milliseconds: 16),
-        (_) {
-          final now = DateTime.now();
-          final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-          final currentKeyboardVisible = keyboardHeight > 0;
-
-          // 至少间隔100ms才更新键盘状态，防止频繁更新导致卡顿
-          if (now.difference(keyboardUpdateThrottle.value).inMilliseconds >
-                  100 &&
-              isKeyboardVisible.value != currentKeyboardVisible) {
-            keyboardUpdateThrottle.value = now;
-            isKeyboardVisible.value = currentKeyboardVisible;
-          }
-        },
-      );
-
-      return keyboardVisibilityTimer.cancel;
     }, const []);
 
     // 是否正在加载历史消息
@@ -228,19 +219,27 @@ class ChatWidget extends HookConsumerWidget {
     // 处理表情按钮点击，优化切换流畅度
     void handleEmojiButtonClick() {
       if (showEmojiPicker.value) {
-        // 先设置状态再请求焦点，避免UI闪烁
+        // 关闭表情选择器
         showEmojiPicker.value = false;
-        // 使用postFrameCallback确保状态更新后再请求焦点
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (context.mounted) {
-            focusNode.requestFocus();
-          }
-        });
+
+        // 如果之前键盘是打开的，则需要重新打开键盘
+        if (wasKeyboardVisible.value) {
+          // 延迟200ms再显示键盘，等待表情选择器完全消失，避免界面跳动
+          Future.delayed(const Duration(milliseconds: 200), () {
+            if (context.mounted) {
+              focusNode.requestFocus();
+            }
+          });
+        }
       } else {
-        // 先取消焦点再显示表情选择器，避免同时存在
+        // 打开表情选择器前记录当前键盘状态
+        wasKeyboardVisible.value = isKeyboardVisible;
+
+        // 先取消焦点，隐藏键盘
         focusNode.unfocus();
-        // 使用postFrameCallback确保UI渲染完成后再更新状态
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+
+        // 延迟到键盘完全收起后再显示表情选择器，避免界面跳动
+        Future.delayed(const Duration(milliseconds: 100), () {
           if (context.mounted) {
             showEmojiPicker.value = true;
           }
@@ -389,138 +388,150 @@ class ChatWidget extends HookConsumerWidget {
       children: [
         // 消息列表
         Expanded(
-          child: messagesAsync.when(
-            data: (messages) {
-              // 合并历史消息和WebSocket实时消息
-              final combinedMessages = [...messages, ...localMessages.value];
+          child: RepaintBoundary(
+            child: messagesAsync.when(
+              data: (messages) {
+                // 合并历史消息和WebSocket实时消息
+                final combinedMessages = [...messages, ...localMessages.value];
 
-              // 按时间排序
-              combinedMessages.sort(
-                (a, b) => a.timestamp.compareTo(b.timestamp),
-              );
+                // 按时间排序
+                combinedMessages.sort(
+                  (a, b) => a.timestamp.compareTo(b.timestamp),
+                );
 
-              // 自动滚动到底部（仅首次加载）
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (scrollController.hasClients &&
-                    !scrollController.position.isScrollingNotifier.value) {
-                  scrollToBottom();
-                }
-              });
+                // 自动滚动到底部（仅首次加载）
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (scrollController.hasClients &&
+                      !scrollController.position.isScrollingNotifier.value) {
+                    scrollToBottom();
+                  }
+                });
 
-              // 使用拆分出的消息列表组件
-              return ChatMessageList(
-                messages: combinedMessages,
-                currentUserId: currentUserId.value ?? userId,
-                scrollController: scrollController,
-                showDateSeparator: showDateSeparator.value,
-                isLoadingHistory: isLoadingHistory.value,
-                onRefresh: handleRefresh,
-                onMessageRead: markMessageAsRead,
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error:
-                (error, _) => Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Text(
-                          '加载消息失败，请检查网络连接后重试',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 16),
+                // 使用拆分出的消息列表组件
+                return ChatMessageList(
+                  messages: combinedMessages,
+                  currentUserId: currentUserId.value ?? userId,
+                  scrollController: scrollController,
+                  showDateSeparator: showDateSeparator.value,
+                  isLoadingHistory: isLoadingHistory.value,
+                  onRefresh: handleRefresh,
+                  onMessageRead: markMessageAsRead,
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error:
+                  (error, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.red,
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          error.toString().replaceAll('Exception:', ''),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Text(
+                            '加载消息失败，请检查网络连接后重试',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 16),
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          ref.invalidate(meetingMessagesProvider(meetingId));
-                        },
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('重新加载'),
-                      ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            error.toString().replaceAll('Exception:', ''),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            ref.invalidate(meetingMessagesProvider(meetingId));
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('重新加载'),
+                        ),
+                      ],
+                    ),
+                  ),
+            ),
+          ),
+        ),
+
+        // 底部输入区域使用一个RepaintBoundary包装，防止键盘弹出/收起时重绘上面的内容
+        RepaintBoundary(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 录音状态指示器 - 使用拆分出的组件
+              if (isRecording.value)
+                RecordingIndicator(
+                  recordDuration: recordDuration.value,
+                  onCancel: cancelRecording,
+                  onSend: stopRecording,
+                ),
+
+              // 输入框 - 使用拆分出的组件
+              if (!isReadOnly)
+                ChatInputBar(
+                  textController: textController,
+                  focusNode: focusNode,
+                  isRecording: isRecording.value,
+                  onEmojiButtonClick: handleEmojiButtonClick,
+                  onVoiceButtonClick: handleVoiceButtonClick,
+                  onSendMessage: sendTextMessage,
+                  showEmojiPicker: showEmojiPicker.value,
+                ),
+
+              // 表情选择器 - 使用拆分出的组件
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                reverseDuration: const Duration(milliseconds: 100),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return SizeTransition(
+                    sizeFactor: animation,
+                    axisAlignment: -1.0,
+                    child: child,
+                  );
+                },
+                child:
+                    showEmojiPicker.value && !isKeyboardVisible
+                        ? ChatEmojiPicker(
+                          emojisData: emojisData.value,
+                          selectedCategory: selectedEmojiCategory,
+                          onEmojiSelected: insertEmoji,
+                          maxHeight: emojiPickerHeight,
+                        )
+                        : const SizedBox.shrink(),
+              ),
+
+              // 只读模式提示
+              if (isReadOnly)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade300),
+                    ),
+                  ),
+                  child: const Text(
+                    '此会议已结束，无法发送新消息',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
+            ],
           ),
         ),
-
-        // 录音状态指示器 - 使用拆分出的组件
-        if (isRecording.value)
-          RecordingIndicator(
-            recordDuration: recordDuration.value,
-            onCancel: cancelRecording,
-            onSend: stopRecording,
-          ),
-
-        // 输入框 - 使用拆分出的组件
-        if (!isReadOnly)
-          ChatInputBar(
-            textController: textController,
-            focusNode: focusNode,
-            isRecording: isRecording.value,
-            onEmojiButtonClick: handleEmojiButtonClick,
-            onVoiceButtonClick: handleVoiceButtonClick,
-            onSendMessage: sendTextMessage,
-            showEmojiPicker: showEmojiPicker.value,
-          ),
-
-        // 表情选择器 - 使用拆分出的组件
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 150),
-          reverseDuration: const Duration(milliseconds: 100),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (Widget child, Animation<double> animation) {
-            return SizeTransition(
-              sizeFactor: animation,
-              axisAlignment: -1.0,
-              child: child,
-            );
-          },
-          child:
-              showEmojiPicker.value && !isKeyboardVisible.value
-                  ? ChatEmojiPicker(
-                    emojisData: emojisData.value,
-                    selectedCategory: selectedEmojiCategory,
-                    onEmojiSelected: insertEmoji,
-                    maxHeight: emojiPickerHeight,
-                  )
-                  : const SizedBox.shrink(),
-        ),
-
-        // 只读模式提示
-        if (isReadOnly)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              border: Border(top: BorderSide(color: Colors.grey.shade300)),
-            ),
-            child: const Text(
-              '此会议已结束，无法发送新消息',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
       ],
     );
   }
