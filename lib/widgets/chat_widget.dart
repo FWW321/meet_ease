@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_providers.dart';
-import '../services/user_service.dart';
 import '../services/service_providers.dart';
 
 /// 优化的聊天组件，作为会议中的主要内容
@@ -38,13 +37,10 @@ class ChatWidget extends HookConsumerWidget {
           final user = await userService.getCurrentUser();
           if (user != null) {
             currentUserId.value = user.id;
-            print('从UserService获取的当前用户ID: ${user.id}');
           } else {
             currentUserId.value = userId; // 回退到传入的userId
-            print('无法获取当前用户，使用传入的userId: $userId');
           }
         } catch (e) {
-          print('获取当前用户ID失败: $e，使用传入的userId: $userId');
           currentUserId.value = userId; // 错误情况下回退到传入的userId
         }
       }
@@ -76,6 +72,9 @@ class ChatWidget extends HookConsumerWidget {
 
     // 是否显示表情选择器
     final showEmojiPicker = useState(false);
+
+    // 当前选中的表情分类
+    final selectedEmojiCategory = useState<String>('笑脸');
 
     // 聚焦节点
     final focusNode = useFocusNode();
@@ -235,6 +234,110 @@ class ChatWidget extends HookConsumerWidget {
       );
     }
 
+    // 构建表情选择器
+    Widget buildEmojiPicker() {
+      // 获取当前选中分类的表情
+      final emojis = _emojisByCategory[selectedEmojiCategory.value] ?? [];
+
+      return Container(
+        height: 250,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(26),
+              offset: const Offset(0, -1),
+              blurRadius: 3,
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // 分类选项卡
+            Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                ),
+              ),
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                children:
+                    _emojisByCategory.keys.map((category) {
+                      final isSelected =
+                          selectedEmojiCategory.value == category;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Center(
+                          child: InkWell(
+                            onTap: () => selectedEmojiCategory.value = category,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    isSelected
+                                        ? Colors.blue.shade100
+                                        : Colors.transparent,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                category,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color:
+                                      isSelected
+                                          ? Colors.blue
+                                          : Colors.grey.shade700,
+                                  fontWeight:
+                                      isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ),
+
+            // 表情网格
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.all(8),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 8,
+                  childAspectRatio: 1.0,
+                  mainAxisSpacing: 4,
+                  crossAxisSpacing: 4,
+                ),
+                itemCount: emojis.length,
+                itemBuilder: (context, index) {
+                  return InkWell(
+                    onTap: () => insertEmoji(emojis[index]),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Center(
+                      child: Text(
+                        emojis[index],
+                        style: const TextStyle(fontSize: 24),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
         // 消息列表
@@ -365,18 +468,17 @@ class ChatWidget extends HookConsumerWidget {
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),
-                      if (error != null)
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            error.toString().replaceAll('Exception:', ''),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                            textAlign: TextAlign.center,
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          error.toString().replaceAll('Exception:', ''),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
                           ),
+                          textAlign: TextAlign.center,
                         ),
+                      ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () {
@@ -441,39 +543,7 @@ class ChatWidget extends HookConsumerWidget {
           ),
 
         // 表情选择器
-        if (showEmojiPicker.value)
-          Container(
-            height: 200,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(26),
-                  offset: const Offset(0, -1),
-                  blurRadius: 3,
-                ),
-              ],
-            ),
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 8,
-                childAspectRatio: 1.0,
-              ),
-              itemCount: _commonEmojis.length,
-              itemBuilder: (context, index) {
-                return InkWell(
-                  onTap: () => insertEmoji(_commonEmojis[index]),
-                  child: Center(
-                    child: Text(
-                      _commonEmojis[index],
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+        if (showEmojiPicker.value) buildEmojiPicker(),
 
         // 输入框
         if (!isReadOnly)
@@ -730,5 +800,114 @@ class ChatWidget extends HookConsumerWidget {
   }
 }
 
-// 常用表情列表
-const _commonEmojis = ['😊', '😂', '👍', '❤️', '🔥', '😍', '😘', '😎'];
+// 常用表情列表（按分类）
+const Map<String, List<String>> _emojisByCategory = {
+  '笑脸': [
+    '😀',
+    '😃',
+    '😄',
+    '😁',
+    '😆',
+    '😅',
+    '😂',
+    '🤣',
+    '😊',
+    '😇',
+    '🙂',
+    '🙃',
+    '😉',
+    '😌',
+    '😍',
+    '🥰',
+    '😘',
+    '😗',
+    '😙',
+    '😚',
+  ],
+  '手势': [
+    '👍',
+    '👎',
+    '👌',
+    '✌️',
+    '🤞',
+    '🤟',
+    '🤘',
+    '🤙',
+    '👈',
+    '👉',
+    '👆',
+    '👇',
+    '☝️',
+    '👋',
+    '🤚',
+    '🖐️',
+    '✋',
+    '🖖',
+    '👏',
+    '🙌',
+  ],
+  '心形': [
+    '❤️',
+    '🧡',
+    '💛',
+    '💚',
+    '💙',
+    '💜',
+    '🖤',
+    '💖',
+    '💗',
+    '💓',
+    '💞',
+    '💕',
+    '❣️',
+    '💔',
+    '💘',
+    '💝',
+    '💟',
+    '☮️',
+  ],
+  '动物': [
+    '🐶',
+    '🐱',
+    '🐭',
+    '🐹',
+    '🐰',
+    '🦊',
+    '🐻',
+    '🐼',
+    '🐨',
+    '🐯',
+    '🦁',
+    '🐮',
+    '🐷',
+    '🐸',
+    '🐵',
+    '🙈',
+    '🙉',
+    '🙊',
+    '🐒',
+    '🦆',
+  ],
+  '食物': [
+    '🍏',
+    '🍎',
+    '🍐',
+    '🍊',
+    '🍋',
+    '🍌',
+    '🍉',
+    '🍇',
+    '🍓',
+    '🍈',
+    '🍒',
+    '🍑',
+    '🥭',
+    '🍍',
+    '🥥',
+    '🥝',
+    '🍅',
+    '🍆',
+    '🥑',
+    '🌮',
+  ],
+};
