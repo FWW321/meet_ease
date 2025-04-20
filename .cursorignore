@@ -2,6 +2,5 @@
 !lib/
 !lib/** 
 !pubspec.yaml
-!api_document.md
 !assets/
 !assets/**
