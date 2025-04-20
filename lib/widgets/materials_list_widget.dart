@@ -712,12 +712,74 @@ class MaterialsListWidget extends ConsumerWidget {
                 child: const Text('取消'),
               ),
               TextButton(
-                onPressed: () {
-                  final notifier = ref.read(
-                    meetingMaterialsNotifierProvider(meetingId).notifier,
+                onPressed: () async {
+                  // 显示加载指示器
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) =>
+                            const Center(child: CircularProgressIndicator()),
                   );
-                  notifier.removeMaterial(materialId);
-                  Navigator.of(context).pop();
+
+                  try {
+                    // 调用删除API
+                    final response = await http.delete(
+                      Uri.parse(
+                        '${AppConstants.apiBaseUrl}/meeting/file/delete/$materialId',
+                      ),
+                      headers: HttpUtils.createHeaders(),
+                    );
+
+                    // 确保widget仍然挂载在树上
+                    if (!context.mounted) return;
+
+                    // 关闭加载指示器
+                    Navigator.of(context).pop();
+                    // 关闭确认对话框
+                    Navigator.of(context).pop();
+
+                    // 处理响应
+                    if (response.statusCode == 200) {
+                      final responseData = HttpUtils.decodeResponse(response);
+
+                      if (responseData['code'] == 200) {
+                        // 删除成功，刷新资料列表
+                        ref.invalidate(
+                          meetingMaterialsNotifierProvider(meetingId),
+                        );
+
+                        // 显示成功消息
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(const SnackBar(content: Text('资料删除成功')));
+                      } else {
+                        // 显示错误消息
+                        final message = responseData['message'] ?? '资料删除失败';
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(message)));
+                      }
+                    } else {
+                      // 显示错误消息
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('删除失败: ${response.statusCode}')),
+                      );
+                    }
+                  } catch (e) {
+                    // 确保widget仍然挂载在树上
+                    if (!context.mounted) return;
+
+                    // 关闭加载指示器
+                    Navigator.of(context).pop();
+                    // 关闭确认对话框
+                    Navigator.of(context).pop();
+
+                    // 显示错误消息
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+                  }
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('删除'),
