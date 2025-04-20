@@ -6,6 +6,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_providers.dart';
 import '../services/service_providers.dart';
+import '../services/emoji_service.dart';
 
 /// 优化的聊天组件，作为会议中的主要内容
 class ChatWidget extends HookConsumerWidget {
@@ -75,6 +76,30 @@ class ChatWidget extends HookConsumerWidget {
 
     // 当前选中的表情分类
     final selectedEmojiCategory = useState<String>('笑脸');
+
+    // 表情数据 - 使用异步Provider
+    final emojisAsync = ref.watch(emojisProvider);
+
+    // 表情数据
+    final emojisData = useState<Map<String, List<String>>>({});
+
+    // 监听表情数据变化
+    useEffect(() {
+      // 当异步加载完成后更新表情数据
+      emojisAsync.whenData((data) {
+        if (data.isNotEmpty) {
+          emojisData.value = data;
+
+          // 如果当前选择的分类不在新数据中，重置为第一个分类
+          if (!data.containsKey(selectedEmojiCategory.value) &&
+              data.isNotEmpty) {
+            selectedEmojiCategory.value = data.keys.first;
+          }
+        }
+      });
+
+      return null;
+    }, [emojisAsync]);
 
     // 聚焦节点
     final focusNode = useFocusNode();
@@ -291,7 +316,7 @@ class ChatWidget extends HookConsumerWidget {
     // 构建表情选择器
     Widget buildEmojiPicker() {
       // 获取当前选中分类的表情
-      final emojis = _emojisByCategory[selectedEmojiCategory.value] ?? [];
+      final currentEmojis = emojisData.value[selectedEmojiCategory.value] ?? [];
 
       // 使用固定高度模拟键盘高度
       const emojiKeyboardHeight = 250.0;
@@ -320,14 +345,14 @@ class ChatWidget extends HookConsumerWidget {
                   mainAxisSpacing: 4,
                   crossAxisSpacing: 4,
                 ),
-                itemCount: emojis.length,
+                itemCount: currentEmojis.length,
                 itemBuilder: (context, index) {
                   return InkWell(
-                    onTap: () => insertEmoji(emojis[index]),
+                    onTap: () => insertEmoji(currentEmojis[index]),
                     borderRadius: BorderRadius.circular(8),
                     child: Center(
                       child: Text(
-                        emojis[index],
+                        currentEmojis[index],
                         style: const TextStyle(fontSize: 24),
                       ),
                     ),
@@ -349,7 +374,7 @@ class ChatWidget extends HookConsumerWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 children:
-                    _emojisByCategory.keys.map((category) {
+                    emojisData.value.keys.map((category) {
                       final isSelected =
                           selectedEmojiCategory.value == category;
                       return Padding(
@@ -860,115 +885,3 @@ class ChatWidget extends HookConsumerWidget {
     return '$minutes:$seconds';
   }
 }
-
-// 常用表情列表（按分类）
-const Map<String, List<String>> _emojisByCategory = {
-  '笑脸': [
-    '😀',
-    '😃',
-    '😄',
-    '😁',
-    '😆',
-    '😅',
-    '😂',
-    '🤣',
-    '😊',
-    '😇',
-    '🙂',
-    '🙃',
-    '😉',
-    '😌',
-    '😍',
-    '🥰',
-    '😘',
-    '😗',
-    '😙',
-    '😚',
-  ],
-  '手势': [
-    '👍',
-    '👎',
-    '👌',
-    '✌️',
-    '🤞',
-    '🤟',
-    '🤘',
-    '🤙',
-    '👈',
-    '👉',
-    '👆',
-    '👇',
-    '☝️',
-    '👋',
-    '🤚',
-    '🖐️',
-    '✋',
-    '🖖',
-    '👏',
-    '🙌',
-  ],
-  '心形': [
-    '❤️',
-    '🧡',
-    '💛',
-    '💚',
-    '💙',
-    '💜',
-    '🖤',
-    '💖',
-    '💗',
-    '💓',
-    '💞',
-    '💕',
-    '❣️',
-    '💔',
-    '💘',
-    '💝',
-    '💟',
-    '☮️',
-  ],
-  '动物': [
-    '🐶',
-    '🐱',
-    '🐭',
-    '🐹',
-    '🐰',
-    '🦊',
-    '🐻',
-    '🐼',
-    '🐨',
-    '🐯',
-    '🦁',
-    '🐮',
-    '🐷',
-    '🐸',
-    '🐵',
-    '🙈',
-    '🙉',
-    '🙊',
-    '🐒',
-    '🦆',
-  ],
-  '食物': [
-    '🍏',
-    '🍎',
-    '🍐',
-    '🍊',
-    '🍋',
-    '🍌',
-    '🍉',
-    '🍇',
-    '🍓',
-    '🍈',
-    '🍒',
-    '🍑',
-    '🥭',
-    '🍍',
-    '🥥',
-    '🥝',
-    '🍅',
-    '🍆',
-    '🥑',
-    '🌮',
-  ],
-};

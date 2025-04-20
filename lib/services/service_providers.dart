@@ -6,6 +6,10 @@ import 'speech_request_service.dart';
 import 'webrtc_service.dart';
 import 'user_service.dart';
 import 'api_user_service.dart';
+import 'emoji_service.dart';
+
+// 重新导出表情服务提供者
+export 'emoji_service.dart';
 
 // 用户服务提供者
 final userServiceProvider = Provider<UserService>((ref) {
