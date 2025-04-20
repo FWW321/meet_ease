@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 /// 会议图标生成工具
 /// 使用Flutter原生功能生成一个简单的会议图标
@@ -63,7 +62,7 @@ class IconGenerator {
     // 绘制一个简单的会议桌图形 (圆形)
     final tablePaint =
         Paint()
-          ..color = Colors.white.withOpacity(0.9)
+          ..color = Colors.white.withAlpha(230)
           ..style = PaintingStyle.fill;
 
     canvas.drawCircle(
@@ -75,7 +74,7 @@ class IconGenerator {
     // 桌子边框
     final borderPaint =
         Paint()
-          ..color = Colors.white.withOpacity(0.5)
+          ..color = Colors.white.withAlpha(128)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 15;
 

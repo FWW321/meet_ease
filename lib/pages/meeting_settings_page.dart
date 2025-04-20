@@ -14,6 +14,7 @@ class MeetingSettingsPage extends HookConsumerWidget {
   const MeetingSettingsPage({
     required this.meetingId,
     required this.currentUserId,
+    super.key,
   });
 
   @override
@@ -572,7 +573,7 @@ class _MeetingInfoTab extends HookConsumerWidget {
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
 
-    if (pickedDate != null) {
+    if (pickedDate != null && context.mounted) {
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(dateTime.value),

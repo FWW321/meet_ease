@@ -71,10 +71,14 @@ class ServerUtils {
     // 更新服务器地址
     await AppConstants.updateApiDomain(newAddress);
 
+    return true;
+  }
+
+  /// 显示更新成功信息
+  static void showUpdateSuccess(BuildContext context) {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('服务器地址已更新')));
-    return true;
   }
 
   /// 显示服务器连接测试结果

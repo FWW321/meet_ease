@@ -6,7 +6,6 @@ import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../providers/chat_providers.dart';
 import '../widgets/meeting_password_dialog.dart';
-import '../services/service_providers.dart';
 import 'meeting_process_page.dart';
 import 'meeting_settings_page.dart';
 
@@ -323,50 +322,56 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
     }
 
     // 密码验证成功或不需要密码，进入会议
-    if (context.mounted) {
-      // 如果是进行中的会议，建立WebSocket连接
-      if (meeting.status == MeetingStatus.ongoing && currentUserId != null) {
-        try {
-          // 连接到WebSocket
-          await ref.read(
-            webSocketConnectProvider({
-              'meetingId': widget.meetingId,
-              'userId': currentUserId!,
-            }).future,
-          );
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('WebSocket连接失败: $e'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-            // 失败但仍继续进入会议（可能使用HTTP请求作为回退方式）
-          }
-        }
+    if (!mounted) return;
+
+    // 如果是进行中的会议，建立WebSocket连接
+    if (meeting.status == MeetingStatus.ongoing && currentUserId != null) {
+      try {
+        // 连接到WebSocket
+        await ref.read(
+          webSocketConnectProvider({
+            'meetingId': widget.meetingId,
+            'userId': currentUserId!,
+          }).future,
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('WebSocket连接失败: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        // 失败但仍继续进入会议（可能使用HTTP请求作为回退方式）
       }
+    }
 
-      // 打开会议处理页面，并等待页面关闭
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => MeetingProcessPage(
-                meetingId: widget.meetingId,
-                meeting: meeting,
-              ),
-        ),
-      );
+    if (!mounted) return;
 
-      // 页面关闭后，断开WebSocket连接（无论页面如何关闭）
-      final isConnected = ref.read(webSocketConnectedProvider);
-      if (isConnected) {
-        try {
-          await ref.read(webSocketDisconnectProvider)();
-        } catch (e) {
-          print('断开WebSocket连接失败: $e');
-        }
+    // 打开会议处理页面，并等待页面关闭
+    if (!context.mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => MeetingProcessPage(
+              meetingId: widget.meetingId,
+              meeting: meeting,
+            ),
+      ),
+    );
+
+    // 页面关闭后，断开WebSocket连接（无论页面如何关闭）
+    if (!mounted) return;
+
+    final isConnected = ref.read(webSocketConnectedProvider);
+    if (isConnected) {
+      try {
+        await ref.read(webSocketDisconnectProvider)();
+      } catch (e) {
+        print('断开WebSocket连接失败: $e');
       }
     }
   }

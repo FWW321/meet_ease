@@ -38,7 +38,7 @@ class _IconGeneratorPageState extends State<IconGeneratorPage> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(26),
                         blurRadius: 5,
                         offset: const Offset(0, 3),
                       ),

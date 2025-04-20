@@ -5,7 +5,7 @@ import '../models/meeting.dart';
 import '../providers/meeting_providers.dart';
 
 class CreateMeetingPage extends HookConsumerWidget {
-  const CreateMeetingPage({Key? key}) : super(key: key);
+  const CreateMeetingPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -542,6 +542,9 @@ class CreateMeetingPage extends HookConsumerWidget {
                             );
                           }
                         },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child:
                     createMeetingState.isLoading
                         ? const SizedBox(
@@ -553,9 +556,6 @@ class CreateMeetingPage extends HookConsumerWidget {
                           ),
                         )
                         : const Text('创建会议'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
               ),
             ),
           ],
@@ -584,6 +584,7 @@ class CreateMeetingPage extends HookConsumerWidget {
     );
 
     if (pickedDate == null) return;
+    if (!context.mounted) return;
 
     // 选择时间
     final TimeOfDay? pickedTime = await showTimePicker(
@@ -592,6 +593,7 @@ class CreateMeetingPage extends HookConsumerWidget {
     );
 
     if (pickedTime == null) return;
+    if (!context.mounted) return;
 
     // 组合日期和时间
     final newDateTime = DateTime(

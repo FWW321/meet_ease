@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:http/http.dart' as http;
 import '../services/auth_service.dart';
-import '../services/service_providers.dart';
 import '../pages/home_page.dart';
 import '../pages/register_page.dart';
 import '../constants/app_constants.dart';

@@ -241,7 +241,7 @@ class HelpCenterPage extends HookConsumerWidget {
                             decoration: BoxDecoration(
                               color: Theme.of(
                                 context,
-                              ).primaryColor.withOpacity(0.1),
+                              ).primaryColor.withAlpha(26),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
