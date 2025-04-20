@@ -5,11 +5,13 @@ import 'package:intl/intl.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_providers.dart';
+import '../services/user_service.dart';
+import '../services/service_providers.dart';
 
 /// 优化的聊天组件，作为会议中的主要内容
 class ChatWidget extends HookConsumerWidget {
   final String meetingId;
-  final String userId;
+  final String userId; // 传入的userId可能不准确，我们将从UserService获取真实的当前用户ID
   final String userName;
   final String? userAvatar;
   final bool isReadOnly;
@@ -25,6 +27,32 @@ class ChatWidget extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 获取当前登录用户ID（从用户服务中）
+    final currentUserId = useState<String?>(null);
+
+    // 使用useEffect获取当前用户ID
+    useEffect(() {
+      Future<void> fetchCurrentUserId() async {
+        try {
+          final userService = ref.read(userServiceProvider);
+          final user = await userService.getCurrentUser();
+          if (user != null) {
+            currentUserId.value = user.id;
+            print('从UserService获取的当前用户ID: ${user.id}');
+          } else {
+            currentUserId.value = userId; // 回退到传入的userId
+            print('无法获取当前用户，使用传入的userId: $userId');
+          }
+        } catch (e) {
+          print('获取当前用户ID失败: $e，使用传入的userId: $userId');
+          currentUserId.value = userId; // 错误情况下回退到传入的userId
+        }
+      }
+
+      fetchCurrentUserId();
+      return null;
+    }, []);
+
     // 消息列表
     final messagesAsync = ref.watch(meetingMessagesProvider(meetingId));
 
@@ -276,8 +304,10 @@ class ChatWidget extends HookConsumerWidget {
                                   previousMessage.timestamp,
                                 ));
 
-                        // 是否为当前用户发送的消息
-                        final isCurrentUser = message.senderId == userId;
+                        // 是否为当前用户发送的消息 - 使用真实的当前用户ID
+                        final realCurrentUserId = currentUserId.value ?? userId;
+                        final isSentByMe =
+                            message.senderId == realCurrentUserId;
 
                         return Column(
                           children: [
@@ -295,7 +325,8 @@ class ChatWidget extends HookConsumerWidget {
                             _buildMessageBubble(
                               context,
                               message,
-                              isCurrentUser,
+                              isSentByMe,
+                              realCurrentUserId,
                             ),
                           ],
                         );
@@ -541,36 +572,35 @@ class ChatWidget extends HookConsumerWidget {
   Widget _buildMessageBubble(
     BuildContext context,
     ChatMessage message,
-    bool isCurrentUser,
+    bool isSentByMe,
+    String currentUserId,
   ) {
     final timeFormat = DateFormat('HH:mm');
     final time = timeFormat.format(message.timestamp);
 
     // 自定义气泡颜色
     final bubbleColor =
-        isCurrentUser ? Colors.blue.shade100 : Colors.grey.shade100;
+        isSentByMe ? Colors.blue.shade100 : Colors.grey.shade100;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment:
-            isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            isSentByMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 左侧头像（非当前用户的消息）
-          if (!isCurrentUser) _buildAvatar(message),
+          if (!isSentByMe) _buildAvatar(message),
 
           const SizedBox(width: 8),
 
           // 消息内容
           Column(
             crossAxisAlignment:
-                isCurrentUser
-                    ? CrossAxisAlignment.end
-                    : CrossAxisAlignment.start,
+                isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
               // 发送者名称（非当前用户的消息）
-              if (!isCurrentUser)
+              if (!isSentByMe)
                 Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 2),
                   child: Text(
@@ -596,7 +626,7 @@ class ChatWidget extends HookConsumerWidget {
           const SizedBox(width: 8),
 
           // 右侧头像（当前用户的消息）
-          if (isCurrentUser) _buildAvatar(message),
+          if (isSentByMe) _buildAvatar(message),
         ],
       ),
     );
