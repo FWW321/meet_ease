@@ -6,15 +6,19 @@ import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../providers/chat_providers.dart';
+import '../services/service_providers.dart';
 import '../widgets/agenda_list_widget.dart';
 import '../widgets/materials_list_widget.dart';
 import '../widgets/notes_list_widget.dart';
 import '../widgets/votes_list_widget.dart';
-import '../widgets/chat_widget.dart';
+import '../widgets/chat/chat_widget.dart';
 import '../widgets/voice_meeting_widget.dart';
 
+// 全局聊天组件缓存提供者
+final chatWidgetCacheProvider = StateProvider<ChatWidget?>((ref) => null);
+
 /// 会议过程管理页面 - 以实时语音为主要内容的界面
-class MeetingProcessPage extends StatefulHookConsumerWidget {
+class MeetingProcessPage extends HookConsumerWidget {
   final String meetingId;
   final Meeting meeting;
 
@@ -25,51 +29,63 @@ class MeetingProcessPage extends StatefulHookConsumerWidget {
   });
 
   @override
-  ConsumerState<MeetingProcessPage> createState() => _MeetingProcessPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 获取当前用户ID
+    final currentUserIdAsync = ref.watch(currentUserIdProvider);
 
-class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
-  String? currentUserId;
+    // 使用useState保存当前用户ID，避免重复请求
+    final currentUserId = useState<String>('');
 
-  // 提前创建聊天组件实例，防止每次点击底部菜单时重新创建导致延迟
-  late final ChatWidget _chatWidget;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCurrentUserId();
-
-    // 提前创建聊天组件实例
-    _chatWidget = ChatWidget(
-      meetingId: widget.meetingId,
-      isReadOnly: widget.meeting.status == MeetingStatus.completed,
-      userId: currentUserId ?? '',
-      userName: '当前用户', // 替换为实际用户名
-    );
-  }
-
-  @override
-  void dispose() {
-    // 在页面销毁时断开WebSocket连接的代码移除，因为已在MeetingDetailPage处理
-    super.dispose();
-  }
-
-  Future<void> _loadCurrentUserId() async {
-    final userId = await ref.read(currentUserIdProvider.future);
-    if (mounted) {
-      setState(() {
-        currentUserId = userId;
+    // 提前预加载聊天消息，避免点击聊天标签时出现加载延迟
+    useEffect(() {
+      // 使用微任务确保不阻塞UI
+      Future.microtask(() async {
+        // 预加载聊天消息数据
+        await ref.read(meetingMessagesProvider(meetingId).future);
+        // 预加载表情数据
+        await ref.read(emojisProvider.future);
+        // 初始化其他可能需要预加载的数据
       });
-    }
-  }
+      return null;
+    }, const []); // 空依赖数组确保只执行一次
 
-  @override
-  Widget build(BuildContext context) {
     // 是否为已结束的会议
-    final isCompletedMeeting = widget.meeting.status == MeetingStatus.completed;
+    final isCompletedMeeting = meeting.status == MeetingStatus.completed;
+
+    // 是否显示签到对话框
+    final isShowingSignInDialog = useState(false);
+
+    // 当前选中的功能选项
+    final selectedFeatureIndex = useState(-1);
+
+    // 缓存预创建的聊天组件实例
+    final chatWidgetCache = useState<ChatWidget?>(null);
+
+    // 获取参会人员列表
+    final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
+
+    // 使用useEffect获取当前用户ID
+    useEffect(() {
+      currentUserIdAsync.whenData((userId) {
+        currentUserId.value = userId;
+        // 用户ID获取后，预创建聊天组件
+        if (userId.isNotEmpty && chatWidgetCache.value == null) {
+          final widget = ChatWidget(
+            meetingId: meetingId,
+            userId: userId,
+            userName: ref.read(currentUserProvider).value?.name ?? '当前用户',
+            isReadOnly: isCompletedMeeting,
+          );
+          chatWidgetCache.value = widget;
+          // 更新全局缓存
+          ref.read(chatWidgetCacheProvider.notifier).state = widget;
+        }
+      });
+      return null;
+    }, [currentUserIdAsync]);
 
     // 检查会议是否已取消
-    final isCancelledMeeting = widget.meeting.status == MeetingStatus.cancelled;
+    final isCancelledMeeting = meeting.status == MeetingStatus.cancelled;
 
     // 如果会议已取消，显示无法进入提示并返回
     if (isCancelledMeeting) {
@@ -110,8 +126,8 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
 
     // 检查当前用户是否在黑名单中
     final isBlocked =
-        currentUserId != null &&
-        widget.meeting.blacklist.contains(currentUserId);
+        currentUserId.value.isNotEmpty &&
+        meeting.blacklist.contains(currentUserId.value);
 
     // 如果用户在黑名单中，显示拒绝访问提示
     if (isBlocked) {
@@ -141,22 +157,8 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
       );
     }
 
-    // 使用hooks
     // 签到状态
-    final signInStatusAsync = ref.watch(
-      meetingSignInProvider(widget.meetingId),
-    );
-
-    // 是否显示签到对话框
-    final isShowingSignInDialog = useState(false);
-
-    // 当前选中的功能选项
-    final selectedFeatureIndex = useState(-1);
-
-    // 获取参会人员列表
-    final participantsAsync = ref.watch(
-      meetingParticipantsProvider(widget.meetingId),
-    );
+    final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
 
     // 功能选项列表
     final features = [
@@ -198,7 +200,7 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
     List<Widget> buildActions() {
       return [
         // 签到按钮 - 仅在进行中且未签到的会议显示
-        if (widget.meeting.status == MeetingStatus.ongoing)
+        if (meeting.status == MeetingStatus.ongoing)
           signInStatusAsync.when(
             data:
                 (isSignedIn) =>
@@ -234,9 +236,7 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
                   color: Colors.red,
                   tooltip: '签到状态获取失败',
                   onPressed:
-                      () => ref.invalidate(
-                        meetingSignInProvider(widget.meetingId),
-                      ),
+                      () => ref.invalidate(meetingSignInProvider(meetingId)),
                 ),
           ),
 
@@ -252,13 +252,13 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
           ),
 
         // 显示用户权限徽章
-        if (!isCompletedMeeting && currentUserId != null)
+        if (!isCompletedMeeting && currentUserId.value.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: Chip(
               label: Text(
                 getMeetingPermissionText(
-                  widget.meeting.getUserPermission(currentUserId!),
+                  meeting.getUserPermission(currentUserId.value),
                 ),
               ),
               backgroundColor: Colors.blue.shade100,
@@ -270,7 +270,7 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
         IconButton(
           icon: const Icon(Icons.info_outline),
           tooltip: '会议信息',
-          onPressed: () => _showMeetingInfo(context),
+          onPressed: () => _showMeetingInfo(context, meeting),
         ),
 
         // 更多选项按钮
@@ -286,9 +286,9 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
               );
 
               // 创建者可以结束进行中的会议
-              if (currentUserId != null &&
-                  widget.meeting.isCreatorOnly(currentUserId!) &&
-                  widget.meeting.status == MeetingStatus.ongoing) {
+              if (currentUserId.value.isNotEmpty &&
+                  meeting.isCreatorOnly(currentUserId.value) &&
+                  meeting.status == MeetingStatus.ongoing) {
                 menuItems.add(
                   const PopupMenuItem(
                     value: 'end_meeting',
@@ -305,15 +305,20 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
 
             return menuItems;
           },
-          onSelected: (value) {
+          onSelected: (value) async {
             // 处理菜单项选择
             switch (value) {
               case 'invite':
                 // 实现邀请参会者功能
                 break;
               case 'end_meeting':
-                if (currentUserId != null) {
-                  _showEndMeetingConfirmDialog(context, ref, currentUserId!);
+                if (currentUserId.value.isNotEmpty) {
+                  _showEndMeetingConfirmDialog(
+                    context,
+                    ref,
+                    currentUserId.value,
+                    meetingId,
+                  );
                 }
                 break;
               case 'exit':
@@ -330,7 +335,7 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
       // 使用Future.microtask确保在构建完成后显示对话框
       Future.microtask(() {
         if (context.mounted) {
-          _showSignInDialog(context, ref, () {
+          _showSignInDialog(context, ref, meetingId, () {
             isShowingSignInDialog.value = false;
           });
         }
@@ -338,10 +343,7 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.meeting.title),
-        actions: buildActions(),
-      ),
+      appBar: AppBar(title: Text(meeting.title), actions: buildActions()),
       body: Stack(
         children: [
           // 主体内容 - 实时语音通话或历史记录
@@ -349,11 +351,12 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
             padding: const EdgeInsets.all(16.0),
             child:
                 isCompletedMeeting
-                    ? _buildCompletedMeetingView(ref)
+                    ? _buildCompletedMeetingView(ref, meeting, meetingId)
                     : VoiceMeetingWidget(
-                      meetingId: widget.meetingId,
-                      userId: currentUserId ?? '',
-                      userName: '当前用户', // 替换为实际用户名
+                      meetingId: meetingId,
+                      userId: currentUserId.value,
+                      userName:
+                          ref.watch(currentUserProvider).value?.name ?? '当前用户',
                     ),
           ),
 
@@ -449,8 +452,9 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
                               Expanded(
                                 child: _buildFeaturePanel(
                                   selectedFeatureIndex.value,
+                                  meetingId: meetingId,
                                   isReadOnly: isCompletedMeeting,
-                                  currentUserId: currentUserId,
+                                  currentUserId: currentUserId.value,
                                   participants: participantsAsync,
                                   ref: ref,
                                 ),
@@ -469,405 +473,413 @@ class _MeetingProcessPageState extends ConsumerState<MeetingProcessPage> {
       ),
     );
   }
+}
 
-  // 构建已结束会议的主视图
-  Widget _buildCompletedMeetingView(WidgetRef ref) {
-    // 获取签到状态
-    final signInStatusAsync = ref.watch(
-      meetingSignInProvider(widget.meetingId),
-    );
+// 构建已结束会议的主视图
+Widget _buildCompletedMeetingView(
+  WidgetRef ref,
+  Meeting meeting,
+  String meetingId,
+) {
+  // 获取签到状态
+  final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
 
-    return Column(
-      children: [
-        // 会议状态和签到信息
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(Icons.history, color: Colors.grey),
-                  SizedBox(width: 8),
-                  Text(
-                    '会议已结束',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '会议结束时间：${widget.meeting.endTime.toString().substring(0, 16)}',
-                style: const TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 12),
-
-              // 签到状态
-              Row(
-                children: [
-                  const Text('签到状态：', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(width: 8),
-                  signInStatusAsync.when(
-                    data:
-                        (isSignedIn) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isSignedIn
-                                    ? Colors.green.shade50
-                                    : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color:
-                                  isSignedIn
-                                      ? Colors.green
-                                      : Colors.red.shade300,
-                            ),
-                          ),
-                          child: Text(
-                            isSignedIn ? '已签到' : '未签到',
-                            style: TextStyle(
-                              color:
-                                  isSignedIn
-                                      ? Colors.green
-                                      : Colors.red.shade700,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                    loading:
-                        () => const SizedBox(
-                          height: 12,
-                          width: 12,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                    error:
-                        (_, __) => Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey),
-                          ),
-                          child: const Text(
-                            '加载失败',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  return Column(
+    children: [
+      // 会议状态和签到信息
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200),
         ),
-
-        const SizedBox(height: 24),
-
-        // 会议历史记录入口提示
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
               children: [
-                const Icon(
-                  Icons.history_toggle_off,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '此会议已结束',
+                Icon(Icons.history, color: Colors.grey),
+                SizedBox(width: 8),
+                Text(
+                  '会议已结束',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  '您可以通过底部功能栏查看会议记录',
-                  style: TextStyle(color: Colors.grey),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '会议结束时间：${meeting.endTime.toString().substring(0, 16)}',
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+
+            // 签到状态
+            Row(
+              children: [
+                const Text('签到状态：', style: TextStyle(color: Colors.grey)),
+                const SizedBox(width: 8),
+                signInStatusAsync.when(
+                  data:
+                      (isSignedIn) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              isSignedIn
+                                  ? Colors.green.shade50
+                                  : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                isSignedIn ? Colors.green : Colors.red.shade300,
+                          ),
+                        ),
+                        child: Text(
+                          isSignedIn ? '已签到' : '未签到',
+                          style: TextStyle(
+                            color:
+                                isSignedIn ? Colors.green : Colors.red.shade700,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  loading:
+                      () => const SizedBox(
+                        height: 12,
+                        width: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                  error:
+                      (_, __) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey),
+                        ),
+                        child: const Text(
+                          '加载失败',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                 ),
-                const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.mail_outline),
-                  label: const Text('发送会议纪要至邮箱'),
-                  onPressed: () {
-                    // 实现发送会议纪要功能
-                  },
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+              ],
+            ),
+          ],
+        ),
+      ),
+
+      const SizedBox(height: 24),
+
+      // 会议历史记录入口提示
+      Expanded(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.history_toggle_off,
+                size: 64,
+                color: Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '此会议已结束',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '您可以通过底部功能栏查看会议记录',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.mail_outline),
+                label: const Text('发送会议纪要至邮箱'),
+                onPressed: () {
+                  // 实现发送会议纪要功能
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
+}
+
+// 构建功能面板内容
+Widget _buildFeaturePanel(
+  int index, {
+  required String meetingId,
+  bool isReadOnly = false,
+  required String currentUserId,
+  required AsyncValue<List<User>> participants,
+  required WidgetRef ref,
+}) {
+  // 获取缓存的聊天组件（如果有）或创建新的
+  final ChatWidget chatWidget = ref.read(
+    Provider((ref) {
+      final cache = ref.read(chatWidgetCacheProvider);
+      if (cache != null) {
+        return cache;
+      }
+      // 如果没有缓存，创建新的
+      return ChatWidget(
+        meetingId: meetingId,
+        userId: currentUserId,
+        userName: ref.watch(currentUserProvider).value?.name ?? '当前用户',
+        isReadOnly: isReadOnly,
+      );
+    }),
+  );
+
+  // 功能组件列表
+  final functionWidgets = [
+    // 使用缓存的聊天组件
+    chatWidget,
+    AgendaListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+    MaterialsListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+    NotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+    VotesListWidget(meetingId: meetingId, isReadOnly: isReadOnly),
+  ];
+
+  if (index >= 0 && index < functionWidgets.length) {
+    return functionWidgets[index];
   }
 
-  // 构建功能面板内容
-  Widget _buildFeaturePanel(
-    int index, {
-    bool isReadOnly = false,
-    required String? currentUserId,
-    required AsyncValue<List<User>> participants,
-    required WidgetRef ref,
-  }) {
-    // 功能列表 - 使用已创建的聊天组件实例
-    final functionWidgets = [
-      // 使用已经创建的聊天组件实例，避免每次点击重建
-      _chatWidget,
-      AgendaListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
-      MaterialsListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
-      NotesListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
-      VotesListWidget(meetingId: widget.meetingId, isReadOnly: isReadOnly),
-    ];
+  return const Center(child: Text('未知功能'));
+}
 
-    if (index >= 0 && index < functionWidgets.length) {
-      return functionWidgets[index];
-    }
-
-    return const Center(child: Text('未知功能'));
-  }
-
-  // 显示会议信息对话框
-  void _showMeetingInfo(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('会议信息'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoRow('标题', widget.meeting.title),
-                _buildInfoRow(
-                  '开始时间',
-                  widget.meeting.startTime.toString().substring(0, 16),
-                ),
-                _buildInfoRow(
-                  '结束时间',
-                  widget.meeting.endTime.toString().substring(0, 16),
-                ),
-                _buildInfoRow('地点', widget.meeting.location),
-                _buildInfoRow(
-                  '状态',
-                  getMeetingStatusText(widget.meeting.status),
-                ),
-                _buildInfoRow('类型', getMeetingTypeText(widget.meeting.type)),
-                _buildInfoRow('组织者', widget.meeting.organizerName),
-                if (widget.meeting.description != null)
-                  _buildInfoRow('描述', widget.meeting.description!),
-                _buildInfoRow(
-                  '参与人数',
-                  widget.meeting.participantCount.toString(),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
+// 显示会议信息对话框
+void _showMeetingInfo(BuildContext context, Meeting meeting) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('会议信息'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoRow('标题', meeting.title),
+              _buildInfoRow(
+                '开始时间',
+                meeting.startTime.toString().substring(0, 16),
               ),
+              _buildInfoRow(
+                '结束时间',
+                meeting.endTime.toString().substring(0, 16),
+              ),
+              _buildInfoRow('地点', meeting.location),
+              _buildInfoRow('状态', getMeetingStatusText(meeting.status)),
+              _buildInfoRow('类型', getMeetingTypeText(meeting.type)),
+              _buildInfoRow('组织者', meeting.organizerName),
+              if (meeting.description != null)
+                _buildInfoRow('描述', meeting.description!),
+              _buildInfoRow('参与人数', meeting.participantCount.toString()),
             ],
           ),
-    );
-  }
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        ),
+  );
+}
 
-  // 显示签到对话框
-  void _showSignInDialog(
-    BuildContext context,
-    WidgetRef ref,
-    VoidCallback onComplete,
-  ) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('会议签到'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('确认签到本次会议吗？'),
-                const SizedBox(height: 16),
+// 显示签到对话框
+void _showSignInDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String meetingId,
+  VoidCallback onComplete,
+) {
+  final meeting = ref.read(meetingDetailProvider(meetingId)).value;
+
+  showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('会议签到'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('确认签到本次会议吗？'),
+              const SizedBox(height: 16),
+              Text(
+                meeting?.title ?? '当前会议',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (meeting != null)
                 Text(
-                  widget.meeting.title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '开始时间：${widget.meeting.startTime.toString().substring(0, 16)}',
+                  '开始时间：${meeting.startTime.toString().substring(0, 16)}',
                   style: const TextStyle(color: Colors.grey),
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onComplete();
-                },
-                child: const Text('取消'),
-              ),
-              Consumer(
-                builder: (context, ref, child) {
-                  final signInAsyncValue = ref.watch(
-                    meetingSignInProvider(widget.meetingId),
-                  );
-                  final isLoading = signInAsyncValue.isLoading;
-
-                  return TextButton(
-                    onPressed:
-                        isLoading
-                            ? null
-                            : () async {
-                              await ref
-                                  .read(
-                                    meetingSignInProvider(
-                                      widget.meetingId,
-                                    ).notifier,
-                                  )
-                                  .signIn();
-                              if (context.mounted) {
-                                Navigator.of(context).pop();
-                                onComplete();
-                              }
-                            },
-                    child:
-                        isLoading
-                            ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                            : const Text('确认签到'),
-                  );
-                },
-              ),
             ],
           ),
-    );
-  }
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                onComplete();
+              },
+              child: const Text('取消'),
+            ),
+            Consumer(
+              builder: (context, ref, child) {
+                final signInAsyncValue = ref.watch(
+                  meetingSignInProvider(meetingId),
+                );
+                final isLoading = signInAsyncValue.isLoading;
 
-  // 构建信息行
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 16)),
-          const Divider(height: 16),
-        ],
-      ),
-    );
-  }
+                return TextButton(
+                  onPressed:
+                      isLoading
+                          ? null
+                          : () async {
+                            await ref
+                                .read(meetingSignInProvider(meetingId).notifier)
+                                .signIn();
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                              onComplete();
+                            }
+                          },
+                  child:
+                      isLoading
+                          ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('确认签到'),
+                );
+              },
+            ),
+          ],
+        ),
+  );
+}
 
-  // 显示结束会议确认对话框
-  void _showEndMeetingConfirmDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String currentUserId,
-  ) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('结束会议'),
-            content: const Text('确认要结束此会议吗？此操作不可撤销，所有参会者将收到会议已结束的通知。'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  Navigator.of(context).pop();
+// 构建信息行
+Widget _buildInfoRow(String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 16)),
+        const Divider(height: 16),
+      ],
+    ),
+  );
+}
 
-                  // 显示加载指示器
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder:
-                        (context) =>
-                            const Center(child: CircularProgressIndicator()),
-                  );
+// 显示结束会议确认对话框
+void _showEndMeetingConfirmDialog(
+  BuildContext context,
+  WidgetRef ref,
+  String currentUserId,
+  String meetingId,
+) {
+  showDialog(
+    context: context,
+    builder:
+        (context) => AlertDialog(
+          title: const Text('结束会议'),
+          content: const Text('确认要结束此会议吗？此操作不可撤销，所有参会者将收到会议已结束的通知。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
 
-                  try {
-                    // 调用结束会议服务
-                    final meetingService = ref.read(meetingServiceProvider);
-                    await meetingService.endMeeting(
-                      widget.meetingId,
-                      currentUserId,
+                // 显示加载指示器
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder:
+                      (context) =>
+                          const Center(child: CircularProgressIndicator()),
+                );
+
+                try {
+                  // 调用结束会议服务
+                  final meetingService = ref.read(meetingServiceProvider);
+                  await meetingService.endMeeting(meetingId, currentUserId);
+
+                  // 刷新会议详情
+                  ref.invalidate(meetingDetailProvider(meetingId));
+
+                  if (context.mounted) {
+                    // 关闭加载指示器
+                    Navigator.of(context).pop();
+
+                    // 显示成功提示
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('会议已成功结束'),
+                        backgroundColor: Colors.green,
+                      ),
                     );
 
-                    // 刷新会议详情
-                    ref.invalidate(meetingDetailProvider(widget.meetingId));
-
-                    if (context.mounted) {
-                      // 关闭加载指示器
-                      Navigator.of(context).pop();
-
-                      // 显示成功提示
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('会议已成功结束'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-
-                      // 返回会议列表
-                      Navigator.of(context).pop();
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      // 关闭加载指示器
-                      Navigator.of(context).pop();
-
-                      // 显示错误提示
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('结束会议失败: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
+                    // 返回会议列表
+                    Navigator.of(context).pop();
                   }
-                },
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('确定结束'),
-              ),
-            ],
-          ),
-    );
-  }
+                } catch (e) {
+                  if (context.mounted) {
+                    // 关闭加载指示器
+                    Navigator.of(context).pop();
+
+                    // 显示错误提示
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('结束会议失败: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('确定结束'),
+            ),
+          ],
+        ),
+  );
 }
 
 /// 会议功能选项模型
