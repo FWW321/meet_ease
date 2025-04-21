@@ -1,8 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/meeting.dart';
 import '../providers/meeting_providers.dart';
+import '../constants/app_constants.dart';
+
+// 简化的API用户模型
+class ApiUser {
+  final String userId;
+  final String username;
+  final String? email;
+  final String? phone;
+
+  ApiUser({
+    required this.userId,
+    required this.username,
+    this.email,
+    this.phone,
+  });
+
+  factory ApiUser.fromJson(Map<String, dynamic> json) {
+    return ApiUser(
+      userId: json['userId'].toString(),
+      username: json['username'] as String,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+    );
+  }
+}
+
+// API用户搜索响应
+class UserSearchResponse {
+  final int code;
+  final String message;
+  final List<ApiUser> data;
+
+  UserSearchResponse({
+    required this.code,
+    required this.message,
+    required this.data,
+  });
+
+  factory UserSearchResponse.fromJson(Map<String, dynamic> json) {
+    return UserSearchResponse(
+      code: json['code'] as int,
+      message: json['message'] as String,
+      data:
+          (json['data'] as List<dynamic>)
+              .map((e) => ApiUser.fromJson(e as Map<String, dynamic>))
+              .toList(),
+    );
+  }
+}
 
 class CreateMeetingPage extends HookConsumerWidget {
   const CreateMeetingPage({super.key});
@@ -12,30 +65,100 @@ class CreateMeetingPage extends HookConsumerWidget {
     final formKey = GlobalKey<FormState>();
 
     // 表单字段控制器
-    final titleController = TextEditingController();
-    final locationController = TextEditingController();
-    final descriptionController = TextEditingController();
-    final passwordController = TextEditingController();
+    final titleController = useTextEditingController();
+    final locationController = useTextEditingController();
+    final descriptionController = useTextEditingController();
+    final passwordController = useTextEditingController();
+
+    // 用户搜索框控制器
+    final searchController = useTextEditingController();
 
     // 日期和时间
-    final startDate = ValueNotifier<DateTime>(
-      DateTime.now().add(const Duration(hours: 1)),
-    );
-    final endDate = ValueNotifier<DateTime>(
-      DateTime.now().add(const Duration(hours: 2)),
-    );
+    final startDate = useState(DateTime.now().add(const Duration(hours: 1)));
+    final endDate = useState(DateTime.now().add(const Duration(hours: 2)));
 
     // 会议类型和可见性
-    final meetingType = ValueNotifier<MeetingType>(MeetingType.regular);
-    final meetingVisibility = ValueNotifier<MeetingVisibility>(
-      MeetingVisibility.public,
-    );
+    final meetingType = useState(MeetingType.regular);
+    final meetingVisibility = useState(MeetingVisibility.public);
 
     // 是否启用密码
-    final enablePassword = ValueNotifier<bool>(false);
+    final enablePassword = useState(false);
 
-    // 可选择的用户列表（对于私有会议）
-    final selectedUsers = ValueNotifier<List<String>>([]);
+    // 用户搜索和选择相关状态
+    final searchQuery = useState('');
+    final searchResults = useState<List<ApiUser>>([]);
+    final isSearching = useState(false);
+    final selectedUserIds = useState<List<String>>([]);
+
+    // 搜索防抖计时器
+    final searchDebounce = useState<Timer?>(null);
+
+    // 同步搜索文本和控制器
+    useEffect(() {
+      searchController.text = searchQuery.value;
+      return null;
+    }, [searchQuery.value]);
+
+    // 用户搜索方法
+    final searchUsers = useCallback((String query) {
+      // 取消之前的计时器
+      searchDebounce.value?.cancel();
+
+      // 如果查询为空，清空结果
+      if (query.isEmpty) {
+        searchResults.value = [];
+        isSearching.value = false;
+        return;
+      }
+
+      // 设置新计时器进行防抖
+      searchDebounce.value = Timer(const Duration(milliseconds: 500), () async {
+        isSearching.value = true;
+
+        try {
+          // 构建URL
+          final uri = Uri.parse(
+            '${AppConstants.apiBaseUrl}/user/search',
+          ).replace(queryParameters: {'username': query});
+
+          // 发送请求
+          final response = await http.get(uri);
+
+          // 处理响应
+          if (response.statusCode == 200) {
+            final searchResponse = UserSearchResponse.fromJson(
+              json.decode(response.body) as Map<String, dynamic>,
+            );
+            searchResults.value = searchResponse.data;
+          } else {
+            searchResults.value = [];
+          }
+        } catch (e) {
+          // 处理错误
+          searchResults.value = [];
+        } finally {
+          isSearching.value = false;
+        }
+      });
+    }, []);
+
+    // 检查用户是否已选择
+    final isUserSelected = useCallback((String userId) {
+      return selectedUserIds.value.contains(userId);
+    }, [selectedUserIds.value]);
+
+    // 切换用户选择状态
+    final toggleUserSelection = useCallback((String userId) {
+      final currentSelected = List<String>.from(selectedUserIds.value);
+
+      if (currentSelected.contains(userId)) {
+        currentSelected.remove(userId);
+      } else {
+        currentSelected.add(userId);
+      }
+
+      selectedUserIds.value = currentSelected;
+    }, [selectedUserIds.value]);
 
     // 创建会议状态
     final createMeetingState = ref.watch(createMeetingProvider);
@@ -125,83 +248,71 @@ class CreateMeetingPage extends HookConsumerWidget {
             const SizedBox(height: 16),
 
             // 会议类型选择
-            ValueListenableBuilder<MeetingType>(
-              valueListenable: meetingType,
-              builder: (context, type, _) {
-                return InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: '会议类型',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.category),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<MeetingType>(
-                      value: type,
-                      isExpanded: true,
-                      onChanged: (newValue) {
-                        if (newValue != null) {
-                          meetingType.value = newValue;
-                        }
-                      },
-                      items:
-                          MeetingType.values.map((type) {
-                            return DropdownMenuItem<MeetingType>(
-                              value: type,
-                              child: Text(getMeetingTypeText(type)),
-                            );
-                          }).toList(),
-                    ),
-                  ),
-                );
-              },
+            InputDecorator(
+              decoration: const InputDecoration(
+                labelText: '会议类型',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<MeetingType>(
+                  value: meetingType.value,
+                  isExpanded: true,
+                  onChanged: (newValue) {
+                    if (newValue != null) {
+                      meetingType.value = newValue;
+                    }
+                  },
+                  items:
+                      MeetingType.values.map((type) {
+                        return DropdownMenuItem<MeetingType>(
+                          value: type,
+                          child: Text(getMeetingTypeText(type)),
+                        );
+                      }).toList(),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
             // 会议可见性选择
-            ValueListenableBuilder<MeetingVisibility>(
-              valueListenable: meetingVisibility,
-              builder: (context, visibility, _) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: '会议可见性',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.visibility),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<MeetingVisibility>(
-                          value: visibility,
-                          isExpanded: true,
-                          onChanged: (newValue) {
-                            if (newValue != null) {
-                              meetingVisibility.value = newValue;
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: '会议可见性',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.visibility),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<MeetingVisibility>(
+                      value: meetingVisibility.value,
+                      isExpanded: true,
+                      onChanged: (newValue) {
+                        if (newValue != null) {
+                          meetingVisibility.value = newValue;
 
-                              // 重置已选用户列表，当可见性从私有变为其他类型时
-                              if (newValue != MeetingVisibility.private) {
-                                selectedUsers.value = [];
-                              }
-                            }
-                          },
-                          items:
-                              MeetingVisibility.values.map((visibility) {
-                                return DropdownMenuItem<MeetingVisibility>(
-                                  value: visibility,
-                                  child: Text(
-                                    getMeetingVisibilityText(visibility),
-                                  ),
-                                );
-                              }).toList(),
-                        ),
-                      ),
+                          // 重置已选用户列表，当可见性从私有变为其他类型时
+                          if (newValue != MeetingVisibility.private) {
+                            selectedUserIds.value = [];
+                          }
+                        }
+                      },
+                      items:
+                          MeetingVisibility.values.map((visibility) {
+                            return DropdownMenuItem<MeetingVisibility>(
+                              value: visibility,
+                              child: Text(getMeetingVisibilityText(visibility)),
+                            );
+                          }).toList(),
                     ),
-                    const SizedBox(height: 8),
-                    // 不同可见性的提示信息
-                    _buildVisibilityHelperText(visibility),
-                  ],
-                );
-              },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 不同可见性的提示信息
+                _buildVisibilityHelperText(meetingVisibility.value),
+              ],
             ),
             const SizedBox(height: 16),
 
@@ -230,80 +341,59 @@ class CreateMeetingPage extends HookConsumerWidget {
                             ),
                           ),
                         ),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: enablePassword,
-                          builder: (context, enabled, _) {
-                            return Switch(
-                              value: enabled,
-                              onChanged: (value) {
-                                enablePassword.value = value;
-                                if (!value) {
-                                  passwordController.clear();
-                                }
-                              },
-                            );
+                        Switch(
+                          value: enablePassword.value,
+                          onChanged: (value) {
+                            enablePassword.value = value;
+                            if (!value) {
+                              passwordController.clear();
+                            }
                           },
                         ),
                       ],
                     ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: enablePassword,
-                      builder: (context, enabled, _) {
-                        return enabled
-                            ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 8),
-                                TextFormField(
-                                  controller: passwordController,
-                                  obscureText: true, // 隐藏密码
-                                  decoration: const InputDecoration(
-                                    labelText: '设置密码',
-                                    hintText: '参会者需要输入此密码才能加入会议',
-                                    border: OutlineInputBorder(),
-                                  ),
-                                  validator:
-                                      enabled
-                                          ? (value) {
-                                            if (value == null ||
-                                                value.isEmpty) {
-                                              return '请输入会议密码';
-                                            }
-                                            if (value.length < 4) {
-                                              return '密码长度至少为4位';
-                                            }
-                                            if (value.length > 16) {
-                                              return '密码长度不能超过16位';
-                                            }
-                                            // 验证密码格式，可以根据需要增加字母、数字等要求
-                                            if (!RegExp(
-                                              r'^[a-zA-Z0-9]+$',
-                                            ).hasMatch(value)) {
-                                              return '密码只能包含字母和数字';
-                                            }
-                                            return null;
-                                          }
-                                          : null,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  '启用密码后，参会者需要输入正确的密码才能加入会议。',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            )
-                            : const Text(
-                              '不启用密码，所有参会者可直接加入会议。',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            );
-                      },
-                    ),
+                    if (enablePassword.value)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: passwordController,
+                            obscureText: true, // 隐藏密码
+                            decoration: const InputDecoration(
+                              labelText: '设置密码',
+                              hintText: '参会者需要输入此密码才能加入会议',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '请输入会议密码';
+                              }
+                              if (value.length < 4) {
+                                return '密码长度至少为4位';
+                              }
+                              if (value.length > 16) {
+                                return '密码长度不能超过16位';
+                              }
+                              // 验证密码格式，可以根据需要增加字母、数字等要求
+                              if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+                                return '密码只能包含字母和数字';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '启用密码后，参会者需要输入正确的密码才能加入会议。',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ],
+                      )
+                    else
+                      const Text(
+                        '不启用密码，所有参会者可直接加入会议。',
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
                   ],
                 ),
               ),
@@ -311,140 +401,171 @@ class CreateMeetingPage extends HookConsumerWidget {
             const SizedBox(height: 16),
 
             // 当选择私有会议时，显示用户选择列表
-            ValueListenableBuilder<MeetingVisibility>(
-              valueListenable: meetingVisibility,
-              builder: (context, visibility, _) {
-                if (visibility == MeetingVisibility.private) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '选择可参与的用户',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+            if (meetingVisibility.value == MeetingVisibility.private)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '选择可参与的用户',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // 用户搜索框
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: '搜索用户...',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                    ),
+                    controller: searchController,
+                    onChanged: (value) {
+                      searchQuery.value = value;
+                      searchUsers(value);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+
+                  // 用户选择列表 - 只有当搜索结果不为空时才显示
+                  if (isSearching.value || searchResults.value.isNotEmpty)
+                    Container(
+                      constraints: const BoxConstraints(
+                        maxHeight: 300, // 设置最大高度为300
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child:
+                          isSearching.value
+                              ? const Center(child: CircularProgressIndicator())
+                              : ListView.builder(
+                                shrinkWrap: true, // 使ListView高度适应内容
+                                itemCount: searchResults.value.length,
+                                itemBuilder: (context, index) {
+                                  final user = searchResults.value[index];
+                                  return CheckboxListTile(
+                                    title: Text(
+                                      user.username,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('ID: ${user.userId}'),
+                                        if (user.email != null &&
+                                            user.email!.isNotEmpty)
+                                          Text('邮箱: ${user.email}'),
+                                        if (user.phone != null &&
+                                            user.phone!.isNotEmpty)
+                                          Text('电话: ${user.phone}'),
+                                      ],
+                                    ),
+                                    isThreeLine: true,
+                                    dense: true,
+                                    value: isUserSelected(user.userId),
+                                    onChanged:
+                                        (_) => toggleUserSelection(user.userId),
+                                  );
+                                },
+                              ),
+                    )
+                  else if (searchQuery.value.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      child: Center(
+                        child: Text(
+                          '未找到匹配的用户',
+                          style: TextStyle(color: Colors.grey.shade600),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // 这里应该实现用户选择逻辑，为简化示例，使用模拟数据
-                      _buildUserSelectionList(selectedUsers),
-                      // 显示选择用户提示
-                      ValueListenableBuilder<List<String>>(
-                        valueListenable: selectedUsers,
-                        builder: (context, selectedIds, _) {
-                          if (selectedIds.isEmpty) {
-                            return const Padding(
-                              padding: EdgeInsets.only(top: 8.0, left: 16.0),
-                              child: Text(
-                                '请至少选择一名用户',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(
-                              top: 8.0,
-                              left: 16.0,
-                            ),
-                            child: Text(
-                              '已选择 ${selectedIds.length} 名用户',
+                    ),
+
+                  // 已选用户提示
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                    child:
+                        selectedUserIds.value.isEmpty
+                            ? const Text(
+                              '请至少选择一名用户',
+                              style: TextStyle(color: Colors.red, fontSize: 12),
+                            )
+                            : Text(
+                              '已选择 ${selectedUserIds.value.length} 名用户',
                               style: TextStyle(
-                                color: Colors.green[700],
+                                color: Colors.green.shade700,
                                 fontSize: 12,
                               ),
                             ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
 
             // 开始时间选择
-            ValueListenableBuilder<DateTime>(
-              valueListenable: startDate,
-              builder: (context, date, _) {
-                return InkWell(
-                  onTap: () => _selectDateTime(context, startDate, true),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: '开始时间',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.access_time),
-                    ),
-                    child: Text(DateFormat('yyyy-MM-dd HH:mm').format(date)),
-                  ),
-                );
-              },
+            InkWell(
+              onTap: () => _selectDateTime(context, startDate, true),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: '开始时间',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.access_time),
+                ),
+                child: Text(
+                  DateFormat('yyyy-MM-dd HH:mm').format(startDate.value),
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
             // 结束时间选择
-            ValueListenableBuilder<DateTime>(
-              valueListenable: endDate,
-              builder: (context, date, _) {
-                return InkWell(
-                  onTap: () => _selectDateTime(context, endDate, false),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: '结束时间',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.access_time),
-                    ),
-                    child: Text(DateFormat('yyyy-MM-dd HH:mm').format(date)),
-                  ),
-                );
-              },
+            InkWell(
+              onTap: () => _selectDateTime(context, endDate, false),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: '结束时间',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.access_time),
+                ),
+                child: Text(
+                  DateFormat('yyyy-MM-dd HH:mm').format(endDate.value),
+                ),
+              ),
             ),
+
             // 时间验证错误提示
-            ValueListenableBuilder<DateTime>(
-              valueListenable: startDate,
-              builder: (context, startTime, _) {
-                return ValueListenableBuilder<DateTime>(
-                  valueListenable: endDate,
-                  builder: (context, endTime, _) {
-                    if (endTime.isBefore(startTime) ||
-                        endTime.isAtSameMomentAs(startTime)) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
-                        child: Text(
-                          '结束时间必须晚于开始时间',
-                          style: TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      );
-                    }
-                    // 检查会议时长是否合理
-                    final duration = endTime.difference(startTime);
-                    if (duration.inMinutes < 15) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
-                        child: Text(
-                          '会议时长至少需要15分钟',
-                          style: TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      );
-                    }
-                    if (duration.inHours > 24) {
-                      return const Padding(
-                        padding: EdgeInsets.only(top: 8.0, left: 16.0),
-                        child: Text(
-                          '会议时长不建议超过24小时',
-                          style: TextStyle(color: Colors.orange, fontSize: 12),
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
-                );
-              },
-            ),
+            if (endDate.value.isBefore(startDate.value) ||
+                endDate.value.isAtSameMomentAs(startDate.value))
+              const Padding(
+                padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                child: Text(
+                  '结束时间必须晚于开始时间',
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+
+            // 检查会议时长是否合理
+            if (endDate.value.difference(startDate.value).inMinutes < 15)
+              const Padding(
+                padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                child: Text(
+                  '会议时长至少需要15分钟',
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+
+            if (endDate.value.difference(startDate.value).inHours > 24)
+              const Padding(
+                padding: EdgeInsets.only(top: 8.0, left: 16.0),
+                child: Text(
+                  '会议时长不建议超过24小时',
+                  style: TextStyle(color: Colors.orange, fontSize: 12),
+                ),
+              ),
+
             const SizedBox(height: 16),
 
             // 会议描述
@@ -506,7 +627,7 @@ class CreateMeetingPage extends HookConsumerWidget {
                           // 3. 如果是私有会议，必须选择至少一名用户
                           if (meetingVisibility.value ==
                                   MeetingVisibility.private &&
-                              selectedUsers.value.isEmpty) {
+                              selectedUserIds.value.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('私有会议必须选择至少一名用户'),
@@ -533,7 +654,7 @@ class CreateMeetingPage extends HookConsumerWidget {
                               allowedUsers:
                                   meetingVisibility.value ==
                                           MeetingVisibility.private
-                                      ? selectedUsers.value
+                                      ? selectedUserIds.value
                                       : [],
                               password:
                                   enablePassword.value
@@ -635,54 +756,6 @@ class CreateMeetingPage extends HookConsumerWidget {
       ),
     );
   }
-
-  // 用户选择列表
-  Widget _buildUserSelectionList(ValueNotifier<List<String>> selectedUsers) {
-    // 接口参数使用的用户ID列表
-    final List<Map<String, dynamic>> apiUsers = [
-      {'id': '1912151761567330306', 'name': '用户A'},
-      {'id': '1912153432590577666', 'name': '用户B'},
-      {'id': '1912154379643449345', 'name': '用户C'},
-    ];
-
-    return ValueListenableBuilder<List<String>>(
-      valueListenable: selectedUsers,
-      builder: (context, selectedIds, _) {
-        return Column(
-          children:
-              apiUsers.map((user) {
-                final String userId = user['id'];
-                final bool isSelected = selectedIds.contains(userId);
-
-                return CheckboxListTile(
-                  title: Text(user['name']),
-                  subtitle: Text(userId),
-                  value: isSelected,
-                  onChanged: (bool? value) {
-                    final newList = List<String>.from(selectedIds);
-                    if (value == true) {
-                      if (!newList.contains(userId)) {
-                        newList.add(userId);
-                      }
-                    } else {
-                      newList.remove(userId);
-                    }
-                    selectedUsers.value = newList;
-                  },
-                );
-              }).toList(),
-        );
-      },
-    );
-  }
-}
-
-// 简化的用户模型，仅用于示例
-class User {
-  final String id;
-  final String name;
-
-  User({required this.id, required this.name});
 }
 
 // 获取会议类型文本

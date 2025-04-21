@@ -6,25 +6,7 @@ part of 'user_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$currentUserHash() => r'642757d8261dd2968dc9eaf93acc05f35d3b3958';
-
-/// 当前用户提供者
-///
-/// Copied from [currentUser].
-@ProviderFor(currentUser)
-final currentUserProvider = AutoDisposeFutureProvider<User?>.internal(
-  currentUser,
-  name: r'currentUserProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$currentUserHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef CurrentUserRef = AutoDisposeFutureProviderRef<User?>;
-String _$userHash() => r'027b11c6b5fdc290186fcf2323c0e6326571c45e';
+String _$searchUsersHash() => r'0ac346fa430a2b6666fe39bb5902b7df5b5ae2cc';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -46,6 +28,216 @@ class _SystemHash {
     return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
   }
 }
+
+/// 用户搜索提供者
+///
+/// Copied from [searchUsers].
+@ProviderFor(searchUsers)
+const searchUsersProvider = SearchUsersFamily();
+
+/// 用户搜索提供者
+///
+/// Copied from [searchUsers].
+class SearchUsersFamily extends Family<AsyncValue<List<User>>> {
+  /// 用户搜索提供者
+  ///
+  /// Copied from [searchUsers].
+  const SearchUsersFamily();
+
+  /// 用户搜索提供者
+  ///
+  /// Copied from [searchUsers].
+  SearchUsersProvider call({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  }) {
+    return SearchUsersProvider(
+      username: username,
+      email: email,
+      phone: phone,
+      userId: userId,
+    );
+  }
+
+  @override
+  SearchUsersProvider getProviderOverride(
+    covariant SearchUsersProvider provider,
+  ) {
+    return call(
+      username: provider.username,
+      email: provider.email,
+      phone: provider.phone,
+      userId: provider.userId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'searchUsersProvider';
+}
+
+/// 用户搜索提供者
+///
+/// Copied from [searchUsers].
+class SearchUsersProvider extends AutoDisposeFutureProvider<List<User>> {
+  /// 用户搜索提供者
+  ///
+  /// Copied from [searchUsers].
+  SearchUsersProvider({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  }) : this._internal(
+         (ref) => searchUsers(
+           ref as SearchUsersRef,
+           username: username,
+           email: email,
+           phone: phone,
+           userId: userId,
+         ),
+         from: searchUsersProvider,
+         name: r'searchUsersProvider',
+         debugGetCreateSourceHash:
+             const bool.fromEnvironment('dart.vm.product')
+                 ? null
+                 : _$searchUsersHash,
+         dependencies: SearchUsersFamily._dependencies,
+         allTransitiveDependencies:
+             SearchUsersFamily._allTransitiveDependencies,
+         username: username,
+         email: email,
+         phone: phone,
+         userId: userId,
+       );
+
+  SearchUsersProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.username,
+    required this.email,
+    required this.phone,
+    required this.userId,
+  }) : super.internal();
+
+  final String? username;
+  final String? email;
+  final String? phone;
+  final String? userId;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<User>> Function(SearchUsersRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: SearchUsersProvider._internal(
+        (ref) => create(ref as SearchUsersRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        username: username,
+        email: email,
+        phone: phone,
+        userId: userId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<User>> createElement() {
+    return _SearchUsersProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SearchUsersProvider &&
+        other.username == username &&
+        other.email == email &&
+        other.phone == phone &&
+        other.userId == userId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, username.hashCode);
+    hash = _SystemHash.combine(hash, email.hashCode);
+    hash = _SystemHash.combine(hash, phone.hashCode);
+    hash = _SystemHash.combine(hash, userId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin SearchUsersRef on AutoDisposeFutureProviderRef<List<User>> {
+  /// The parameter `username` of this provider.
+  String? get username;
+
+  /// The parameter `email` of this provider.
+  String? get email;
+
+  /// The parameter `phone` of this provider.
+  String? get phone;
+
+  /// The parameter `userId` of this provider.
+  String? get userId;
+}
+
+class _SearchUsersProviderElement
+    extends AutoDisposeFutureProviderElement<List<User>>
+    with SearchUsersRef {
+  _SearchUsersProviderElement(super.provider);
+
+  @override
+  String? get username => (origin as SearchUsersProvider).username;
+  @override
+  String? get email => (origin as SearchUsersProvider).email;
+  @override
+  String? get phone => (origin as SearchUsersProvider).phone;
+  @override
+  String? get userId => (origin as SearchUsersProvider).userId;
+}
+
+String _$currentUserHash() => r'642757d8261dd2968dc9eaf93acc05f35d3b3958';
+
+/// 当前用户提供者
+///
+/// Copied from [currentUser].
+@ProviderFor(currentUser)
+final currentUserProvider = AutoDisposeFutureProvider<User?>.internal(
+  currentUser,
+  name: r'currentUserProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product') ? null : _$currentUserHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CurrentUserRef = AutoDisposeFutureProviderRef<User?>;
+String _$userHash() => r'027b11c6b5fdc290186fcf2323c0e6326571c45e';
 
 /// 用户详情提供者
 ///
@@ -190,6 +382,25 @@ final currentUserIdProvider = AutoDisposeFutureProvider<String>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentUserIdRef = AutoDisposeFutureProviderRef<String>;
+String _$userSearchHash() => r'a750b23ee1bfee8f9174fb07a45d45c6101da0b7';
+
+/// 用户搜索状态提供者
+///
+/// Copied from [UserSearch].
+@ProviderFor(UserSearch)
+final userSearchProvider =
+    AutoDisposeAsyncNotifierProvider<UserSearch, List<User>>.internal(
+      UserSearch.new,
+      name: r'userSearchProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$userSearchHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$UserSearch = AutoDisposeAsyncNotifier<List<User>>;
 String _$authStateHash() => r'33fceb0dde28b06909a44ef5707a318f5e48fe67';
 
 /// 用户登录状态提供者

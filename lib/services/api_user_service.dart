@@ -36,6 +36,57 @@ class ApiUserService implements UserService {
     }
   }
 
+  /// 搜索用户
+  @override
+  Future<List<User>> searchUsers({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  }) async {
+    // 构建查询参数
+    final queryParameters = <String, String>{};
+    if (username != null && username.isNotEmpty) {
+      queryParameters['username'] = username;
+    }
+    if (email != null && email.isNotEmpty) {
+      queryParameters['email'] = email;
+    }
+    if (phone != null && phone.isNotEmpty) {
+      queryParameters['phone'] = phone;
+    }
+    if (userId != null && userId.isNotEmpty) {
+      queryParameters['userId'] = userId;
+    }
+
+    // 构建请求URL
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/user/search',
+    ).replace(queryParameters: queryParameters);
+
+    try {
+      final response = await _client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final userResponse = UserSearchResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+
+        // 转换为应用内用户模型列表
+        return userResponse.data.map((apiUser) => apiUser.toUser()).toList();
+      } else {
+        developer.log('搜索用户失败: ${response.statusCode}, ${response.body}');
+        throw Exception('搜索用户失败: ${response.statusCode}');
+      }
+    } catch (e) {
+      developer.log('搜索用户异常: $e');
+      throw Exception('搜索用户异常: $e');
+    }
+  }
+
   @override
   Future<User> updateUserInfo(User user) async {
     final response = await _client.put(

@@ -12,6 +12,61 @@ final userServiceProvider = Provider<UserService>((ref) {
   return ApiUserService();
 });
 
+/// 用户搜索提供者
+@riverpod
+Future<List<User>> searchUsers(
+  Ref ref, {
+  String? username,
+  String? email,
+  String? phone,
+  String? userId,
+}) async {
+  final userService = ref.watch(userServiceProvider);
+  return userService.searchUsers(
+    username: username,
+    email: email,
+    phone: phone,
+    userId: userId,
+  );
+}
+
+/// 用户搜索状态提供者
+@riverpod
+class UserSearch extends _$UserSearch {
+  @override
+  FutureOr<List<User>> build() {
+    return const []; // 初始为空列表
+  }
+
+  // 搜索用户
+  Future<void> search({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  }) async {
+    state = const AsyncValue.loading();
+
+    try {
+      final userService = ref.read(userServiceProvider);
+      final users = await userService.searchUsers(
+        username: username,
+        email: email,
+        phone: phone,
+        userId: userId,
+      );
+      state = AsyncValue.data(users);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
+  // 清空搜索结果
+  void clear() {
+    state = const AsyncValue.data([]);
+  }
+}
+
 /// 当前用户提供者
 @riverpod
 Future<User?> currentUser(Ref ref) async {

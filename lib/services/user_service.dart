@@ -14,6 +14,14 @@ abstract class UserService {
   /// 更新用户信息
   Future<User> updateUserInfo(User user);
 
+  /// 搜索用户
+  Future<List<User>> searchUsers({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  });
+
   /// 用户登录
   Future<User> login(String username, String password);
 
@@ -137,6 +145,50 @@ class MockUserService implements UserService {
     await Future.delayed(const Duration(milliseconds: 1000));
     // 返回更新后的用户信息
     return user.copyWith(updatedAt: DateTime.now());
+  }
+
+  @override
+  Future<List<User>> searchUsers({
+    String? username,
+    String? email,
+    String? phone,
+    String? userId,
+  }) async {
+    // 模拟网络请求延迟
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // 如果所有搜索参数都为空，返回所有用户
+    if ((username == null || username.isEmpty) &&
+        (email == null || email.isEmpty) &&
+        (phone == null || phone.isEmpty) &&
+        (userId == null || userId.isEmpty)) {
+      return _users;
+    }
+
+    // 过滤用户
+    return _users.where((user) {
+      bool matches = true;
+
+      if (username != null && username.isNotEmpty) {
+        matches =
+            matches && user.name.toLowerCase().contains(username.toLowerCase());
+      }
+
+      if (email != null && email.isNotEmpty) {
+        matches =
+            matches && user.email.toLowerCase().contains(email.toLowerCase());
+      }
+
+      if (phone != null && phone.isNotEmpty && user.phoneNumber != null) {
+        matches = matches && user.phoneNumber!.contains(phone);
+      }
+
+      if (userId != null && userId.isNotEmpty) {
+        matches = matches && user.id.contains(userId);
+      }
+
+      return matches;
+    }).toList();
   }
 
   @override
