@@ -261,6 +261,7 @@ class _UserSearchWidgetState extends State<UserSearchWidget>
                 _stateHolder.isSearching
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.builder(
+                      key: const PageStorageKey<String>('userSearchListView'),
                       shrinkWrap: true, // 使ListView高度适应内容
                       itemCount: _stateHolder.searchResults.length,
                       itemBuilder: (context, index) {
@@ -390,6 +391,7 @@ class CreateMeetingPage extends HookConsumerWidget {
       body: Form(
         key: formKey,
         child: ListView(
+          key: const PageStorageKey<String>('createMeetingFormListView'),
           padding: const EdgeInsets.all(16),
           children: [
             // 会议标题
