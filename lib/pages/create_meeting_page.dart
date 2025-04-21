@@ -57,6 +57,214 @@ class UserSearchResponse {
   }
 }
 
+// 用户搜索组件 - 使用StatefulWidget隔离状态
+class UserSearchWidget extends StatefulWidget {
+  final List<String> selectedUserIds;
+  final ValueChanged<List<String>> onSelectedUsersChanged;
+
+  const UserSearchWidget({
+    Key? key,
+    required this.selectedUserIds,
+    required this.onSelectedUsersChanged,
+  }) : super(key: key);
+
+  @override
+  State<UserSearchWidget> createState() => _UserSearchWidgetState();
+}
+
+class _UserSearchWidgetState extends State<UserSearchWidget> {
+  final TextEditingController _searchController = TextEditingController();
+  bool _isSearching = false;
+  List<ApiUser> _searchResults = [];
+  String _searchQuery = '';
+  Timer? _searchDebounce;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
+  // 搜索用户方法
+  void _searchUsers(String query) {
+    // 取消之前的计时器
+    _searchDebounce?.cancel();
+
+    // 如果查询为空，清空结果
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    // 设置新计时器进行防抖
+    _searchDebounce = Timer(const Duration(milliseconds: 500), () async {
+      setState(() {
+        _isSearching = true;
+      });
+
+      try {
+        // 构建URL
+        final uri = Uri.parse(
+          '${AppConstants.apiBaseUrl}/user/search',
+        ).replace(queryParameters: {'username': query});
+
+        // 发送请求
+        final response = await http.get(uri);
+
+        // 处理响应
+        if (response.statusCode == 200) {
+          final searchResponse = UserSearchResponse.fromJson(
+            json.decode(response.body) as Map<String, dynamic>,
+          );
+
+          if (mounted) {
+            setState(() {
+              _searchResults = searchResponse.data;
+              _isSearching = false;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _searchResults = [];
+              _isSearching = false;
+            });
+          }
+        }
+      } catch (e) {
+        // 处理错误
+        if (mounted) {
+          setState(() {
+            _searchResults = [];
+            _isSearching = false;
+          });
+        }
+      }
+    });
+  }
+
+  // 检查用户是否已选择
+  bool _isUserSelected(String userId) {
+    return widget.selectedUserIds.contains(userId);
+  }
+
+  // 切换用户选择状态
+  void _toggleUserSelection(String userId) {
+    final currentSelected = List<String>.from(widget.selectedUserIds);
+
+    if (currentSelected.contains(userId)) {
+      currentSelected.remove(userId);
+    } else {
+      currentSelected.add(userId);
+    }
+
+    widget.onSelectedUsersChanged(currentSelected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '选择可参与的用户',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        const SizedBox(height: 8),
+
+        // 用户搜索框
+        TextField(
+          decoration: const InputDecoration(
+            hintText: '搜索用户...',
+            prefixIcon: Icon(Icons.search),
+            border: OutlineInputBorder(),
+          ),
+          controller: _searchController,
+          onChanged: (value) {
+            _searchQuery = value;
+            _searchUsers(value);
+          },
+        ),
+        const SizedBox(height: 8),
+
+        // 用户选择列表 - 只有当搜索结果不为空时才显示
+        if (_isSearching || _searchResults.isNotEmpty)
+          Container(
+            constraints: const BoxConstraints(
+              maxHeight: 300, // 设置最大高度为300
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child:
+                _isSearching
+                    ? const Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                      shrinkWrap: true, // 使ListView高度适应内容
+                      itemCount: _searchResults.length,
+                      itemBuilder: (context, index) {
+                        final user = _searchResults[index];
+                        return CheckboxListTile(
+                          title: Text(
+                            user.username,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('ID: ${user.userId}'),
+                              if (user.email != null && user.email!.isNotEmpty)
+                                Text('邮箱: ${user.email}'),
+                              if (user.phone != null && user.phone!.isNotEmpty)
+                                Text('电话: ${user.phone}'),
+                            ],
+                          ),
+                          isThreeLine: true,
+                          dense: true,
+                          value: _isUserSelected(user.userId),
+                          onChanged: (_) => _toggleUserSelection(user.userId),
+                        );
+                      },
+                    ),
+          )
+        else if (_searchQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Center(
+              child: Text(
+                '未找到匹配的用户',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+          ),
+
+        // 已选用户提示
+        Padding(
+          padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+          child:
+              widget.selectedUserIds.isEmpty
+                  ? const Text(
+                    '请至少选择一名用户',
+                    style: TextStyle(color: Colors.red, fontSize: 12),
+                  )
+                  : Text(
+                    '已选择 ${widget.selectedUserIds.length} 名用户',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontSize: 12,
+                    ),
+                  ),
+        ),
+      ],
+    );
+  }
+}
+
 class CreateMeetingPage extends HookConsumerWidget {
   const CreateMeetingPage({super.key});
 
@@ -70,9 +278,6 @@ class CreateMeetingPage extends HookConsumerWidget {
     final descriptionController = useTextEditingController();
     final passwordController = useTextEditingController();
 
-    // 用户搜索框控制器
-    final searchController = useTextEditingController();
-
     // 日期和时间
     final startDate = useState(DateTime.now().add(const Duration(hours: 1)));
     final endDate = useState(DateTime.now().add(const Duration(hours: 2)));
@@ -84,81 +289,8 @@ class CreateMeetingPage extends HookConsumerWidget {
     // 是否启用密码
     final enablePassword = useState(false);
 
-    // 用户搜索和选择相关状态
-    final searchQuery = useState('');
-    final searchResults = useState<List<ApiUser>>([]);
-    final isSearching = useState(false);
+    // 选中的用户列表
     final selectedUserIds = useState<List<String>>([]);
-
-    // 搜索防抖计时器
-    final searchDebounce = useState<Timer?>(null);
-
-    // 同步搜索文本和控制器
-    useEffect(() {
-      searchController.text = searchQuery.value;
-      return null;
-    }, [searchQuery.value]);
-
-    // 用户搜索方法
-    final searchUsers = useCallback((String query) {
-      // 取消之前的计时器
-      searchDebounce.value?.cancel();
-
-      // 如果查询为空，清空结果
-      if (query.isEmpty) {
-        searchResults.value = [];
-        isSearching.value = false;
-        return;
-      }
-
-      // 设置新计时器进行防抖
-      searchDebounce.value = Timer(const Duration(milliseconds: 500), () async {
-        isSearching.value = true;
-
-        try {
-          // 构建URL
-          final uri = Uri.parse(
-            '${AppConstants.apiBaseUrl}/user/search',
-          ).replace(queryParameters: {'username': query});
-
-          // 发送请求
-          final response = await http.get(uri);
-
-          // 处理响应
-          if (response.statusCode == 200) {
-            final searchResponse = UserSearchResponse.fromJson(
-              json.decode(response.body) as Map<String, dynamic>,
-            );
-            searchResults.value = searchResponse.data;
-          } else {
-            searchResults.value = [];
-          }
-        } catch (e) {
-          // 处理错误
-          searchResults.value = [];
-        } finally {
-          isSearching.value = false;
-        }
-      });
-    }, []);
-
-    // 检查用户是否已选择
-    final isUserSelected = useCallback((String userId) {
-      return selectedUserIds.value.contains(userId);
-    }, [selectedUserIds.value]);
-
-    // 切换用户选择状态
-    final toggleUserSelection = useCallback((String userId) {
-      final currentSelected = List<String>.from(selectedUserIds.value);
-
-      if (currentSelected.contains(userId)) {
-        currentSelected.remove(userId);
-      } else {
-        currentSelected.add(userId);
-      }
-
-      selectedUserIds.value = currentSelected;
-    }, [selectedUserIds.value]);
 
     // 创建会议状态
     final createMeetingState = ref.watch(createMeetingProvider);
@@ -405,101 +537,12 @@ class CreateMeetingPage extends HookConsumerWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '选择可参与的用户',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 用户搜索框
-                  TextField(
-                    decoration: const InputDecoration(
-                      hintText: '搜索用户...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
-                    ),
-                    controller: searchController,
-                    onChanged: (value) {
-                      searchQuery.value = value;
-                      searchUsers(value);
+                  // 使用独立的用户搜索组件
+                  UserSearchWidget(
+                    selectedUserIds: selectedUserIds.value,
+                    onSelectedUsersChanged: (newSelectedUsers) {
+                      selectedUserIds.value = newSelectedUsers;
                     },
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 用户选择列表 - 只有当搜索结果不为空时才显示
-                  if (isSearching.value || searchResults.value.isNotEmpty)
-                    Container(
-                      constraints: const BoxConstraints(
-                        maxHeight: 300, // 设置最大高度为300
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child:
-                          isSearching.value
-                              ? const Center(child: CircularProgressIndicator())
-                              : ListView.builder(
-                                shrinkWrap: true, // 使ListView高度适应内容
-                                itemCount: searchResults.value.length,
-                                itemBuilder: (context, index) {
-                                  final user = searchResults.value[index];
-                                  return CheckboxListTile(
-                                    title: Text(
-                                      user.username,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text('ID: ${user.userId}'),
-                                        if (user.email != null &&
-                                            user.email!.isNotEmpty)
-                                          Text('邮箱: ${user.email}'),
-                                        if (user.phone != null &&
-                                            user.phone!.isNotEmpty)
-                                          Text('电话: ${user.phone}'),
-                                      ],
-                                    ),
-                                    isThreeLine: true,
-                                    dense: true,
-                                    value: isUserSelected(user.userId),
-                                    onChanged:
-                                        (_) => toggleUserSelection(user.userId),
-                                  );
-                                },
-                              ),
-                    )
-                  else if (searchQuery.value.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12.0),
-                      child: Center(
-                        child: Text(
-                          '未找到匹配的用户',
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                      ),
-                    ),
-
-                  // 已选用户提示
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0, left: 4.0),
-                    child:
-                        selectedUserIds.value.isEmpty
-                            ? const Text(
-                              '请至少选择一名用户',
-                              style: TextStyle(color: Colors.red, fontSize: 12),
-                            )
-                            : Text(
-                              '已选择 ${selectedUserIds.value.length} 名用户',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontSize: 12,
-                              ),
-                            ),
                   ),
                   const SizedBox(height: 16),
                 ],
