@@ -57,6 +57,25 @@ class UserSearchResponse {
   }
 }
 
+// 用户搜索组件状态保持器 - 使用静态变量存储状态，使其不受组件生命周期影响
+class _UserSearchStateHolder {
+  // 静态实例
+  static final _UserSearchStateHolder _instance =
+      _UserSearchStateHolder._internal();
+
+  factory _UserSearchStateHolder() => _instance;
+
+  _UserSearchStateHolder._internal();
+
+  // 状态数据
+  String currentQuery = '';
+  List<ApiUser> searchResults = [];
+  bool isSearching = false;
+  bool hasError = false;
+  // 保存搜索框文本
+  String searchText = '';
+}
+
 // 用户搜索组件 - 使用StatefulWidget隔离状态
 class UserSearchWidget extends StatefulWidget {
   final List<String> selectedUserIds;
@@ -72,39 +91,71 @@ class UserSearchWidget extends StatefulWidget {
   State<UserSearchWidget> createState() => _UserSearchWidgetState();
 }
 
-class _UserSearchWidgetState extends State<UserSearchWidget> {
-  final TextEditingController _searchController = TextEditingController();
-  bool _isSearching = false;
-  List<ApiUser> _searchResults = [];
-  String _searchQuery = '';
+class _UserSearchWidgetState extends State<UserSearchWidget>
+    with AutomaticKeepAliveClientMixin {
+  // 使用全局状态保持器
+  final _stateHolder = _UserSearchStateHolder();
+  late final TextEditingController _searchController;
   Timer? _searchDebounce;
 
   @override
+  bool get wantKeepAlive => true; // 保持状态
+
+  @override
+  void initState() {
+    super.initState();
+    // 初始化文本控制器并恢复已保存的文本
+    _searchController = TextEditingController(text: _stateHolder.searchText);
+
+    // 如果有保存的搜索结果但没有进行中的搜索，恢复状态
+    if (_stateHolder.searchResults.isNotEmpty && !_stateHolder.isSearching) {
+      // 无需操作，状态会在build方法中直接使用
+    }
+    // 如果有保存的查询但没有结果，重新执行搜索
+    else if (_stateHolder.currentQuery.isNotEmpty &&
+        _stateHolder.searchResults.isEmpty &&
+        !_stateHolder.isSearching) {
+      _performSearch(_stateHolder.currentQuery);
+    }
+  }
+
+  @override
   void dispose() {
+    // 仅处理本地资源，不清除全局状态
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
   }
 
   // 搜索用户方法
-  void _searchUsers(String query) {
+  void _performSearch(String query) {
+    // 保存查询和文本
+    _stateHolder.currentQuery = query;
+    _stateHolder.searchText = query;
+
     // 取消之前的计时器
     _searchDebounce?.cancel();
 
     // 如果查询为空，清空结果
     if (query.isEmpty) {
       setState(() {
-        _searchResults = [];
-        _isSearching = false;
+        _stateHolder.searchResults = [];
+        _stateHolder.isSearching = false;
+        _stateHolder.hasError = false;
       });
       return;
     }
 
+    // 设置搜索状态
+    setState(() {
+      _stateHolder.isSearching = true;
+      _stateHolder.hasError = false;
+    });
+
     // 设置新计时器进行防抖
     _searchDebounce = Timer(const Duration(milliseconds: 500), () async {
-      setState(() {
-        _isSearching = true;
-      });
+      // 保存当前查询用于后续比较
+      final currentQuery = query;
 
       try {
         // 构建URL
@@ -121,26 +172,29 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
             json.decode(response.body) as Map<String, dynamic>,
           );
 
-          if (mounted) {
+          // 确保查询仍然相关
+          if (mounted && _stateHolder.currentQuery == currentQuery) {
             setState(() {
-              _searchResults = searchResponse.data;
-              _isSearching = false;
+              _stateHolder.searchResults = searchResponse.data;
+              _stateHolder.isSearching = false;
             });
           }
         } else {
-          if (mounted) {
+          if (mounted && _stateHolder.currentQuery == currentQuery) {
             setState(() {
-              _searchResults = [];
-              _isSearching = false;
+              _stateHolder.searchResults = [];
+              _stateHolder.isSearching = false;
+              _stateHolder.hasError = true;
             });
           }
         }
       } catch (e) {
         // 处理错误
-        if (mounted) {
+        if (mounted && _stateHolder.currentQuery == currentQuery) {
           setState(() {
-            _searchResults = [];
-            _isSearching = false;
+            _stateHolder.searchResults = [];
+            _stateHolder.isSearching = false;
+            _stateHolder.hasError = true;
           });
         }
       }
@@ -167,7 +221,10 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin需要
+
     return Column(
+      key: const ValueKey('userSearchColumn'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
@@ -178,22 +235,21 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
 
         // 用户搜索框
         TextField(
+          key: const ValueKey('userSearchField'),
           decoration: const InputDecoration(
             hintText: '搜索用户...',
             prefixIcon: Icon(Icons.search),
             border: OutlineInputBorder(),
           ),
           controller: _searchController,
-          onChanged: (value) {
-            _searchQuery = value;
-            _searchUsers(value);
-          },
+          onChanged: _performSearch,
         ),
         const SizedBox(height: 8),
 
         // 用户选择列表 - 只有当搜索结果不为空时才显示
-        if (_isSearching || _searchResults.isNotEmpty)
+        if (_stateHolder.isSearching || _stateHolder.searchResults.isNotEmpty)
           Container(
+            key: const ValueKey('searchResultsContainer'),
             constraints: const BoxConstraints(
               maxHeight: 300, // 设置最大高度为300
             ),
@@ -202,14 +258,15 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
               borderRadius: BorderRadius.circular(4),
             ),
             child:
-                _isSearching
+                _stateHolder.isSearching
                     ? const Center(child: CircularProgressIndicator())
                     : ListView.builder(
                       shrinkWrap: true, // 使ListView高度适应内容
-                      itemCount: _searchResults.length,
+                      itemCount: _stateHolder.searchResults.length,
                       itemBuilder: (context, index) {
-                        final user = _searchResults[index];
+                        final user = _stateHolder.searchResults[index];
                         return CheckboxListTile(
+                          key: ValueKey('user_${user.userId}'),
                           title: Text(
                             user.username,
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -232,13 +289,16 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
                       },
                     ),
           )
-        else if (_searchQuery.isNotEmpty)
+        else if (_stateHolder.currentQuery.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: Center(
               child: Text(
-                '未找到匹配的用户',
-                style: TextStyle(color: Colors.grey.shade600),
+                _stateHolder.hasError ? '搜索出错，请重试' : '未找到匹配的用户',
+                style: TextStyle(
+                  color:
+                      _stateHolder.hasError ? Colors.red : Colors.grey.shade600,
+                ),
               ),
             ),
           ),
