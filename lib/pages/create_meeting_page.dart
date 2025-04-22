@@ -263,16 +263,6 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
     // 取消之前的计时器
     _searchDebounce?.cancel();
 
-    // 如果查询为空，清空结果
-    if (query.isEmpty) {
-      setState(() {
-        _stateHolder.searchResults = [];
-        _stateHolder.isSearching = false;
-        _stateHolder.hasError = false;
-      });
-      return;
-    }
-
     // 设置搜索状态
     setState(() {
       _stateHolder.isSearching = true;
@@ -281,17 +271,23 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
 
     // 设置新计时器进行防抖
     _searchDebounce = Timer(const Duration(milliseconds: 500), () async {
-      // 保存当前查询用于后续比较
-      final currentQuery = query;
-
       try {
-        // 构建URL
-        final uri = Uri.parse(
-          '${AppConstants.apiBaseUrl}/user/search',
-        ).replace(queryParameters: {'username': query});
+        // 构建URL - 不传递query参数则查询所有用户
+        final uri = Uri.parse('${AppConstants.apiBaseUrl}/user/search');
+
+        // 只有在有查询内容时才添加查询参数
+        final Map<String, String> queryParams = {};
+        if (query.isNotEmpty) {
+          queryParams['username'] = query;
+        }
+
+        final uriWithParams =
+            queryParams.isNotEmpty
+                ? uri.replace(queryParameters: queryParams)
+                : uri;
 
         // 发送请求
-        final response = await http.get(uri);
+        final response = await http.get(uriWithParams);
 
         // 处理响应
         if (response.statusCode == 200) {
@@ -300,14 +296,14 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
           );
 
           // 确保查询仍然相关
-          if (mounted && _stateHolder.currentQuery == currentQuery) {
+          if (mounted && _stateHolder.currentQuery == query) {
             setState(() {
               _stateHolder.searchResults = searchResponse.data;
               _stateHolder.isSearching = false;
             });
           }
         } else {
-          if (mounted && _stateHolder.currentQuery == currentQuery) {
+          if (mounted && _stateHolder.currentQuery == query) {
             setState(() {
               _stateHolder.searchResults = [];
               _stateHolder.isSearching = false;
@@ -317,7 +313,7 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
         }
       } catch (e) {
         // 处理错误
-        if (mounted && _stateHolder.currentQuery == currentQuery) {
+        if (mounted && _stateHolder.currentQuery == query) {
           setState(() {
             _stateHolder.searchResults = [];
             _stateHolder.isSearching = false;
@@ -372,7 +368,7 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
               return TextField(
                 key: const ValueKey('userSearchField'),
                 decoration: const InputDecoration(
-                  hintText: '搜索用户...',
+                  hintText: '搜索用户 (空白显示全部)',
                   prefixIcon: Icon(Icons.search),
                   border: OutlineInputBorder(),
                 ),
@@ -429,7 +425,8 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
                                 ),
                               ),
                     )
-                    : _stateHolder.currentQuery.isNotEmpty
+                    : _stateHolder.currentQuery.isNotEmpty &&
+                        _stateHolder.searchResults.isEmpty
                     ? Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                       child: Center(
@@ -445,24 +442,6 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
                       ),
                     )
                     : const SizedBox.shrink(), // 当没有搜索结果且没有查询时，不显示任何内容
-          ),
-
-          // 已选用户提示
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0, left: 4.0),
-            child:
-                selectedUsers.isEmpty
-                    ? const Text(
-                      '请至少选择一名用户',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
-                    )
-                    : Text(
-                      '已选择 ${selectedUsers.length} 名用户',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 12,
-                      ),
-                    ),
           ),
         ],
       ),
@@ -638,10 +617,31 @@ class CreateMeetingPage extends HookConsumerWidget {
       // 保存当前UserSearchWidget实例，以便查询用户信息
       ref.read(_userSearchWidgetProvider.notifier).state = null;
 
+      // 创建一个GlobalKey，用于获取UserSearchWidget实例并执行空查询
+      final userSearchWidgetKey = GlobalKey<_UserSearchWidgetState>();
+
+      // 创建一个Completer，用于在弹窗显示后执行空查询
+      final dialogShown = Completer<void>();
+
       final bool? result = await showDialog<bool>(
         context: context,
         barrierDismissible: false, // 防止误触背景关闭对话框
         builder: (BuildContext context) {
+          // 标记弹窗已显示
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!dialogShown.isCompleted) {
+              dialogShown.complete();
+
+              // 对话框显示后立即执行空查询显示所有用户
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                final searchState = userSearchWidgetKey.currentState;
+                if (searchState != null) {
+                  searchState._performSearch('');
+                }
+              });
+            }
+          });
+
           // 获取屏幕尺寸
           final Size screenSize = MediaQuery.of(context).size;
           final double maxDialogWidth = math.min(
@@ -663,40 +663,57 @@ class CreateMeetingPage extends HookConsumerWidget {
                     constraints: BoxConstraints(maxHeight: maxDialogHeight),
                     decoration: BoxDecoration(
                       color: Theme.of(context).dialogBackgroundColor,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16), // 更大的圆角
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black26,
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
                     // 使用SingleChildScrollView防止整个弹窗溢出
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16), // 匹配外部圆角
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // 标题栏 - 固定在顶部
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                          // 标题栏 - 固定在顶部，使用更现代的样式
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withOpacity(0.05),
+                              border: Border(
+                                bottom: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).dividerColor.withOpacity(0.5),
+                                ),
+                              ),
+                            ),
+                            padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
                             child: Row(
                               children: [
-                                const Icon(Icons.people, color: Colors.blue),
-                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.people,
+                                  color: Theme.of(context).primaryColor,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 12),
                                 const Text(
                                   '选择可参与的用户',
                                   style: TextStyle(
                                     fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                                 const Spacer(),
                                 // 关闭按钮
                                 IconButton(
-                                  icon: const Icon(Icons.close),
+                                  icon: const Icon(Icons.close, size: 22),
                                   onPressed: () {
                                     ref
                                         .read(userSelectProvider.notifier)
@@ -704,9 +721,14 @@ class CreateMeetingPage extends HookConsumerWidget {
                                     Navigator.of(context).pop(false);
                                   },
                                   visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  iconSize: 20,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.grey.withOpacity(
+                                      0.1,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -717,58 +739,80 @@ class CreateMeetingPage extends HookConsumerWidget {
                             child: SingleChildScrollView(
                               child: Padding(
                                 padding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  0,
-                                  20,
-                                  0,
+                                  24,
+                                  12,
+                                  24,
+                                  12,
                                 ),
-                                child: buildUserSelectionContent(
-                                  tempSelectedUserIds,
+                                child: UserSearchWidget(
+                                  key: userSearchWidgetKey, // 使用key获取实例
+                                  initialSelectedUserIds: tempSelectedUserIds,
+                                  onSelectedUsersChanged: (_) {
+                                    // 选择变化直接反映在provider中，不需要额外处理
+                                  },
                                 ),
                               ),
                             ),
                           ),
 
-                          // 按钮区域 - 固定在底部
+                          // 按钮区域 - 固定在底部，使用更现代的样式
                           Container(
                             decoration: BoxDecoration(
-                              color: Theme.of(context).dialogBackgroundColor,
-                              border: Border(
-                                top: BorderSide(color: Colors.grey.shade300),
-                              ),
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, -2),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
-                                TextButton(
-                                  child: const Text('取消'),
-                                  onPressed: () {
-                                    // 取消选择，恢复原来的状态
-                                    ref
-                                        .read(userSelectProvider.notifier)
-                                        .updateAll(selectedUserIds.value);
-                                    Navigator.of(context).pop(false);
-                                  },
-                                ),
-                                const SizedBox(width: 8),
+                                // 清除选择按钮
                                 Consumer(
                                   builder: (context, ref, _) {
-                                    final currentSelected = ref.watch(
-                                      userSelectProvider,
-                                    );
-                                    final isValid = currentSelected.isNotEmpty;
-
-                                    return FilledButton(
+                                    final selectedUsers =
+                                        ref.watch(userSelectProvider).length;
+                                    return OutlinedButton.icon(
+                                      icon: const Icon(Icons.clear, size: 16),
+                                      label: Text(
+                                        '清空选择${selectedUsers > 0 ? ' ($selectedUsers)' : ''}',
+                                      ),
                                       onPressed:
-                                          isValid
+                                          selectedUsers > 0
                                               ? () {
-                                                Navigator.of(context).pop(true);
+                                                ref
+                                                    .read(
+                                                      userSelectProvider
+                                                          .notifier,
+                                                    )
+                                                    .updateAll([]);
                                               }
                                               : null,
-                                      child: const Text('确认选择'),
+                                      style: OutlinedButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                      ),
                                     );
                                   },
+                                ),
+                                const SizedBox(width: 12),
+                                FilledButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop(true);
+                                  },
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 24,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  child: const Text('确认选择'),
                                 ),
                               ],
                             ),
@@ -1053,37 +1097,85 @@ class CreateMeetingPage extends HookConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // 显示已选用户数量 - 消除冗余显示
-                      if (selectedUserIds.value.isEmpty)
-                        const Text(
-                          '请选择参与此会议的用户',
-                          style: TextStyle(color: Colors.red),
-                        )
-                      else
+
+                      // 只在有选择用户时显示用户信息区域
+                      if (selectedUserIds.value.isNotEmpty) ...[
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.green.shade50,
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Colors.green.shade100),
                           ),
                           padding: const EdgeInsets.all(12),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 20,
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '已选择 ${selectedUserIds.value.length} 名参与用户',
+                                    style: TextStyle(
+                                      color: Colors.green.shade700,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '已选择参与用户',
-                                style: TextStyle(
-                                  color: Colors.green.shade700,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                              const SizedBox(height: 8),
+                              // 如果选择用户数量较多，增加可滚动区域
+                              selectedUserIds.value.length > 5
+                                  ? SizedBox(
+                                    height: 40,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: Row(
+                                        children: [
+                                          for (
+                                            var i = 0;
+                                            i < selectedUserIds.value.length;
+                                            i++
+                                          )
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                right: 6,
+                                              ),
+                                              child: Chip(
+                                                label: Text(
+                                                  'User ${i + 1}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                materialTapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                padding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  : Text(
+                                    '点击"修改选择"按钮可编辑参与用户',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
                             ],
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
