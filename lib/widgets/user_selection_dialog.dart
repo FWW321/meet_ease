@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'user_search_widget.dart';
+import '../providers/user_providers.dart';
 
 /// 显示用户选择对话框
 Future<List<String>?> showUserSelectionDialog({
@@ -154,39 +155,81 @@ Future<List<String>?> showUserSelectionDialog({
                             // 清除选择按钮 - 使用ConstrainedBox控制最大宽度防止溢出
                             Consumer(
                               builder: (context, ref, _) {
-                                final selectedUsers =
-                                    ref.watch(userSelectProvider).length;
+                                final selectedUserIds = ref.watch(
+                                  userSelectProvider,
+                                );
+                                final currentUserIdAsync = ref.watch(
+                                  currentLoggedInUserIdProvider,
+                                );
 
-                                // 使用ConstrainedBox限制按钮最大宽度，防止文本过长溢出
-                                return ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    maxWidth:
-                                        maxDialogWidth * 0.4, // 限制最大宽度为对话框的40%
-                                  ),
-                                  child: OutlinedButton.icon(
-                                    icon: const Icon(Icons.clear, size: 16),
-                                    label:
-                                        selectedUsers > 0
-                                            ? Text(
-                                              '清空选择 ($selectedUsers)',
-                                            ) // 用空格代替括号，避免括号显示问题
-                                            : const Text('清空选择'),
-                                    onPressed:
-                                        selectedUsers > 0
-                                            ? () {
-                                              ref
-                                                  .read(
-                                                    userSelectProvider.notifier,
-                                                  )
-                                                  .updateAll([]);
-                                              // 强制刷新对话框
-                                              setState(() {});
-                                            }
-                                            : null,
-                                    style: OutlinedButton.styleFrom(
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                  ),
+                                return currentUserIdAsync.when(
+                                  data: (currentUserId) {
+                                    // 计算真实选中用户数量（不包括当前用户）
+                                    final actualSelectedCount =
+                                        selectedUserIds
+                                            .where((id) => id != currentUserId)
+                                            .length;
+
+                                    // 使用ConstrainedBox限制按钮最大宽度，防止文本过长溢出
+                                    return ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth:
+                                            maxDialogWidth *
+                                            0.4, // 限制最大宽度为对话框的40%
+                                      ),
+                                      child: OutlinedButton.icon(
+                                        icon: const Icon(Icons.clear, size: 16),
+                                        label:
+                                            actualSelectedCount > 0
+                                                ? Text(
+                                                  '清空选择 ($actualSelectedCount)',
+                                                )
+                                                : const Text('清空选择'),
+                                        onPressed:
+                                            actualSelectedCount > 0
+                                                ? () {
+                                                  // 保留当前用户ID（如果在列表中）
+                                                  final List<String>
+                                                  newSelection =
+                                                      selectedUserIds.contains(
+                                                            currentUserId,
+                                                          )
+                                                          ? [currentUserId]
+                                                          : [];
+
+                                                  ref
+                                                      .read(
+                                                        userSelectProvider
+                                                            .notifier,
+                                                      )
+                                                      .updateAll(newSelection);
+
+                                                  // 强制刷新对话框
+                                                  setState(() {});
+                                                }
+                                                : null,
+                                        style: OutlinedButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  loading:
+                                      () => const SizedBox(
+                                        width: 100,
+                                        child: OutlinedButton(
+                                          onPressed: null,
+                                          child: Text('清空选择'),
+                                        ),
+                                      ),
+                                  error:
+                                      (_, __) => const SizedBox(
+                                        width: 100,
+                                        child: OutlinedButton(
+                                          onPressed: null,
+                                          child: Text('清空选择'),
+                                        ),
+                                      ),
                                 );
                               },
                             ),

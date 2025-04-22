@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:intl/intl.dart';
 import '../models/meeting.dart' as models;
 import '../providers/meeting_providers.dart';
+import '../providers/user_providers.dart';
 import '../utils/meeting_utils.dart';
 import '../widgets/user_selection_dialog.dart';
 
@@ -115,25 +116,49 @@ class CreateMeetingPage extends HookConsumerWidget {
         isValid = false;
       }
 
-      // 3. 如果是私有会议，必须选择至少一名用户
-      if (meetingVisibility.value == models.MeetingVisibility.private &&
-          selectedUserIds.value.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('私有会议必须选择至少一名用户'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: '选择用户',
-              onPressed: showUserSelectionFunc,
-            ),
-          ),
+      // 3. 如果是私有会议，必须选择至少一名其他用户
+      if (meetingVisibility.value == models.MeetingVisibility.private) {
+        // 获取当前用户ID
+        final currentUserId = await ref.read(
+          currentLoggedInUserIdProvider.future,
         );
-        isValid = false;
+
+        // 计算不包括当前用户的已选择用户数量
+        final actualSelectedCount =
+            selectedUserIds.value.where((id) => id != currentUserId).length;
+
+        if (actualSelectedCount == 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('私有会议必须选择至少一名其他用户'),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: '选择用户',
+                onPressed: showUserSelectionFunc,
+              ),
+            ),
+          );
+          isValid = false;
+        }
       }
 
       if (isValid) {
+        // 获取当前用户ID
+        final currentUserIdAsync = await ref.read(
+          currentLoggedInUserIdProvider.future,
+        );
+
         // 调用创建会议方法
         final notifier = ref.read(createMeetingProvider.notifier);
+
+        // 如果列表中包含当前用户ID，需要移除
+        final List<String> allowedUsersList =
+            meetingVisibility.value == models.MeetingVisibility.private
+                ? selectedUserIds.value
+                    .where((id) => id != currentUserIdAsync)
+                    .toList()
+                    .cast<String>()
+                : [];
 
         await notifier.create(
           title: titleController.text.trim(),
@@ -143,10 +168,7 @@ class CreateMeetingPage extends HookConsumerWidget {
           description: descriptionController.text.trim(),
           type: meetingType.value,
           visibility: meetingVisibility.value,
-          allowedUsers:
-              meetingVisibility.value == models.MeetingVisibility.private
-                  ? selectedUserIds.value
-                  : [],
+          allowedUsers: allowedUsersList,
           password:
               enablePassword.value ? passwordController.text.trim() : null,
         );
@@ -333,80 +355,119 @@ class CreateMeetingPage extends HookConsumerWidget {
 
                       // 只在有选择用户时显示用户信息区域
                       if (selectedUserIds.value.isNotEmpty) ...[
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.green.shade100),
-                          ),
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.green,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '已选择 ${selectedUserIds.value.length} 名参与用户',
-                                    style: TextStyle(
-                                      color: Colors.green.shade700,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final currentUserIdAsync = ref.watch(
+                              currentLoggedInUserIdProvider,
+                            );
+
+                            return currentUserIdAsync.when(
+                              data: (currentUserId) {
+                                // 过滤掉当前用户
+                                final actualSelectedCount =
+                                    selectedUserIds.value
+                                        .where((id) => id != currentUserId)
+                                        .length;
+
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: Colors.green.shade100,
                                     ),
                                   ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              // 如果选择用户数量较多，增加可滚动区域
-                              selectedUserIds.value.length > 5
-                                  ? SizedBox(
-                                    height: 40,
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: Row(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
                                         children: [
-                                          for (
-                                            var i = 0;
-                                            i < selectedUserIds.value.length;
-                                            i++
-                                          )
-                                            Padding(
-                                              padding: const EdgeInsets.only(
-                                                right: 6,
-                                              ),
-                                              child: Chip(
-                                                label: Text(
-                                                  'User ${i + 1}',
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                visualDensity:
-                                                    VisualDensity.compact,
-                                                materialTapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                                padding: EdgeInsets.zero,
-                                              ),
+                                          const Icon(
+                                            Icons.check_circle,
+                                            color: Colors.green,
+                                            size: 16,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '已选择 $actualSelectedCount 名参与用户',
+                                            style: TextStyle(
+                                              color: Colors.green.shade700,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
                                             ),
+                                          ),
                                         ],
                                       ),
-                                    ),
-                                  )
-                                  : Text(
-                                    '点击"修改选择"按钮可编辑参与用户',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
+                                      const SizedBox(height: 8),
+                                      // 如果选择用户数量较多，增加可滚动区域
+                                      actualSelectedCount > 5
+                                          ? SizedBox(
+                                            height: 40,
+                                            child: SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              child: Row(
+                                                children: [
+                                                  for (
+                                                    var i = 0;
+                                                    i < actualSelectedCount;
+                                                    i++
+                                                  )
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            right: 6,
+                                                          ),
+                                                      child: Chip(
+                                                        label: Text(
+                                                          'User ${i + 1}',
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 12,
+                                                              ),
+                                                        ),
+                                                        visualDensity:
+                                                            VisualDensity
+                                                                .compact,
+                                                        materialTapTargetSize:
+                                                            MaterialTapTargetSize
+                                                                .shrinkWrap,
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                          : Text(
+                                            '点击"修改选择"按钮可编辑参与用户',
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              loading:
+                                  () => const Center(
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
                                     ),
                                   ),
-                            ],
-                          ),
+                              error:
+                                  (_, __) => Container(
+                                    padding: const EdgeInsets.all(12),
+                                    child: const Text(
+                                      '加载用户信息失败',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                            );
+                          },
                         ),
                       ],
                     ],

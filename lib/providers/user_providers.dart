@@ -12,6 +12,15 @@ final userServiceProvider = Provider<UserService>((ref) {
   return ApiUserService();
 });
 
+/// 当前登录用户ID，用于在搜索和选择时排除
+final currentLoggedInUserIdProvider = FutureProvider.autoDispose<String>((
+  ref,
+) async {
+  final userService = ref.watch(userServiceProvider);
+  final user = await userService.getUserFromLocal();
+  return user?.id ?? '';
+});
+
 /// 用户搜索提供者
 @riverpod
 Future<List<User>> searchUsers(

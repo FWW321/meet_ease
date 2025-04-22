@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../constants/app_constants.dart';
+import '../providers/user_providers.dart';
 
 // 简化的API用户模型
 class ApiUser {
@@ -99,7 +100,7 @@ final userSelectProvider =
     );
 
 // 将用户搜索列表抽离为单独的小组件
-class UserSearchResultList extends StatelessWidget {
+class UserSearchResultList extends ConsumerWidget {
   final ScrollController scrollController;
   final List<ApiUser> searchResults;
   final List<String> selectedUserIds;
@@ -114,87 +115,121 @@ class UserSearchResultList extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // 对搜索结果进行处理，将已选择的用户置顶
-    final List<ApiUser> sortedResults = _getSortedResults();
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 获取当前登录用户ID
+    final currentUserIdAsync = ref.watch(currentLoggedInUserIdProvider);
 
-    return ListView.builder(
-      controller: scrollController,
-      key: const PageStorageKey<String>('userSearchListView'),
-      shrinkWrap: true,
-      physics: const ClampingScrollPhysics(),
-      itemCount: sortedResults.length,
-      itemBuilder: (context, index) {
-        final user = sortedResults[index];
-        final isSelected = selectedUserIds.contains(user.userId);
+    return currentUserIdAsync.when(
+      data: (currentUserId) {
+        // 过滤掉当前用户
+        final filteredResults =
+            searchResults
+                .where((user) => user.userId != currentUserId)
+                .toList();
 
-        // 将每个列表项包装在手势探测器中，自行处理点击，避免事件冒泡
-        return GestureDetector(
-          // 吸收所有点击事件
-          behavior: HitTestBehavior.opaque,
-          // 拦截点击事件，避免冒泡到父级滚动容器
-          onTap: () => onUserSelect(user.userId),
-          child: CheckboxListTile(
-            key: ValueKey('user_${user.userId}'),
-            title: Text(
-              user.username,
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Theme.of(context).primaryColor : null,
-              ),
-              overflow: TextOverflow.ellipsis, // 防止文本溢出
+        // 对搜索结果进行处理，将已选择的用户置顶
+        final List<ApiUser> sortedResults = _getSortedResults(
+          filteredResults,
+          selectedUserIds,
+        );
+
+        if (filteredResults.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Text('没有可选的用户', style: TextStyle(color: Colors.grey)),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 使用Flexible或Expanded包装可能溢出的文本
-                Text(
-                  'ID: ${user.userId}',
-                  style: const TextStyle(fontSize: 12),
-                  overflow: TextOverflow.ellipsis,
+          );
+        }
+
+        return ListView.builder(
+          controller: scrollController,
+          key: const PageStorageKey<String>('userSearchListView'),
+          shrinkWrap: true,
+          physics: const ClampingScrollPhysics(),
+          itemCount: sortedResults.length,
+          itemBuilder: (context, index) {
+            final user = sortedResults[index];
+            final isSelected = selectedUserIds.contains(user.userId);
+
+            // 将每个列表项包装在手势探测器中，自行处理点击，避免事件冒泡
+            return GestureDetector(
+              // 吸收所有点击事件
+              behavior: HitTestBehavior.opaque,
+              // 拦截点击事件，避免冒泡到父级滚动容器
+              onTap: () => onUserSelect(user.userId),
+              child: CheckboxListTile(
+                key: ValueKey('user_${user.userId}'),
+                title: Text(
+                  user.username,
+                  style: TextStyle(
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.normal,
+                    color: isSelected ? Theme.of(context).primaryColor : null,
+                  ),
+                  overflow: TextOverflow.ellipsis, // 防止文本溢出
                 ),
-                if (user.email != null && user.email!.isNotEmpty)
-                  Text(
-                    '邮箱: ${user.email}',
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                if (user.phone != null && user.phone!.isNotEmpty)
-                  Text(
-                    '电话: ${user.phone}',
-                    style: const TextStyle(fontSize: 12),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-            isThreeLine: true,
-            dense: true,
-            value: isSelected,
-            onChanged: (_) => onUserSelect(user.userId),
-            controlAffinity: ListTileControlAffinity.leading,
-            // 为已选择项添加背景色
-            tileColor:
-                isSelected
-                    ? Theme.of(context).primaryColor.withOpacity(0.05)
-                    : null,
-          ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 使用Flexible或Expanded包装可能溢出的文本
+                    Text(
+                      'ID: ${user.userId}',
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (user.email != null && user.email!.isNotEmpty)
+                      Text(
+                        '邮箱: ${user.email}',
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    if (user.phone != null && user.phone!.isNotEmpty)
+                      Text(
+                        '电话: ${user.phone}',
+                        style: const TextStyle(fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+                isThreeLine: true,
+                dense: true,
+                value: isSelected,
+                onChanged: (_) => onUserSelect(user.userId),
+                controlAffinity: ListTileControlAffinity.leading,
+                // 为已选择项添加背景色
+                tileColor:
+                    isSelected
+                        ? Theme.of(context).primaryColor.withOpacity(0.05)
+                        : null,
+              ),
+            );
+          },
         );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error:
+          (_, __) => const Center(
+            child: Text('获取用户信息失败', style: TextStyle(color: Colors.red)),
+          ),
     );
   }
 
   // 获取排序后的结果，已选择的用户置顶
-  List<ApiUser> _getSortedResults() {
-    if (selectedUserIds.isEmpty) {
-      return List.from(searchResults);
+  List<ApiUser> _getSortedResults(
+    List<ApiUser> results,
+    List<String> selectedIds,
+  ) {
+    if (selectedIds.isEmpty) {
+      return List.from(results);
     }
 
     // 将结果分为已选择和未选择两组
     final List<ApiUser> selectedUsers = [];
     final List<ApiUser> unselectedUsers = [];
 
-    for (final user in searchResults) {
-      if (selectedUserIds.contains(user.userId)) {
+    for (final user in results) {
+      if (selectedIds.contains(user.userId)) {
         selectedUsers.add(user);
       } else {
         unselectedUsers.add(user);
@@ -432,6 +467,7 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
   Widget _buildContent() {
     // 读取当前选中的用户
     final selectedUsers = ref.watch(userSelectProvider);
+    final currentUserIdAsync = ref.watch(currentLoggedInUserIdProvider);
 
     return RepaintBoundary(
       child: Column(
@@ -466,6 +502,30 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
             },
           ),
           const SizedBox(height: 8),
+
+          // 已选用户数量显示
+          currentUserIdAsync.when(
+            data: (currentUserId) {
+              // 计算不包括当前用户的选中数量
+              final actualSelectedCount =
+                  selectedUsers.where((id) => id != currentUserId).length;
+
+              return actualSelectedCount > 0
+                  ? Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Text(
+                      '已选择 $actualSelectedCount 名用户',
+                      style: TextStyle(
+                        color: Theme.of(context).primaryColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  )
+                  : const SizedBox.shrink();
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+          ),
 
           // 用户选择列表 - 只有当搜索结果不为空时才显示
           // 使用AnimatedSize平滑过渡
