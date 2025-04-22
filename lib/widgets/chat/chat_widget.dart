@@ -92,12 +92,22 @@ class ChatWidget extends HookConsumerWidget {
     useEffect(() {
       webSocketMessages.whenData((message) {
         try {
+          print('接收到WebSocket消息: $message');
+
+          // 从消息中获取所需的字段
+          final messageType =
+              message['messageType']?.toString().toUpperCase() ?? '';
+
+          // 创建ChatMessage对象
           final chatMessage = ChatMessage.fromJson(message);
-          // 添加到本地消息列表
+
+          // 将消息添加到本地消息列表
           localMessages.value = [...localMessages.value, chatMessage];
 
-          // 滚动到底部
+          // 滚动到底部显示新消息
           scrollToBottom();
+
+          print('消息类型: $messageType, 内容: ${chatMessage.content}');
         } catch (e) {
           print('处理WebSocket消息失败: $e');
         }

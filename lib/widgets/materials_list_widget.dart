@@ -592,7 +592,7 @@ class MaterialsListWidget extends ConsumerWidget {
                                   final request = http.MultipartRequest(
                                     'POST',
                                     Uri.parse(
-                                      '${AppConstants.apiBaseUrl}/meeting/file/upload/$meetingId',
+                                      '${AppConstants.apiBaseUrl}/meeting/file/upload',
                                     ),
                                   );
 
@@ -859,7 +859,7 @@ class MaterialsListWidget extends ConsumerWidget {
       if (kIsWeb) {
         // 构造正确的下载URL
         final String downloadUrl =
-            '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
+            '${AppConstants.apiBaseUrl}/meeting/file/download/${material.id}';
         await launchUrl(Uri.parse(downloadUrl));
         return;
       }
@@ -934,7 +934,7 @@ class MaterialsListWidget extends ConsumerWidget {
 
       // 构造正确的下载URL
       final String downloadUrl =
-          '${AppConstants.apiBaseUrl}/meeting/file/download/$meetingId/${material.id}';
+          '${AppConstants.apiBaseUrl}/meeting/file/download/${material.id}';
 
       // 下载文件
       final response = await http.get(Uri.parse(downloadUrl));
