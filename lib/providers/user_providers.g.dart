@@ -382,6 +382,135 @@ final currentUserIdProvider = AutoDisposeFutureProvider<String>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CurrentUserIdRef = AutoDisposeFutureProviderRef<String>;
+String _$userNameHash() => r'c2af173bcead3703f9af7093f00c6dbf4b32fa81';
+
+/// 用户名提供者 - 通过用户ID获取用户名
+///
+/// Copied from [userName].
+@ProviderFor(userName)
+const userNameProvider = UserNameFamily();
+
+/// 用户名提供者 - 通过用户ID获取用户名
+///
+/// Copied from [userName].
+class UserNameFamily extends Family<AsyncValue<String>> {
+  /// 用户名提供者 - 通过用户ID获取用户名
+  ///
+  /// Copied from [userName].
+  const UserNameFamily();
+
+  /// 用户名提供者 - 通过用户ID获取用户名
+  ///
+  /// Copied from [userName].
+  UserNameProvider call(String userId) {
+    return UserNameProvider(userId);
+  }
+
+  @override
+  UserNameProvider getProviderOverride(covariant UserNameProvider provider) {
+    return call(provider.userId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'userNameProvider';
+}
+
+/// 用户名提供者 - 通过用户ID获取用户名
+///
+/// Copied from [userName].
+class UserNameProvider extends AutoDisposeFutureProvider<String> {
+  /// 用户名提供者 - 通过用户ID获取用户名
+  ///
+  /// Copied from [userName].
+  UserNameProvider(String userId)
+    : this._internal(
+        (ref) => userName(ref as UserNameRef, userId),
+        from: userNameProvider,
+        name: r'userNameProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$userNameHash,
+        dependencies: UserNameFamily._dependencies,
+        allTransitiveDependencies: UserNameFamily._allTransitiveDependencies,
+        userId: userId,
+      );
+
+  UserNameProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.userId,
+  }) : super.internal();
+
+  final String userId;
+
+  @override
+  Override overrideWith(
+    FutureOr<String> Function(UserNameRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: UserNameProvider._internal(
+        (ref) => create(ref as UserNameRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        userId: userId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<String> createElement() {
+    return _UserNameProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is UserNameProvider && other.userId == userId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, userId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin UserNameRef on AutoDisposeFutureProviderRef<String> {
+  /// The parameter `userId` of this provider.
+  String get userId;
+}
+
+class _UserNameProviderElement extends AutoDisposeFutureProviderElement<String>
+    with UserNameRef {
+  _UserNameProviderElement(super.provider);
+
+  @override
+  String get userId => (origin as UserNameProvider).userId;
+}
+
 String _$userSearchHash() => r'a750b23ee1bfee8f9174fb07a45d45c6101da0b7';
 
 /// 用户搜索状态提供者

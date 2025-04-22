@@ -22,6 +22,9 @@ abstract class UserService {
     String? userId,
   });
 
+  /// 根据用户ID获取用户名
+  Future<String> getUserNameById(String userId);
+
   /// 用户登录
   Future<User> login(String username, String password);
 
@@ -189,6 +192,20 @@ class MockUserService implements UserService {
 
       return matches;
     }).toList();
+  }
+
+  @override
+  Future<String> getUserNameById(String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 查找用户
+    try {
+      final user = _users.firstWhere((user) => user.id == userId);
+      return user.name;
+    } catch (e) {
+      return '未知用户';
+    }
   }
 
   @override

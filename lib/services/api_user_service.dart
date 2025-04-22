@@ -267,4 +267,30 @@ class ApiUserService implements UserService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.userKey);
   }
+
+  @override
+  Future<String> getUserNameById(String userId) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/getname/$userId'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          return responseData['data'] as String;
+        } else {
+          developer.log('获取用户名失败: ${responseData['message']}');
+          return '未知用户';
+        }
+      } else {
+        developer.log('获取用户名失败: ${response.statusCode}, ${response.body}');
+        return '未知用户';
+      }
+    } catch (e) {
+      developer.log('获取用户名异常: $e');
+      return '未知用户';
+    }
+  }
 }

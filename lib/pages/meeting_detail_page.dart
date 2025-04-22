@@ -166,6 +166,9 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                 ),
               ]),
 
+              // 构建组织者和管理员列表（用于公开和可搜索会议）
+              _buildOrganizersAndAdminsList(context, meeting),
+
               // 时间和地点
               _buildInfoCard([
                 _buildInfoItem(
@@ -189,7 +192,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                   ),
               ]),
 
-              // 会议参与者（显示创建者和管理员标识）
+              // 仅私有会议显示参会人员列表
               _buildParticipantsList(context, meeting),
 
               // 如果会议已取消，显示取消原因
@@ -378,15 +381,20 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
   // 构建会议参与者列表
   Widget _buildParticipantsList(BuildContext context, Meeting meeting) {
+    // 如果不是私有会议，直接返回空组件，不显示参会人员列表
+    if (meeting.visibility != MeetingVisibility.private) {
+      return const SizedBox.shrink();
+    }
+
     final participantsAsync = ref.watch(
       meetingParticipantsProvider(widget.meetingId),
     );
     final canManageMeeting =
         currentUserId != null && meeting.canUserManage(currentUserId!);
 
-    // 决定标题文字
-    final titleText =
-        meeting.visibility == MeetingVisibility.private ? '允许参加的人员' : '组织者和管理员';
+    // 为私有会议设置标题和描述
+    const titleText = '允许参加的人员';
+    const descriptionText = '只有被邀请的人员才能参加此私有会议';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -398,16 +406,12 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   titleText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
-                // 私有会议且用户是管理员时，显示管理按钮
-                if (meeting.visibility == MeetingVisibility.private &&
-                    canManageMeeting)
+                // 私有会议用户是管理员时，显示管理按钮
+                if (canManageMeeting)
                   TextButton.icon(
                     icon: const Icon(Icons.person_add),
                     label: const Text('管理'),
@@ -420,28 +424,18 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                   ),
               ],
             ),
+            // 显示描述文字
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 12),
+              child: Text(
+                descriptionText,
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
             const SizedBox(height: 16),
             participantsAsync.when(
               data: (participants) {
-                // 根据会议可见性筛选要显示的参与者
-                List<User> filteredParticipants;
-
-                if (meeting.visibility == MeetingVisibility.private) {
-                  // 私有会议: 显示所有允许参与的人员
-                  filteredParticipants = participants;
-                } else {
-                  // 公开/可搜索会议: 只显示创建者和管理员
-                  filteredParticipants =
-                      participants
-                          .where(
-                            (user) =>
-                                user.id == meeting.organizerId ||
-                                meeting.admins.contains(user.id),
-                          )
-                          .toList();
-                }
-
-                if (filteredParticipants.isEmpty) {
+                if (participants.isEmpty) {
                   return const Center(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 24.0),
@@ -452,7 +446,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
                 return Column(
                   children:
-                      filteredParticipants.map((user) {
+                      participants.map((user) {
                         // 确定用户角色标签
                         Widget? roleTag;
                         if (user.id == meeting.organizerId) {
@@ -461,24 +455,78 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                           roleTag = _buildRoleTag('管理员', Colors.blue);
                         }
 
-                        return ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(
-                              context,
-                            ).primaryColor.withAlpha(51),
-                            child: Text(
-                              user.name.isNotEmpty
-                                  ? user.name[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                color: Theme.of(context).primaryColor,
-                              ),
-                            ),
-                          ),
-                          title: Text(user.name),
-                          subtitle:
-                              user.email.isNotEmpty ? Text(user.email) : null,
-                          trailing: roleTag,
+                        // 使用用户名提供者来获取最新用户名
+                        return Consumer(
+                          builder: (context, ref, child) {
+                            final userNameAsync = ref.watch(
+                              userNameProvider(user.id),
+                            );
+
+                            return userNameAsync.when(
+                              data: (userName) {
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: Theme.of(
+                                      context,
+                                    ).primaryColor.withAlpha(51),
+                                    child: Text(
+                                      userName.isNotEmpty
+                                          ? userName[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        color: Theme.of(context).primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(userName),
+                                  subtitle:
+                                      user.email.isNotEmpty
+                                          ? Text(user.email)
+                                          : null,
+                                  trailing: roleTag,
+                                );
+                              },
+                              loading:
+                                  () => ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).primaryColor.withAlpha(51),
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    title: Text(user.name),
+                                    subtitle:
+                                        user.email.isNotEmpty
+                                            ? Text(user.email)
+                                            : null,
+                                    trailing: roleTag,
+                                  ),
+                              error:
+                                  (_, __) => ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).primaryColor.withAlpha(51),
+                                      child: Text(
+                                        user.name.isNotEmpty
+                                            ? user.name[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(user.name),
+                                    subtitle:
+                                        user.email.isNotEmpty
+                                            ? Text(user.email)
+                                            : null,
+                                    trailing: roleTag,
+                                  ),
+                            );
+                          },
                         );
                       }).toList(),
                 );
@@ -492,6 +540,166 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                   ),
               error: (error, _) => Center(child: Text('加载参会人员失败: $error')),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 构建组织者和管理员列表（用于公开和可搜索会议）
+  Widget _buildOrganizersAndAdminsList(BuildContext context, Meeting meeting) {
+    // 如果是私有会议，不显示此组件（私有会议显示完整参会人员列表）
+    if (meeting.visibility == MeetingVisibility.private) {
+      return const SizedBox.shrink();
+    }
+
+    String descriptionText;
+    if (meeting.visibility == MeetingVisibility.public) {
+      descriptionText = '这是一个公开会议，任何人都可以参加';
+    } else {
+      descriptionText = '这是一个可搜索会议，知道会议ID的人都可以参加';
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '组织者和管理员',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 12),
+              child: Text(
+                descriptionText,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 显示组织者信息
+            Consumer(
+              builder: (context, ref, child) {
+                final organizerNameAsync = ref.watch(
+                  userNameProvider(meeting.organizerId),
+                );
+
+                return organizerNameAsync.when(
+                  data:
+                      (name) => ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.orange.withAlpha(51),
+                          child: Text(
+                            name.isNotEmpty ? name[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.orange),
+                          ),
+                        ),
+                        title: Text(name),
+                        subtitle: const Text('会议创建者'),
+                        trailing: _buildRoleTag('创建者', Colors.orange),
+                      ),
+                  loading:
+                      () => const ListTile(
+                        leading: CircleAvatar(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ),
+                        title: Text('加载中...'),
+                        subtitle: Text('会议创建者'),
+                      ),
+                  error:
+                      (_, __) => ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Colors.red,
+                          child: Icon(
+                            Icons.error,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        title: Text(meeting.organizerName),
+                        subtitle: const Text('会议创建者（加载失败）'),
+                      ),
+                );
+              },
+            ),
+
+            // 显示管理员列表
+            if (meeting.admins.isNotEmpty) ...[
+              const Divider(),
+              const Padding(
+                padding: EdgeInsets.only(top: 8, bottom: 8),
+                child: Text(
+                  '管理员',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+              ...meeting.admins
+                  .map(
+                    (adminId) => Consumer(
+                      builder: (context, ref, child) {
+                        final adminNameAsync = ref.watch(
+                          userNameProvider(adminId),
+                        );
+
+                        return adminNameAsync.when(
+                          data:
+                              (name) => ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.blue.withAlpha(51),
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(color: Colors.blue),
+                                  ),
+                                ),
+                                title: Text(name),
+                                trailing: _buildRoleTag('管理员', Colors.blue),
+                                dense: true,
+                              ),
+                          loading:
+                              () => const ListTile(
+                                leading: CircleAvatar(
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                                title: Text('加载中...'),
+                                dense: true,
+                              ),
+                          error:
+                              (_, __) => ListTile(
+                                leading: const CircleAvatar(
+                                  backgroundColor: Colors.red,
+                                  child: Icon(
+                                    Icons.error,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                title: Text('管理员 ID: $adminId'),
+                                dense: true,
+                              ),
+                        );
+                      },
+                    ),
+                  )
+                  .toList(),
+            ],
           ],
         ),
       ),

@@ -193,3 +193,10 @@ class UserNotifier extends _$UserNotifier {
     }
   }
 }
+
+/// 用户名提供者 - 通过用户ID获取用户名
+@riverpod
+Future<String> userName(Ref ref, String userId) async {
+  final userService = ref.watch(userServiceProvider);
+  return userService.getUserNameById(userId);
+}

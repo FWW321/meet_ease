@@ -666,6 +666,24 @@ class ApiMeetingService implements MeetingService {
             // TODO: 调用更新会议状态为"已结束"的接口 - 接口未实现，保留逻辑
           }
 
+          // 处理管理员ID列表
+          List<String> adminIds = [];
+          if (meetingData['adminIds'] != null) {
+            if (meetingData['adminIds'] is List) {
+              adminIds =
+                  (meetingData['adminIds'] as List)
+                      .map((item) => item.toString())
+                      .toList();
+            } else if (meetingData['adminIds'] is String) {
+              // 如果adminIds是逗号分隔的字符串，则拆分为列表
+              final adminIdsStr = meetingData['adminIds'] as String;
+              if (adminIdsStr.isNotEmpty) {
+                adminIds =
+                    adminIdsStr.split(',').map((id) => id.trim()).toList();
+              }
+            }
+          }
+
           return Meeting(
             id: meetingData['meetingId'].toString(),
             title: meetingData['title'],
@@ -682,7 +700,7 @@ class ApiMeetingService implements MeetingService {
                 meetingData['createdAt'] != null
                     ? DateTime.parse(meetingData['createdAt'])
                     : null,
-            admins: const [], // API未提供
+            admins: adminIds,
             blacklist: const [], // API未提供
             allowedUsers: const [], // API未提供
           );
