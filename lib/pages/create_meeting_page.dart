@@ -1042,6 +1042,12 @@ class CreateMeetingPage extends HookConsumerWidget {
                             // 重置Riverpod状态
                             ref.read(userSelectProvider.notifier).updateAll([]);
                           }
+
+                          // 当切换到私有会议时，禁用密码功能
+                          if (newValue == MeetingVisibility.private) {
+                            enablePassword.value = false;
+                            passwordController.clear();
+                          }
                         }
                       },
                       items:
@@ -1183,88 +1189,96 @@ class CreateMeetingPage extends HookConsumerWidget {
 
             const SizedBox(height: 16),
 
-            // 会议密码设置
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: Colors.grey.shade300),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.lock, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            '会议密码',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+            // 会议密码设置 - 仅在非私有会议时显示
+            if (meetingVisibility.value != MeetingVisibility.private)
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.lock, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              '会议密码',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        Switch(
-                          value: enablePassword.value,
-                          onChanged: (value) {
-                            enablePassword.value = value;
-                            if (!value) {
-                              passwordController.clear();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    if (enablePassword.value)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: passwordController,
-                            obscureText: true, // 隐藏密码
-                            decoration: const InputDecoration(
-                              labelText: '设置密码',
-                              hintText: '参会者需要输入此密码才能加入会议',
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return '请输入会议密码';
+                          Switch(
+                            value: enablePassword.value,
+                            onChanged: (value) {
+                              enablePassword.value = value;
+                              if (!value) {
+                                passwordController.clear();
                               }
-                              if (value.length < 4) {
-                                return '密码长度至少为4位';
-                              }
-                              if (value.length > 16) {
-                                return '密码长度不能超过16位';
-                              }
-                              // 验证密码格式，可以根据需要增加字母、数字等要求
-                              if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
-                                return '密码只能包含字母和数字';
-                              }
-                              return null;
                             },
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            '启用密码后，参会者需要输入正确的密码才能加入会议。',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
                         ],
-                      )
-                    else
-                      const Text(
-                        '不启用密码，所有参会者可直接加入会议。',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
                       ),
-                  ],
+                      // 只有启用密码时才显示密码输入框
+                      if (enablePassword.value)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: passwordController,
+                              obscureText: true, // 隐藏密码
+                              decoration: const InputDecoration(
+                                labelText: '设置密码',
+                                hintText: '参会者需要输入此密码才能加入会议',
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return '请输入会议密码';
+                                }
+                                if (value.length < 4) {
+                                  return '密码长度至少为4位';
+                                }
+                                if (value.length > 16) {
+                                  return '密码长度不能超过16位';
+                                }
+                                // 验证密码格式，可以根据需要增加字母、数字等要求
+                                if (!RegExp(
+                                  r'^[a-zA-Z0-9]+$',
+                                ).hasMatch(value)) {
+                                  return '密码只能包含字母和数字';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              '启用密码后，参会者需要输入正确的密码才能加入会议。',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const Text(
+                          '不启用密码，所有参会者可直接加入会议。',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+
             const SizedBox(height: 16),
 
             // 开始时间选择
