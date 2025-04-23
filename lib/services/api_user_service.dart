@@ -293,4 +293,42 @@ class ApiUserService implements UserService {
       return '未知用户';
     }
   }
+
+  @override
+  Future<bool> updatePassword(
+    String userId,
+    String oldPassword,
+    String newPassword,
+  ) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/updatePassword'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode({
+          'userId': userId,
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200) {
+          return true;
+        } else {
+          throw Exception(responseData['message'] ?? '修改密码失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '修改密码失败'),
+        );
+      }
+    } catch (e) {
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
+    }
+  }
 }

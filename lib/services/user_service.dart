@@ -47,6 +47,13 @@ abstract class UserService {
 
   /// 清除本地用户信息
   Future<void> clearUserFromLocal();
+
+  /// 更新用户密码
+  Future<bool> updatePassword(
+    String userId,
+    String oldPassword,
+    String newPassword,
+  );
 }
 
 /// 模拟用户服务实现
@@ -291,5 +298,15 @@ class MockUserService implements UserService {
   Future<void> clearUserFromLocal() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(AppConstants.userKey);
+  }
+
+  @override
+  Future<bool> updatePassword(
+    String userId,
+    String oldPassword,
+    String newPassword,
+  ) async {
+    // Implementation needed
+    throw UnimplementedError();
   }
 }

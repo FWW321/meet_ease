@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../constants/app_constants.dart';
+import '../services/service_providers.dart' as service_providers;
+import '../services/user_service.dart';
+import '../services/auth_service.dart';
+import '../providers/user_providers.dart';
+import 'dart:developer' as developer;
 
 class AccountSecurityPage extends HookConsumerWidget {
   const AccountSecurityPage({super.key});
@@ -20,7 +25,7 @@ class AccountSecurityPage extends HookConsumerWidget {
               ListTile(
                 title: const Text('修改密码'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _showChangePasswordDialog(context),
+                onTap: () => _showChangePasswordDialog(context, ref),
               ),
             ],
           ),
@@ -109,7 +114,7 @@ class AccountSecurityPage extends HookConsumerWidget {
   }
 
   // 修改密码对话框
-  void _showChangePasswordDialog(BuildContext context) {
+  void _showChangePasswordDialog(BuildContext context, WidgetRef ref) {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
@@ -117,89 +122,187 @@ class AccountSecurityPage extends HookConsumerWidget {
     // 表单验证状态
     final formKey = GlobalKey<FormState>();
 
+    // 获取用户服务
+    final userService = ref.read(service_providers.userServiceProvider);
+
+    // 加载状态
+    bool isLoading = false;
+
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: const Text('修改密码'),
-            content: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: currentPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: '当前密码',
-                        border: OutlineInputBorder(),
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('修改密码'),
+                  content: Form(
+                    key: formKey,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextFormField(
+                            controller: currentPasswordController,
+                            decoration: const InputDecoration(
+                              labelText: '当前密码',
+                              border: OutlineInputBorder(),
+                            ),
+                            obscureText: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '请输入当前密码';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: newPasswordController,
+                            decoration: const InputDecoration(
+                              labelText: '新密码',
+                              border: OutlineInputBorder(),
+                            ),
+                            obscureText: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '请输入新密码';
+                              }
+                              if (value.length < 6) {
+                                return '密码长度至少为6位';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: confirmPasswordController,
+                            decoration: const InputDecoration(
+                              labelText: '确认新密码',
+                              border: OutlineInputBorder(),
+                            ),
+                            obscureText: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return '请确认新密码';
+                              }
+                              if (value != newPasswordController.text) {
+                                return '两次输入的密码不一致';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                       ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return '请输入当前密码';
-                        }
-                        return null;
-                      },
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: newPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: '新密码',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return '请输入新密码';
-                        }
-                        if (value.length < 8) {
-                          return '密码长度至少为8位';
-                        }
-                        return null;
-                      },
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed:
+                          isLoading ? null : () => Navigator.of(context).pop(),
+                      child: const Text('取消'),
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: confirmPasswordController,
-                      decoration: const InputDecoration(
-                        labelText: '确认新密码',
-                        border: OutlineInputBorder(),
-                      ),
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return '请确认新密码';
-                        }
-                        if (value != newPasswordController.text) {
-                          return '两次输入的密码不一致';
-                        }
-                        return null;
-                      },
+                    ElevatedButton(
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () async {
+                                if (formKey.currentState!.validate()) {
+                                  setState(() {
+                                    isLoading = true;
+                                  });
+
+                                  try {
+                                    // 获取当前用户
+                                    final currentUser =
+                                        await userService.getCurrentUser();
+                                    if (currentUser == null) {
+                                      throw Exception('未获取到用户信息，请重新登录');
+                                    }
+
+                                    // 调用密码修改API
+                                    final success = await userService
+                                        .updatePassword(
+                                          currentUser.id,
+                                          currentPasswordController.text,
+                                          newPasswordController.text,
+                                        );
+
+                                    if (success) {
+                                      // 关闭对话框
+                                      Navigator.of(context).pop();
+
+                                      try {
+                                        // 显示成功提示
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('密码修改成功，请重新登录'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+
+                                        // 先清除本地登录状态
+                                        await AuthService.clearLoginStatus();
+
+                                        // 使用Riverpod清除用户状态
+                                        await ref
+                                            .read(authStateProvider.notifier)
+                                            .logout();
+
+                                        // 确保上下文有效，立即跳转到登录页面
+                                        if (context.mounted) {
+                                          // 返回到登录页面，清除所有路由历史
+                                          Navigator.pushNamedAndRemoveUntil(
+                                            context,
+                                            AppConstants.loginRoute,
+                                            (route) => false,
+                                          );
+                                        }
+                                      } catch (e) {
+                                        developer.log(
+                                          '退出登录时出错: ${e.toString()}',
+                                        );
+                                        // 确保即使出错也返回登录页面
+                                        if (context.mounted) {
+                                          Navigator.pushNamedAndRemoveUntil(
+                                            context,
+                                            AppConstants.loginRoute,
+                                            (route) => false,
+                                          );
+                                        }
+                                      }
+                                    }
+                                  } catch (e) {
+                                    // 显示错误信息
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('密码修改失败：${e.toString()}'),
+                                      ),
+                                    );
+                                  } finally {
+                                    // 更新加载状态
+                                    if (context.mounted) {
+                                      setState(() {
+                                        isLoading = false;
+                                      });
+                                    }
+                                  }
+                                }
+                              },
+                      child:
+                          isLoading
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text('确认修改'),
                     ),
                   ],
                 ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (formKey.currentState!.validate()) {
-                    // TODO: 实现修改密码功能
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(const SnackBar(content: Text('密码修改成功')));
-                  }
-                },
-                child: const Text('确认修改'),
-              ),
-            ],
           ),
     );
   }
