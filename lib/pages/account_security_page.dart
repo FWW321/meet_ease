@@ -7,83 +7,120 @@ import '../services/auth_service.dart';
 import '../providers/user_providers.dart';
 import 'dart:developer' as developer;
 
-class AccountSecurityPage extends HookConsumerWidget {
+class AccountSecurityPage extends StatefulHookConsumerWidget {
   const AccountSecurityPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountSecurityPage> createState() =>
+      _AccountSecurityPageState();
+}
+
+class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
+  bool _rememberLogin = true; // 默认值
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberLoginSetting();
+  }
+
+  // 加载记住登录设置
+  Future<void> _loadRememberLoginSetting() async {
+    final rememberLogin = await AuthService.getRememberLoginSetting();
+    setState(() {
+      _rememberLogin = rememberLogin;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('账号与安全')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 更改密码
-          _buildSection(
-            context,
-            title: '密码管理',
-            children: [
-              ListTile(
-                title: const Text('修改密码'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => _showChangePasswordDialog(context, ref),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // 登录安全
-          _buildSection(
-            context,
-            title: '登录安全',
-            children: [
-              SwitchListTile(
-                title: const Text('记住登录状态'),
-                subtitle: const Text('开启后，应用将在您下次打开时自动登录'),
-                value: true, // 应当从用户偏好设置中获取实际值
-                onChanged: (value) {
-                  // TODO: 实现记住登录状态功能
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('记住登录状态${value ? '已开启' : '已关闭'}')),
-                  );
-                },
-              ),
-
-              SwitchListTile(
-                title: const Text('生物识别登录'),
-                subtitle: const Text('使用指纹或面部识别快速登录'),
-                value: false, // 应当从用户偏好设置中获取实际值
-                onChanged: (value) {
-                  // TODO: 实现生物识别登录功能
-                  ScaffoldMessenger.of(
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // 更改密码
+                  _buildSection(
                     context,
-                  ).showSnackBar(const SnackBar(content: Text('生物识别登录功能开发中')));
-                },
-              ),
-            ],
-          ),
+                    title: '密码管理',
+                    children: [
+                      ListTile(
+                        title: const Text('修改密码'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () => _showChangePasswordDialog(context, ref),
+                      ),
+                    ],
+                  ),
 
-          const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-          // 账号管理
-          _buildSection(
-            context,
-            title: '账号管理',
-            children: [
-              ListTile(
-                title: const Text('注销账号'),
-                textColor: Colors.red,
-                trailing: const Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.red,
-                ),
-                onTap: () => _showDeactivateAccountDialog(context, ref),
+                  // 登录安全
+                  _buildSection(
+                    context,
+                    title: '登录安全',
+                    children: [
+                      SwitchListTile(
+                        title: const Text('记住登录状态'),
+                        subtitle: const Text('开启后，应用将在您下次打开时自动登录'),
+                        value: _rememberLogin,
+                        onChanged: (value) async {
+                          // 保存设置
+                          await AuthService.saveRememberLoginSetting(value);
+                          // 更新UI
+                          setState(() {
+                            _rememberLogin = value;
+                          });
+                          // 显示提示
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('记住登录状态${value ? '已开启' : '已关闭'}'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+
+                      SwitchListTile(
+                        title: const Text('生物识别登录'),
+                        subtitle: const Text('使用指纹或面部识别快速登录'),
+                        value: false, // 应当从用户偏好设置中获取实际值
+                        onChanged: (value) {
+                          // TODO: 实现生物识别登录功能
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('生物识别登录功能开发中')),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 账号管理
+                  _buildSection(
+                    context,
+                    title: '账号管理',
+                    children: [
+                      ListTile(
+                        title: const Text('注销账号'),
+                        textColor: Colors.red,
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.red,
+                        ),
+                        onTap: () => _showDeactivateAccountDialog(context, ref),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 

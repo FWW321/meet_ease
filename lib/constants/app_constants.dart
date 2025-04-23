@@ -29,6 +29,7 @@ class AppConstants {
   /// 缓存相关
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_info';
+  static const String rememberLoginKey = 'remember_login';
 
   /// 路由名称
   static const String homeRoute = '/';
