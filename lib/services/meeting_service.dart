@@ -809,20 +809,51 @@ class ApiMeetingService implements MeetingService {
       final formattedStartTime = startTime.toIso8601String();
       final formattedEndTime = endTime.toIso8601String();
 
-      // 构建请求体
-      final requestBody = jsonEncode({
-        'title': title,
-        'description': description ?? '',
-        'startTime': formattedStartTime,
-        'endTime': formattedEndTime,
-        'organizerId': organizerId,
-        'location': location,
-        'participantIds': allowedUsers,
-      });
+      // 确定使用的API路径
+      String apiPath;
+      Map<String, dynamic> requestBodyMap;
+
+      // 根据可见性类型选择API路径
+      if (visibility == MeetingVisibility.private) {
+        // 私有会议请求使用原有的接口
+        apiPath = '${AppConstants.apiBaseUrl}/meeting/create';
+        requestBodyMap = {
+          'title': title,
+          'description': description ?? '',
+          'startTime': formattedStartTime,
+          'endTime': formattedEndTime,
+          'organizerId': organizerId,
+          'location': location,
+          'participantIds': allowedUsers,
+        };
+      } else {
+        // 公开会议和可搜索会议使用新接口
+        apiPath = '${AppConstants.apiBaseUrl}/meeting/createPublic';
+
+        // 根据可见性设置visibility字段（大写）
+        String visibilityStr =
+            visibility == MeetingVisibility.public ? 'PUBLIC' : 'SEARCHABLE';
+
+        // 构建请求体
+        requestBodyMap = {
+          'title': title,
+          'description': description ?? '',
+          'startTime': formattedStartTime,
+          'endTime': formattedEndTime,
+          'organizerId': organizerId,
+          'location': location,
+          'visibility': visibilityStr,
+          'meetingType': _getMeetingTypeString(type),
+          'joinPassword': password, // 如果为null则表示不设置密码
+        };
+      }
+
+      // 转换为JSON
+      final requestBody = jsonEncode(requestBodyMap);
 
       // 发送POST请求
       final response = await _client.post(
-        Uri.parse('${AppConstants.apiBaseUrl}/meeting/create'),
+        Uri.parse(apiPath),
         headers: HttpUtils.createHeaders(),
         body: requestBody,
       );
@@ -840,6 +871,21 @@ class ApiMeetingService implements MeetingService {
             meetingData['status'] ?? '待开始',
           );
 
+          // 获取可见性
+          MeetingVisibility returnedVisibility = visibility; // 默认使用请求中的可见性
+          if (meetingData['visibility'] != null) {
+            // 从响应中解析可见性（如果有）
+            final visibilityStr =
+                meetingData['visibility'].toString().toUpperCase();
+            if (visibilityStr == 'PUBLIC') {
+              returnedVisibility = MeetingVisibility.public;
+            } else if (visibilityStr == 'SEARCHABLE') {
+              returnedVisibility = MeetingVisibility.searchable;
+            } else if (visibilityStr == 'PRIVATE') {
+              returnedVisibility = MeetingVisibility.private;
+            }
+          }
+
           return Meeting(
             id: meetingData['meetingId'].toString(),
             title: meetingData['title'],
@@ -848,7 +894,7 @@ class ApiMeetingService implements MeetingService {
             location: meetingData['location'],
             status: meetingStatus,
             type: type, // API响应中没有会议类型，使用请求参数中的类型
-            visibility: visibility, // API响应中没有可见性，使用请求参数中的可见性
+            visibility: returnedVisibility,
             organizerId: meetingData['organizerId'].toString(),
             organizerName: organizerName, // API响应中可能没有组织者名称
             description: meetingData['description'],
@@ -856,6 +902,7 @@ class ApiMeetingService implements MeetingService {
                 meetingData['createdAt'] != null
                     ? DateTime.parse(meetingData['createdAt'])
                     : DateTime.now(),
+            password: meetingData['joinPassword'],
           );
         } else {
           final message = responseData['message'] ?? '创建会议失败';
@@ -868,6 +915,20 @@ class ApiMeetingService implements MeetingService {
       }
     } catch (e) {
       throw Exception('创建会议时出错: $e');
+    }
+  }
+
+  // 获取会议类型的字符串表示
+  String _getMeetingTypeString(MeetingType type) {
+    switch (type) {
+      case MeetingType.regular:
+        return '常规会议';
+      case MeetingType.training:
+        return '培训会议';
+      case MeetingType.interview:
+        return '面试会议';
+      case MeetingType.other:
+        return '其他';
     }
   }
 
