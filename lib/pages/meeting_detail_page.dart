@@ -5,7 +5,7 @@ import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../providers/chat_providers.dart';
 import '../widgets/meeting_password_dialog.dart';
-import 'meeting_process_page.dart';
+import 'meeting_process/meeting_process_page.dart';
 import 'meeting_settings_page.dart';
 
 class MeetingDetailPage extends ConsumerStatefulWidget {
