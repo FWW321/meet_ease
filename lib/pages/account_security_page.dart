@@ -78,7 +78,7 @@ class AccountSecurityPage extends HookConsumerWidget {
                   size: 16,
                   color: Colors.red,
                 ),
-                onTap: () => _showDeactivateAccountDialog(context),
+                onTap: () => _showDeactivateAccountDialog(context, ref),
               ),
             ],
           ),
@@ -308,52 +308,156 @@ class AccountSecurityPage extends HookConsumerWidget {
   }
 
   // 注销账号对话框
-  void _showDeactivateAccountDialog(BuildContext context) {
+  void _showDeactivateAccountDialog(BuildContext context, WidgetRef ref) {
     final passwordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
 
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title: const Text('注销账号', style: TextStyle(color: Colors.red)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '警告：账号注销后将无法恢复，所有数据将被永久删除。',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                const Text('请输入密码确认注销操作：'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(
-                    labelText: '密码',
-                    border: OutlineInputBorder(),
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text(
+                    '注销账号',
+                    style: TextStyle(color: Colors.red),
                   ),
-                  obscureText: true,
+                  content: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '警告：账号注销后将无法恢复，所有数据将被永久删除。',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text('请输入密码确认注销操作：'),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: passwordController,
+                          decoration: const InputDecoration(
+                            labelText: '密码',
+                            border: OutlineInputBorder(),
+                          ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return '请输入密码';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed:
+                          isLoading ? null : () => Navigator.of(context).pop(),
+                      child: const Text('取消'),
+                    ),
+                    TextButton(
+                      onPressed:
+                          isLoading
+                              ? null
+                              : () async {
+                                if (formKey.currentState!.validate()) {
+                                  setState(() {
+                                    isLoading = true;
+                                  });
+
+                                  try {
+                                    // 获取当前用户
+                                    final userService = ref.read(
+                                      service_providers.userServiceProvider,
+                                    );
+                                    final currentUser =
+                                        await userService.getCurrentUser();
+
+                                    if (currentUser == null) {
+                                      throw Exception('未获取到用户信息，请重新登录');
+                                    }
+
+                                    // 调用注销账号API
+                                    final success = await userService
+                                        .deleteAccount(
+                                          currentUser.id,
+                                          passwordController.text,
+                                        );
+
+                                    if (success) {
+                                      // 关闭对话框
+                                      Navigator.of(context).pop();
+
+                                      // 显示成功提示
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('账号已成功注销'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+
+                                      // 清除登录状态并退出
+                                      await AuthService.clearLoginStatus();
+
+                                      // 使用Riverpod清除用户状态
+                                      await ref
+                                          .read(authStateProvider.notifier)
+                                          .logout();
+
+                                      // 确保上下文有效，立即跳转到登录页面
+                                      if (context.mounted) {
+                                        // 返回到登录页面，清除所有路由历史
+                                        Navigator.pushNamedAndRemoveUntil(
+                                          context,
+                                          AppConstants.loginRoute,
+                                          (route) => false,
+                                        );
+                                      }
+                                    }
+                                  } catch (e) {
+                                    // 显示错误信息
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '注销账号失败：${e.toString()}',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    // 更新加载状态
+                                    if (context.mounted) {
+                                      setState(() {
+                                        isLoading = false;
+                                      });
+                                    }
+                                  }
+                                }
+                              },
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      child:
+                          isLoading
+                              ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.red,
+                                ),
+                              )
+                              : const Text('确认注销'),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
-              ),
-              TextButton(
-                onPressed: () {
-                  // TODO: 实现注销账号功能
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('账号注销功能开发中')));
-                },
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('确认注销'),
-              ),
-            ],
           ),
     );
   }

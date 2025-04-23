@@ -89,26 +89,52 @@ class ApiUserService implements UserService {
 
   @override
   Future<User> updateUserInfo(User user) async {
-    final response = await _client.put(
-      Uri.parse('${AppConstants.apiBaseUrl}/user/${user.id}'),
-      headers: HttpUtils.createHeaders(),
-      body: jsonEncode({
-        'username': user.name,
-        'email': user.email,
-        'phone': user.phoneNumber,
-      }),
-    );
+    // 构建查询参数
+    final queryParameters = <String, String>{
+      'userId': user.id, // 必选参数
+    };
+
+    // 添加可选参数
+    if (user.name.isNotEmpty) {
+      queryParameters['username'] = user.name;
+    }
+    if (user.email.isNotEmpty) {
+      queryParameters['email'] = user.email;
+    }
+    if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) {
+      queryParameters['phone'] = user.phoneNumber!;
+    }
+
+    // 构建请求URL
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/user/updateInfo',
+    ).replace(queryParameters: queryParameters);
+
+    // 发送请求
+    final response = await _client.put(uri, headers: HttpUtils.createHeaders());
 
     if (response.statusCode == 200) {
-      final userData = HttpUtils.decodeResponse(response);
-      final updatedUser = User(
-        id: userData['id'],
-        name: userData['username'],
-        email: userData['email'],
-        phoneNumber: userData['phone'],
-      );
-      await saveUserToLocal(updatedUser);
-      return updatedUser;
+      final responseData = HttpUtils.decodeResponse(response);
+
+      // 检查响应码
+      if (responseData['code'] == 200 && responseData['data'] != null) {
+        final userData = responseData['data'];
+        final updatedUser = User(
+          id: userData['userId'] ?? user.id,
+          name: userData['username'] ?? user.name,
+          email: userData['email'] ?? user.email,
+          phoneNumber: userData['phone'] ?? user.phoneNumber,
+          department: user.department,
+          position: user.position,
+          avatarUrl: user.avatarUrl,
+        );
+
+        // 更新本地存储
+        await saveUserToLocal(updatedUser);
+        return updatedUser;
+      } else {
+        throw Exception(responseData['message'] ?? '更新用户信息失败');
+      }
     } else {
       throw Exception('更新用户信息失败: ${response.statusCode}');
     }
@@ -324,6 +350,49 @@ class ApiUserService implements UserService {
         );
       }
     } catch (e) {
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<bool> deleteAccount(String userId, String password) async {
+    try {
+      // 构建查询参数
+      final queryParameters = <String, String>{
+        'userId': userId,
+        'password': password,
+      };
+
+      // 构建请求URL
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/user/deleteAccount',
+      ).replace(queryParameters: queryParameters);
+
+      final response = await _client.delete(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200) {
+          // 清除本地用户信息
+          await clearUserFromLocal();
+          return true;
+        } else {
+          throw Exception(responseData['message'] ?? '注销账号失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '注销账号失败'),
+        );
+      }
+    } catch (e) {
+      developer.log('注销账号异常: ${e.toString()}', error: e);
       if (e.toString().contains('SocketException') ||
           e.toString().contains('Connection refused')) {
         throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');

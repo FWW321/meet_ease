@@ -54,6 +54,9 @@ abstract class UserService {
     String oldPassword,
     String newPassword,
   );
+
+  /// 注销账号
+  Future<bool> deleteAccount(String userId, String password);
 }
 
 /// 模拟用户服务实现
@@ -306,6 +309,12 @@ class MockUserService implements UserService {
     String oldPassword,
     String newPassword,
   ) async {
+    // Implementation needed
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> deleteAccount(String userId, String password) async {
     // Implementation needed
     throw UnimplementedError();
   }

@@ -57,12 +57,6 @@ class _ProfileForm extends HookConsumerWidget {
     final phoneController = useTextEditingController(
       text: user.phoneNumber ?? '',
     );
-    final departmentController = useTextEditingController(
-      text: user.department ?? '',
-    );
-    final positionController = useTextEditingController(
-      text: user.position ?? '',
-    );
 
     // 表单验证状态
     final formKey = GlobalKey<FormState>();
@@ -196,38 +190,6 @@ class _ProfileForm extends HookConsumerWidget {
             ),
             const SizedBox(height: 32),
 
-            // 工作信息
-            Text(
-              '工作信息',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-
-            // 部门
-            TextFormField(
-              controller: departmentController,
-              decoration: const InputDecoration(
-                labelText: '部门',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 职位
-            TextFormField(
-              controller: positionController,
-              decoration: const InputDecoration(
-                labelText: '职位',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.work),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
             // 保存按钮
             SizedBox(
               width: double.infinity,
@@ -248,14 +210,6 @@ class _ProfileForm extends HookConsumerWidget {
                                   phoneController.text.isEmpty
                                       ? null
                                       : phoneController.text,
-                              department:
-                                  departmentController.text.isEmpty
-                                      ? null
-                                      : departmentController.text,
-                              position:
-                                  positionController.text.isEmpty
-                                      ? null
-                                      : positionController.text,
                             );
 
                             try {
