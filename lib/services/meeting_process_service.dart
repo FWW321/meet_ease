@@ -9,6 +9,7 @@ import '../constants/app_constants.dart';
 import '../services/meeting_service.dart';
 import 'package:http/http.dart' as http;
 import '../utils/http_utils.dart';
+import 'package:intl/intl.dart';
 
 /// 会议过程管理服务接口
 abstract class MeetingProcessService {
@@ -464,50 +465,12 @@ class MockMeetingProcessService implements MeetingProcessService {
 
   @override
   Future<MeetingVote> startVote(String voteId) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // 查找投票
-    final voteIndex = _votes.indexWhere((v) => v.id == voteId);
-    if (voteIndex == -1) {
-      throw Exception('投票不存在');
-    }
-
-    // 检查投票状态
-    if (_votes[voteIndex].status != VoteStatus.pending) {
-      throw Exception('只有待开始的投票才能启动');
-    }
-
-    // 更新投票状态
-    _votes[voteIndex] = _votes[voteIndex].copyWith(
-      status: VoteStatus.active,
-      startTime: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    return _votes[voteIndex];
+    throw UnimplementedError('API服务尚未实现');
   }
 
   @override
   Future<MeetingVote> closeVote(String voteId) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    // 查找投票
-    final voteIndex = _votes.indexWhere((v) => v.id == voteId);
-    if (voteIndex == -1) {
-      throw Exception('投票不存在');
-    }
-
-    // 检查投票状态
-    if (_votes[voteIndex].status != VoteStatus.active) {
-      throw Exception('只有进行中的投票才能结束');
-    }
-
-    // 更新投票状态
-    _votes[voteIndex] = _votes[voteIndex].copyWith(
-      status: VoteStatus.closed,
-      endTime: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    return _votes[voteIndex];
+    throw UnimplementedError('API服务尚未实现');
   }
 
   @override
@@ -516,73 +479,7 @@ class MockMeetingProcessService implements MeetingProcessService {
     String userId,
     List<String> optionIds,
   ) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    // 查找投票
-    final voteIndex = _votes.indexWhere((v) => v.id == voteId);
-    if (voteIndex == -1) {
-      throw Exception('投票不存在');
-    }
-
-    final vote = _votes[voteIndex];
-
-    // 检查投票状态
-    if (vote.status != VoteStatus.active) {
-      throw Exception('只有进行中的投票才能投票');
-    }
-
-    // 检查选项是否存在
-    for (final optionId in optionIds) {
-      if (!vote.options.any((option) => option.id == optionId)) {
-        throw Exception('选项不存在: $optionId');
-      }
-    }
-
-    // 单选时检查选项数量
-    if (vote.type == VoteType.singleChoice && optionIds.length > 1) {
-      throw Exception('单选投票只能选择一个选项');
-    }
-
-    // 检查用户是否已投票 (非匿名投票)
-    if (!vote.isAnonymous) {
-      for (final option in vote.options) {
-        if (option.voterIds?.contains(userId) ?? false) {
-          throw Exception('您已经投过票了');
-        }
-      }
-    }
-
-    // 更新投票选项
-    final updatedOptions = <VoteOption>[];
-    for (final option in vote.options) {
-      if (optionIds.contains(option.id)) {
-        // 更新选中的选项
-        List<String> updatedVoterIds;
-        if (option.voterIds != null) {
-          updatedVoterIds = List<String>.from(option.voterIds!);
-          updatedVoterIds.add(userId);
-        } else {
-          updatedVoterIds = <String>[userId];
-        }
-
-        updatedOptions.add(
-          option.copyWith(
-            votesCount: option.votesCount + 1,
-            voterIds: updatedVoterIds,
-          ),
-        );
-      } else {
-        updatedOptions.add(option);
-      }
-    }
-
-    // 更新投票
-    _votes[voteIndex] = vote.copyWith(
-      options: updatedOptions,
-      totalVotes: vote.totalVotes + 1,
-      updatedAt: DateTime.now(),
-    );
-    return _votes[voteIndex];
+    throw UnimplementedError('API服务尚未实现');
   }
 
   @override
@@ -836,22 +733,286 @@ class ApiMeetingProcessService implements MeetingProcessService {
 
   @override
   Future<List<MeetingVote>> getMeetingVotes(String meetingId) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 尝试获取会议ID为数字
+      final meetingIdParam = int.tryParse(meetingId) ?? meetingId;
+
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 发起获取投票列表请求
+      final response = await client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/vote/meeting/$meetingIdParam'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加日志
+        print('获取投票列表响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final data = responseData['data'] as List<dynamic>;
+
+          // 将API响应数据转换为MeetingVote对象列表
+          return data.map<MeetingVote>((voteData) {
+            // 解析时间
+            DateTime? startTime;
+            DateTime? endTime;
+            DateTime? createdAt;
+
+            if (voteData['startTime'] != null &&
+                voteData['startTime'].toString().isNotEmpty) {
+              startTime = DateTime.parse(
+                voteData['startTime'].toString().replaceAll(' ', 'T'),
+              );
+            }
+
+            if (voteData['endTime'] != null &&
+                voteData['endTime'].toString().isNotEmpty) {
+              endTime = DateTime.parse(
+                voteData['endTime'].toString().replaceAll(' ', 'T'),
+              );
+            }
+
+            if (voteData['createdAt'] != null &&
+                voteData['createdAt'].toString().isNotEmpty) {
+              createdAt = DateTime.parse(voteData['createdAt'].toString());
+            } else {
+              createdAt = DateTime.now();
+            }
+
+            // 解析状态
+            VoteStatus status = VoteStatus.pending;
+            if (voteData['status'] == '进行中') {
+              status = VoteStatus.active;
+            } else if (voteData['status'] == '已结束') {
+              status = VoteStatus.closed;
+            }
+
+            // 由于API返回的数据没有选项信息，创建一个空的选项列表
+            // 真实情况会在获取投票详情时填充选项
+            final voteOptions = <VoteOption>[];
+
+            // 创建并返回投票对象
+            return MeetingVote(
+              id: voteData['voteId'].toString(),
+              meetingId: voteData['meetingId'].toString(),
+              title: voteData['title'],
+              description: voteData['description'],
+              type:
+                  voteData['isMultiple'] == true
+                      ? VoteType.multipleChoice
+                      : VoteType.singleChoice,
+              status: status,
+              isAnonymous: voteData['isAnonymous'] == true,
+              startTime: startTime,
+              endTime: endTime,
+              options: voteOptions,
+              totalVotes: 0, // 这个信息可能需要在获取详情时更新
+              creatorId: 'default',
+              creatorName: '未知用户',
+              createdAt: createdAt,
+            );
+          }).toList();
+        } else {
+          throw Exception('获取投票列表失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('获取投票列表失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('获取投票列表出错: $e');
+      throw Exception('获取投票列表时出错: $e');
+    }
   }
 
   @override
   Future<MeetingVote> createVote(MeetingVote vote) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 准备请求参数
+      final Map<String, dynamic> requestBody = {
+        'meetingId':
+            int.tryParse(vote.meetingId) ?? vote.meetingId, // 尝试将字符串转换为数字
+        'title': vote.title,
+        'description': vote.description ?? '',
+        'isMultiple': vote.type == VoteType.multipleChoice,
+        'isAnonymous': vote.isAnonymous,
+        'options': vote.options.map((option) => option.text).toList(),
+      };
+
+      // 如果有截止时间，添加到请求中
+      if (vote.endTime != null) {
+        final formatter = DateFormat('yyyy-MM-dd HH:mm:ss');
+        requestBody['endTime'] = formatter.format(vote.endTime!);
+      }
+
+      // 打印请求参数作为调试信息
+      print('创建投票请求参数: ${jsonEncode(requestBody)}');
+
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 发起创建投票请求
+      final response = await client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/vote/create'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode(requestBody),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加日志
+        print('创建投票响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final data = responseData['data'];
+
+          // 从响应中解析投票ID和状态等信息
+          final voteId = data['voteId'].toString();
+          final meetingId = data['meetingId'].toString();
+          final startTimeStr = data['startTime'] as String?;
+          final endTimeStr = data['endTime'] as String?;
+          final statusStr = data['status'] as String?;
+
+          // 解析时间
+          DateTime? startTime;
+          DateTime? endTime;
+          if (startTimeStr != null && startTimeStr.isNotEmpty) {
+            startTime = DateTime.parse(startTimeStr.replaceAll(' ', 'T'));
+          }
+          if (endTimeStr != null && endTimeStr.isNotEmpty) {
+            endTime = DateTime.parse(endTimeStr.replaceAll(' ', 'T'));
+          }
+
+          // 解析状态
+          VoteStatus status = VoteStatus.pending;
+          if (statusStr == '进行中') {
+            status = VoteStatus.active;
+          } else if (statusStr == '已结束') {
+            status = VoteStatus.closed;
+          }
+
+          // 创建并返回投票对象
+          return MeetingVote(
+            id: voteId,
+            meetingId: meetingId,
+            title: vote.title,
+            description: vote.description,
+            type: vote.type,
+            status: status,
+            isAnonymous: vote.isAnonymous,
+            options: vote.options,
+            startTime: startTime,
+            endTime: endTime,
+            totalVotes: 0,
+            creatorId: vote.creatorId,
+            creatorName: vote.creatorName,
+            createdAt: DateTime.now(),
+          );
+        } else {
+          throw Exception('创建投票失败: ${responseData['message']}');
+        }
+      } else {
+        throw Exception('创建投票失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('创建投票时出错: $e');
+    }
   }
 
   @override
   Future<MeetingVote> startVote(String voteId) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 发起开始投票请求
+      final response = await client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/vote/start/$voteId'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 添加日志
+      print('开始投票响应: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 尝试获取当前投票信息
+          final votes = await getMeetingVotes('');
+          final currentVote = votes.firstWhere(
+            (v) => v.id == voteId,
+            orElse: () => throw Exception('投票不存在'),
+          );
+
+          // 返回开始状态的投票
+          return currentVote.copyWith(
+            status: VoteStatus.active,
+            startTime: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+        } else {
+          throw Exception('开始投票失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('开始投票失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('开始投票出错: $e');
+      throw Exception('开始投票时出错: $e');
+    }
   }
 
   @override
   Future<MeetingVote> closeVote(String voteId) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 发起结束投票请求
+      final response = await client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/vote/end/$voteId'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 添加日志
+      print('结束投票响应: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 尝试获取当前投票信息
+          final votes = await getMeetingVotes('');
+          final currentVote = votes.firstWhere(
+            (v) => v.id == voteId,
+            orElse: () => throw Exception('投票不存在'),
+          );
+
+          // 返回结束状态的投票
+          return currentVote.copyWith(
+            status: VoteStatus.closed,
+            endTime: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+        } else {
+          throw Exception('结束投票失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('结束投票失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('结束投票出错: $e');
+      throw Exception('结束投票时出错: $e');
+    }
   }
 
   @override
@@ -860,11 +1021,138 @@ class ApiMeetingProcessService implements MeetingProcessService {
     String userId,
     List<String> optionIds,
   ) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      if (optionIds.isEmpty) {
+        throw Exception('未选择任何选项');
+      }
+
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 准备请求URL，添加userId作为查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/vote/submit/$voteId',
+      ).replace(queryParameters: {'userId': userId});
+
+      // 发起提交投票请求，将选项ID列表作为JSON数组发送
+      final response = await client.post(
+        uri,
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode(optionIds),
+      );
+
+      // 添加日志
+      print('提交投票响应: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 投票成功，获取更新后的投票信息
+          // 因为API不返回更新后的对象，所以我们需要再次获取投票详情
+          // 这里暂时返回一个模拟的对象，然后刷新界面时会获取最新数据
+
+          // 首先尝试获取当前投票信息
+          final votes = await getMeetingVotes('');
+          final currentVote = votes.firstWhere(
+            (v) => v.id == voteId,
+            orElse: () => throw Exception('投票不存在'),
+          );
+
+          // 由于我们不知道实际结果如何，创建一个投票成功的临时对象
+          return currentVote.copyWith(
+            totalVotes: currentVote.totalVotes + 1,
+            updatedAt: DateTime.now(),
+          );
+        } else {
+          throw Exception('提交投票失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('提交投票失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('提交投票出错: $e');
+      throw Exception('提交投票时出错: $e');
+    }
   }
 
   @override
   Future<List<VoteOption>> getVoteResults(String voteId) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      print('正在获取投票选项，投票ID: $voteId');
+
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 构建请求URL
+      final url = '${AppConstants.apiBaseUrl}/vote/detail/$voteId';
+      print('请求URL: $url');
+
+      // 发起获取投票选项请求
+      final response = await client.get(
+        Uri.parse(url),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 打印完整的响应内容
+      print('获取投票选项响应状态码: ${response.statusCode}');
+      print('获取投票选项响应头: ${response.headers}');
+      print('获取投票选项响应体: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加详细日志
+        print('解码后的响应数据: $responseData');
+        print('响应码: ${responseData['code']}');
+        print('响应消息: ${responseData['message']}');
+        print('响应数据类型: ${responseData['data']?.runtimeType}');
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final data = responseData['data'] as List<dynamic>;
+          print('投票选项数量: ${data.length}');
+
+          // 打印每个选项的内容
+          for (var i = 0; i < data.length; i++) {
+            print('选项 $i: ${data[i]}');
+          }
+
+          // 将API响应数据转换为VoteOption对象列表
+          final options =
+              data.map<VoteOption>((optionData) {
+                final id = optionData['optionId'].toString();
+                final text = optionData['content'].toString();
+                final votesCount = optionData['voteCount'] as int? ?? 0;
+
+                print('转换选项: id=$id, text=$text, votesCount=$votesCount');
+
+                return VoteOption(
+                  id: id,
+                  text: text,
+                  votesCount: votesCount,
+                  // 由于API不返回投票人信息，我们使用空列表
+                  voterIds: [],
+                );
+              }).toList();
+
+          print('转换完成，返回 ${options.length} 个选项');
+          return options;
+        } else {
+          final errorMsg = '获取投票选项失败: ${responseData['message'] ?? "未知错误"}';
+          print(errorMsg);
+          throw Exception(errorMsg);
+        }
+      } else {
+        final errorMsg = '获取投票选项失败: HTTP ${response.statusCode}';
+        print(errorMsg);
+        throw Exception(errorMsg);
+      }
+    } catch (e, stackTrace) {
+      print('获取投票选项出错: $e');
+      print('堆栈跟踪: $stackTrace');
+      throw Exception('获取投票选项时出错: $e');
+    }
   }
 }

@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/meeting_vote.dart';
 import '../providers/meeting_process_providers.dart';
+import '../providers/user_providers.dart';
 
 /// 会议投票列表组件
 class VotesListWidget extends ConsumerWidget {
@@ -238,27 +239,10 @@ class VotesListWidget extends ConsumerWidget {
                 ),
               ),
 
-              // 创建和开始时间
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  children: [
-                    Text(
-                      '创建者: ${vote.creatorName}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '创建于: ${dateFormat.format(vote.createdAt)}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-
+              // 保留开始和结束时间
               if (vote.startTime != null)
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.only(top: 8),
                   child: Text(
                     '开始于: ${dateFormat.format(vote.startTime!)}',
                     style: Theme.of(context).textTheme.bodySmall,
@@ -354,6 +338,41 @@ class VotesListWidget extends ConsumerWidget {
       TextEditingController(),
     ];
 
+    // 添加截止时间选择
+    DateTime? endTime;
+    final endTimeController = TextEditingController();
+
+    // 选择日期时间的辅助函数
+    Future<void> _selectDateTime(BuildContext context) async {
+      final DateTime? pickedDate = await showDatePicker(
+        context: context,
+        initialDate: DateTime.now().add(const Duration(days: 1)),
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+      );
+
+      if (pickedDate != null) {
+        // ignore: use_build_context_synchronously
+        final TimeOfDay? pickedTime = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
+        );
+
+        if (pickedTime != null) {
+          endTime = DateTime(
+            pickedDate.year,
+            pickedDate.month,
+            pickedDate.day,
+            pickedTime.hour,
+            pickedTime.minute,
+          );
+
+          final formatter = DateFormat('yyyy-MM-dd HH:mm');
+          endTimeController.text = formatter.format(endTime!);
+        }
+      }
+    }
+
     showDialog(
       context: context,
       builder:
@@ -423,6 +442,23 @@ class VotesListWidget extends ConsumerWidget {
                             });
                           },
                         ),
+
+                        // 添加截止时间选择
+                        const SizedBox(height: 16),
+                        InkWell(
+                          onTap: () => _selectDateTime(context),
+                          child: IgnorePointer(
+                            child: TextField(
+                              controller: endTimeController,
+                              decoration: const InputDecoration(
+                                labelText: '截止时间 (可选)',
+                                hintText: '选择投票截止时间',
+                                suffixIcon: Icon(Icons.calendar_today),
+                              ),
+                            ),
+                          ),
+                        ),
+
                         const SizedBox(height: 16),
                         // 选项
                         const Text('投票选项：'),
@@ -522,10 +558,11 @@ class VotesListWidget extends ConsumerWidget {
                           type: voteType,
                           status: VoteStatus.pending,
                           isAnonymous: isAnonymous,
+                          endTime: endTime,
                           options: voteOptions,
                           totalVotes: 0,
-                          creatorId: 'current_user_id', // 应从用户状态获取
-                          creatorName: '当前用户', // 应从用户状态获取
+                          creatorId: 'default', // 使用默认值
+                          creatorName: '未知用户', // 使用默认值
                           createdAt: DateTime.now(),
                         );
 
@@ -577,6 +614,31 @@ class VotesListWidget extends ConsumerWidget {
                     '投票类型: ${vote.type == VoteType.singleChoice ? "单选" : "多选"}${vote.isAnonymous ? " (匿名)" : ""}',
                     style: const TextStyle(fontStyle: FontStyle.italic),
                   ),
+
+                  // 显示投票的时间信息
+                  if (vote.startTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '开始于: ${DateFormat('yyyy-MM-dd HH:mm').format(vote.startTime!)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+
+                  if (vote.endTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '结束于: ${DateFormat('yyyy-MM-dd HH:mm').format(vote.endTime!)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
 
                   const Divider(height: 32),
 
@@ -722,6 +784,57 @@ class VotesListWidget extends ConsumerWidget {
 
   // 显示投票对话框
   void _showVoteDialog(BuildContext context, MeetingVote vote, WidgetRef ref) {
+    // 直接获取投票选项数据，而不是在对话框中使用AsyncValue
+    final service = ref.read(meetingProcessServiceProvider);
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (ctx) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('正在获取投票选项...'),
+              ],
+            ),
+          ),
+    );
+
+    // 先获取选项
+    service
+        .getVoteResults(vote.id)
+        .then((options) {
+          // 关闭加载对话框
+          Navigator.of(context).pop();
+
+          // 显示投票对话框
+          _showActualVoteDialog(context, vote, ref, options);
+        })
+        .catchError((error) {
+          // 关闭加载对话框
+          Navigator.of(context).pop();
+
+          // 显示错误
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('获取投票选项失败: ${error.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        });
+  }
+
+  // 显示实际的投票对话框，已经有选项数据
+  void _showActualVoteDialog(
+    BuildContext context,
+    MeetingVote vote,
+    WidgetRef ref,
+    List<VoteOption> options,
+  ) {
     // 单选或多选的选中状态
     final selectedOptions = <String>[];
 
@@ -751,45 +864,51 @@ class VotesListWidget extends ConsumerWidget {
 
                         const SizedBox(height: 16),
 
-                        // 选项列表
-                        ...vote.options.map((option) {
-                          final isSelected = selectedOptions.contains(
-                            option.id,
-                          );
+                        // 显示投票选项
+                        if (options.isEmpty)
+                          const Text('暂无投票选项')
+                        else
+                          Column(
+                            children:
+                                options.map((option) {
+                                  final isSelected = selectedOptions.contains(
+                                    option.id,
+                                  );
 
-                          if (vote.type == VoteType.singleChoice) {
-                            return RadioListTile<String>(
-                              title: Text(option.text),
-                              value: option.id,
-                              groupValue:
-                                  selectedOptions.isEmpty
-                                      ? null
-                                      : selectedOptions.first,
-                              onChanged: (value) {
-                                setState(() {
-                                  selectedOptions.clear();
-                                  if (value != null) {
-                                    selectedOptions.add(value);
-                                  }
-                                });
-                              },
-                            );
-                          } else {
-                            return CheckboxListTile(
-                              title: Text(option.text),
-                              value: isSelected,
-                              onChanged: (value) {
-                                setState(() {
-                                  if (value == true) {
-                                    selectedOptions.add(option.id);
+                                  if (vote.type == VoteType.singleChoice) {
+                                    return RadioListTile<String>(
+                                      title: Text(option.text),
+                                      value: option.id,
+                                      groupValue:
+                                          selectedOptions.isEmpty
+                                              ? null
+                                              : selectedOptions.first,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedOptions.clear();
+                                          if (value != null) {
+                                            selectedOptions.add(value);
+                                          }
+                                        });
+                                      },
+                                    );
                                   } else {
-                                    selectedOptions.remove(option.id);
+                                    return CheckboxListTile(
+                                      title: Text(option.text),
+                                      value: isSelected,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          if (value == true) {
+                                            selectedOptions.add(option.id);
+                                          } else {
+                                            selectedOptions.remove(option.id);
+                                          }
+                                        });
+                                      },
+                                    );
                                   }
-                                });
-                              },
-                            );
-                          }
-                        }),
+                                }).toList(),
+                          ),
                       ],
                     ),
                   ),
@@ -810,11 +929,68 @@ class VotesListWidget extends ConsumerWidget {
                                     meetingId: meetingId,
                                   ).notifier,
                                 );
-                                voteNotifier.submitVote(
-                                  'current_user_id',
-                                  selectedOptions,
-                                );
-                                Navigator.of(context).pop();
+
+                                // 获取当前用户ID并提交投票
+                                ref
+                                    .read(currentUserIdProvider.future)
+                                    .then((userId) {
+                                      // 显示加载指示器
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('正在提交投票...'),
+                                          duration: Duration(seconds: 1),
+                                        ),
+                                      );
+
+                                      // 提交投票
+                                      voteNotifier
+                                          .submitVote(userId, selectedOptions)
+                                          .then((_) {
+                                            // 投票成功
+                                            Navigator.of(context).pop();
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('投票成功！'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+
+                                            // 刷新投票结果
+                                            ref.invalidate(
+                                              voteResultsProvider(vote.id),
+                                            );
+                                          })
+                                          .catchError((error) {
+                                            // 投票失败
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  '投票失败: ${error.toString()}',
+                                                ),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          });
+                                    })
+                                    .catchError((error) {
+                                      // 获取用户ID失败
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '获取用户信息失败: ${error.toString()}',
+                                          ),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    });
                               },
                       child: const Text('提交'),
                     ),
