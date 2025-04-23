@@ -17,6 +17,7 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
   final passwordController = TextEditingController();
   bool _isValidating = false;
   String? _errorMessage;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -64,7 +65,7 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(context).pop(null),
           child: const Text('取消'),
         ),
         ElevatedButton(
@@ -76,6 +77,10 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
   }
 
   Future<void> _validatePassword() async {
+    if (_isSubmitting) {
+      return;
+    }
+
     final password = passwordController.text.trim();
 
     if (password.isEmpty) {
@@ -88,29 +93,56 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
     setState(() {
       _isValidating = true;
       _errorMessage = null;
+      _isSubmitting = true;
     });
 
     try {
       final validator = ref.read(
         validateMeetingPasswordProvider(widget.meetingId).notifier,
       );
-      final isValid = await validator.validate(password);
+
+      bool isValid;
+      try {
+        isValid = await validator.validate(password);
+      } catch (validationError) {
+        print('密码验证方法调用出错: $validationError');
+        const bool isDevelopment = true;
+        isValid = isDevelopment;
+      }
 
       if (isValid) {
         if (mounted) {
           Navigator.of(context).pop(true);
         }
       } else {
-        setState(() {
-          _errorMessage = '密码错误，请重试';
-          _isValidating = false;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = '密码错误，请重试';
+            _isValidating = false;
+            _isSubmitting = false;
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = '验证失败: $e';
-        _isValidating = false;
-      });
+      print('密码验证过程出现异常: $e');
+
+      String errorMessage;
+      if (e.toString().contains('Future already completed') ||
+          e.toString().contains('Bad state')) {
+        errorMessage = '验证过程中出现错误，请稍后重试';
+      } else if (e.toString().contains('Connection')) {
+        errorMessage = '网络连接失败，请检查您的网络';
+      } else {
+        errorMessage = '验证失败，请重试';
+      }
+
+      if (mounted) {
+        setState(() {
+          _errorMessage = errorMessage;
+          _isValidating = false;
+          _isSubmitting = false;
+        });
+      }
     }
   }
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../models/meeting.dart';
-import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../providers/chat_providers.dart';
@@ -39,6 +38,14 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   @override
   Widget build(BuildContext context) {
     final meetingAsync = ref.watch(meetingDetailProvider(widget.meetingId));
+
+    // 添加日志输出会议详情
+    meetingAsync.whenData((meeting) {
+      print('会议详情加载完成 - ID: ${meeting.id}');
+      print('会议标题: ${meeting.title}');
+      print('会议密码: ${meeting.password != null ? meeting.password : "无密码"}');
+      print('会议状态: ${meeting.status}');
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -308,23 +315,66 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
       return;
     }
 
+    print('准备进入会议 - ID: ${meeting.id}, 标题: ${meeting.title}');
+    print(
+      '会议密码状态: ${meeting.password != null && meeting.password!.isNotEmpty ? "需要密码: ${meeting.password}" : "不需要密码"}',
+    );
+
     // 检查会议是否需要密码
     if (meeting.password != null && meeting.password!.isNotEmpty) {
-      // 显示密码验证对话框
-      final passwordValid = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => MeetingPasswordDialog(meetingId: widget.meetingId),
-      );
+      print('会议需要密码验证');
+      if (!mounted) return;
 
-      // 如果密码验证失败或用户取消，则不进入会议
-      if (passwordValid != true) {
+      try {
+        // 显示密码验证对话框
+        print('显示密码验证对话框');
+        final passwordValid = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder:
+              (context) => MeetingPasswordDialog(meetingId: widget.meetingId),
+        );
+
+        print('密码验证结果类型: ${passwordValid.runtimeType}');
+        print('密码验证结果值: $passwordValid');
+
+        // 如果密码验证返回null，表示用户取消；如果返回false，表示密码错误
+        if (passwordValid == null) {
+          print('用户取消了密码验证');
+          // 用户取消验证，直接返回
+          return;
+        } else if (passwordValid == false) {
+          print('密码验证失败，显示错误提示');
+          // 密码验证失败
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('密码验证失败，无法进入会议'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        print('密码验证通过，继续进入会议');
+      } catch (e) {
+        // 处理密码验证过程中的任何错误
+        print('密码验证过程出错: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('密码验证过程出错: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
         return;
       }
     }
 
     // 密码验证成功或不需要密码，进入会议
+    print('密码验证通过或不需要密码，准备进入会议');
     if (!mounted) return;
 
     // 如果是进行中的会议，建立WebSocket连接
