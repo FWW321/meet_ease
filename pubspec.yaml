@@ -72,6 +72,8 @@ dependencies:
   # 文件选择器
   file_picker: ^10.1.2
 
+  timezone: ^0.10.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
