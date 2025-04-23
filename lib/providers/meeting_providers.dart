@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'dart:async'; // 添加async支持
 import '../models/meeting.dart';
 import '../models/user.dart';
 import '../services/meeting_service.dart';
@@ -118,53 +119,60 @@ class ValidateMeetingPassword extends _$ValidateMeetingPassword {
     return null;
   }
 
-  // 验证密码
+  // 验证密码 - 完全重构以避免状态冲突问题
   Future<bool> validate(String password) async {
-    // 设置状态为加载中
+    // 用一个确定性的key标记此次验证
+    final validationKey =
+        '${meetingId}_${DateTime.now().millisecondsSinceEpoch}';
+    print('开始新的密码验证: $validationKey');
+
+    // 先将状态设为null，避免状态冲突
+    ref.invalidateSelf();
+
+    // 设置为加载状态
     state = const AsyncValue.loading();
 
+    // 使用本地变量存储结果，避免状态竞争
+    bool validationResult;
+
     try {
-      // 防止重复调用导致Future already completed错误
+      // 获取会议服务实例
       final meetingService = ref.read(meetingServiceProvider);
 
-      // 捕获验证过程中的任何异常
-      bool result;
-      try {
-        result = await meetingService.validateMeetingPassword(
-          meetingId,
-          password,
-        );
-      } catch (serviceError) {
-        print('会议服务validateMeetingPassword方法出错: $serviceError');
-        // 开发环境下返回true方便测试
-        const bool isDevelopment = true;
-        if (isDevelopment) {
-          print('开发环境: 忽略密码验证错误，返回验证成功');
-          result = true;
-        } else {
-          rethrow;
-        }
+      // 调用验证方法并添加超时处理
+      validationResult = await meetingService
+          .validateMeetingPassword(meetingId, password)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => throw TimeoutException('验证密码请求超时'),
+          );
+
+      print('密码验证完成: $validationKey, 结果: $validationResult');
+
+      // 只有在验证成功后才更新状态
+      if (state is AsyncLoading) {
+        // 只有在仍然处于Loading状态时才更新
+        state = AsyncValue.data(validationResult);
+      } else {
+        print('警告: 状态已被其他操作更改，不更新结果');
       }
 
-      // 更新状态为结果
-      state = AsyncValue.data(result);
-      return result;
+      // 返回验证结果
+      return validationResult;
     } catch (e, stackTrace) {
-      print('ValidateMeetingPassword.validate 出错: $e');
+      // 捕获并记录错误
+      print('密码验证失败: $validationKey, 错误: $e');
 
-      // 将状态设置为错误
-      state = AsyncValue.error(e, stackTrace);
-
-      // 在开发阶段，我们可以选择返回 true 以方便测试和开发
-      const bool isDevelopment = true; // 根据实际情况修改此标志
-
-      if (isDevelopment) {
-        print('开发环境中，尽管出现错误，仍返回验证成功');
-        return true;
+      // 设置错误状态
+      if (state is AsyncLoading) {
+        // 只有在仍然处于Loading状态时才更新错误
+        state = AsyncValue.error(e, stackTrace);
       }
 
-      // 在生产环境中，继续抛出异常
+      // 向上抛出异常
       rethrow;
+    } finally {
+      print('完成密码验证过程: $validationKey');
     }
   }
 }

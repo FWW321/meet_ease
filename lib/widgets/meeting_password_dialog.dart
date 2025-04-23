@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'dart:async'; // 添加超时异常支持
+import 'dart:math'; // 添加min函数支持
 import '../providers/meeting_providers.dart';
 
 /// 会议密码验证对话框
@@ -17,7 +19,22 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
   final passwordController = TextEditingController();
   bool _isValidating = false;
   String? _errorMessage;
-  bool _isSubmitting = false;
+
+  // 添加验证器缓存
+  ValidateMeetingPassword? _cachedValidator;
+
+  @override
+  void initState() {
+    super.initState();
+    // 预先获取验证器
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _cachedValidator = ref.read(
+          validateMeetingPasswordProvider(widget.meetingId).notifier,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -27,6 +44,11 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // 监听验证状态变化
+    final validationState = ref.watch(
+      validateMeetingPasswordProvider(widget.meetingId),
+    );
+
     return AlertDialog(
       title: Row(
         children: [
@@ -59,7 +81,7 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
             ),
             obscureText: true,
             autofocus: true,
-            onSubmitted: (_) => _validatePassword(),
+            onSubmitted: (_) => _handleValidatePassword(),
           ),
         ],
       ),
@@ -69,20 +91,18 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
           child: const Text('取消'),
         ),
         ElevatedButton(
-          onPressed: _isValidating ? null : _validatePassword,
+          onPressed: _isValidating ? null : _handleValidatePassword,
           child: const Text('加入会议'),
         ),
       ],
     );
   }
 
-  Future<void> _validatePassword() async {
-    if (_isSubmitting) {
-      return;
-    }
-
+  // 完全重写的密码验证处理方法
+  Future<void> _handleValidatePassword() async {
     final password = passwordController.text.trim();
 
+    // 空密码检查
     if (password.isEmpty) {
       setState(() {
         _errorMessage = '请输入密码';
@@ -90,59 +110,77 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
       return;
     }
 
+    // 防止重复验证
+    if (_isValidating) {
+      return;
+    }
+
+    // 设置验证中状态
     setState(() {
       _isValidating = true;
       _errorMessage = null;
-      _isSubmitting = true;
     });
 
     try {
-      final validator = ref.read(
-        validateMeetingPasswordProvider(widget.meetingId).notifier,
-      );
+      // 获取缓存的验证器或创建新的
+      final validator =
+          _cachedValidator ??
+          ref.read(validateMeetingPasswordProvider(widget.meetingId).notifier);
 
-      bool isValid;
-      try {
-        isValid = await validator.validate(password);
-      } catch (validationError) {
-        print('密码验证方法调用出错: $validationError');
-        const bool isDevelopment = true;
-        isValid = isDevelopment;
-      }
+      // 记录调用开始
+      print('开始验证密码: ${DateTime.now()}');
 
-      if (isValid) {
-        if (mounted) {
-          Navigator.of(context).pop(true);
-        }
+      // 执行验证
+      final result = await validator!.validate(password);
+
+      // 记录调用结束
+      print('密码验证完成: ${DateTime.now()}, 结果: $result');
+
+      // 检查组件状态
+      if (!mounted) return;
+
+      // 处理结果
+      if (result) {
+        Navigator.of(context).pop(true);
       } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = '密码错误，请重试';
-            _isValidating = false;
-            _isSubmitting = false;
-          });
-        }
-      }
-    } catch (e) {
-      print('密码验证过程出现异常: $e');
-
-      String errorMessage;
-      if (e.toString().contains('Future already completed') ||
-          e.toString().contains('Bad state')) {
-        errorMessage = '验证过程中出现错误，请稍后重试';
-      } else if (e.toString().contains('Connection')) {
-        errorMessage = '网络连接失败，请检查您的网络';
-      } else {
-        errorMessage = '验证失败，请重试';
-      }
-
-      if (mounted) {
         setState(() {
-          _errorMessage = errorMessage;
+          _errorMessage = '密码错误，请重试';
           _isValidating = false;
-          _isSubmitting = false;
         });
       }
+    } catch (e) {
+      // 记录并处理错误
+      print('密码验证异常: $e');
+
+      if (!mounted) return;
+
+      // 错误分类处理
+      final errorMessage = _getErrorMessage(e);
+
+      setState(() {
+        _errorMessage = errorMessage;
+        _isValidating = false;
+      });
+    }
+  }
+
+  // 辅助方法：获取友好的错误信息
+  String _getErrorMessage(dynamic error) {
+    final errorString = error.toString();
+
+    if (errorString.contains('timeout') || errorString.contains('超时')) {
+      return '验证超时，请稍后再试';
+    } else if (errorString.contains('Connection') ||
+        errorString.contains('network')) {
+      return '网络连接失败，请检查网络';
+    } else if (errorString.contains('Future already completed')) {
+      return '系统处理冲突，请重新尝试';
+    } else if (errorString.contains('会议不存在') ||
+        errorString.contains('not found')) {
+      return '找不到此会议，请检查会议ID';
+    } else {
+      // 限制错误信息长度
+      return '验证失败: ${errorString.length > 20 ? '${errorString.substring(0, 20)}...' : errorString}';
     }
   }
 }

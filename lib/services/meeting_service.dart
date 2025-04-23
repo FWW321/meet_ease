@@ -3,6 +3,7 @@ import '../models/user.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import '../constants/app_constants.dart';
 import '../utils/http_utils.dart';
 
@@ -427,57 +428,51 @@ class MockMeetingService implements MeetingService {
     String meetingId,
     String password,
   ) async {
-    // 模拟网络延迟
-    await Future.delayed(const Duration(milliseconds: 500));
+    // 获取此会议的锁并尝试获取
+    final lock = _getLockForMeeting(meetingId);
+
+    // 如果已有验证正在进行，等待锁
+    try {
+      await lock.acquire();
+      print('获取到密码验证锁，开始验证: $meetingId');
+    } catch (e) {
+      print('获取验证锁失败: $e');
+      throw Exception('无法验证密码，请稍后重试');
+    }
 
     try {
-      final meeting = await getMeetingById(meetingId);
+      print('验证会议密码 - 会议ID: $meetingId, 密码: $password');
 
-      print('验证会议密码 - 会议ID: $meetingId');
-      print('会议密码: ${meeting.password ?? "无密码"}');
-      print('用户输入密码: $password');
+      // 尝试获取会议详情并验证密码
+      final meetingFuture = getMeetingById(meetingId).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          throw TimeoutException('获取会议详情超时');
+        },
+      );
 
-      // 如果会议没有设置密码，认为验证通过
+      final meeting = await meetingFuture;
+
+      // 如果会议无密码，直接通过
       if (meeting.password == null || meeting.password!.isEmpty) {
         print('会议未设置密码，验证通过');
         return true;
       }
 
-      // 比较密码是否正确
-      final bool isValid = meeting.password == password;
-      print('密码比较: "${meeting.password}" == "$password"');
-      print('密码验证结果: ${isValid ? "通过" : "不通过"}');
+      // 比较密码是否匹配
+      final isValid = meeting.password == password;
+      print('密码比较: "${meeting.password}" == "$password" => $isValid');
+
+      // 根据比较结果返回，不区分环境
       return isValid;
     } catch (e) {
-      print('验证会议密码时出错: $e');
-
-      // 尝试一种更直接的方式验证密码
-      try {
-        // 这里可以添加直接验证密码的API调用
-        // 目前由于没有专门的密码验证API，我们返回false
-        print('尝试备用验证方式失败，目前暂不支持');
-
-        // 如果在生产环境中有专门的密码验证API，可以在此处调用
-        // 例如:
-        // final response = await _client.post(
-        //   Uri.parse('${AppConstants.apiBaseUrl}/meeting/$meetingId/verify-password'),
-        //   headers: HttpUtils.createHeaders(),
-        //   body: jsonEncode({'password': password}),
-        // );
-        //
-        // if (response.statusCode == 200) {
-        //   final data = HttpUtils.decodeResponse(response);
-        //   return data['code'] == 200 && data['data'] == true;
-        // }
-
-        // 目前直接返回false可能导致无法验证，这里可以考虑在开发阶段返回true方便测试
-        // 在开发阶段可以临时返回true，方便测试
-        return true;
-      } catch (innerError) {
-        print('备用验证方式也失败: $innerError');
-      }
-
-      return false; // 如果无法验证，返回失败结果
+      // 捕获到异常时，输出并向上传递
+      print('密码验证过程出错: $e');
+      rethrow;
+    } finally {
+      // 无论成功失败，都释放锁
+      lock.release();
+      print('释放密码验证锁: $meetingId');
     }
   }
 
@@ -1019,57 +1014,51 @@ class ApiMeetingService implements MeetingService {
     String meetingId,
     String password,
   ) async {
-    // 模拟网络延迟
-    await Future.delayed(const Duration(milliseconds: 500));
+    // 获取此会议的锁并尝试获取
+    final lock = _getLockForMeeting(meetingId);
+
+    // 如果已有验证正在进行，等待锁
+    try {
+      await lock.acquire();
+      print('获取到密码验证锁，开始验证: $meetingId');
+    } catch (e) {
+      print('获取验证锁失败: $e');
+      throw Exception('无法验证密码，请稍后重试');
+    }
 
     try {
-      final meeting = await getMeetingById(meetingId);
+      print('验证会议密码 - 会议ID: $meetingId, 密码: $password');
 
-      print('验证会议密码 - 会议ID: $meetingId');
-      print('会议密码: ${meeting.password ?? "无密码"}');
-      print('用户输入密码: $password');
+      // 尝试获取会议详情并验证密码
+      final meetingFuture = getMeetingById(meetingId).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          throw TimeoutException('获取会议详情超时');
+        },
+      );
 
-      // 如果会议没有设置密码，认为验证通过
+      final meeting = await meetingFuture;
+
+      // 如果会议无密码，直接通过
       if (meeting.password == null || meeting.password!.isEmpty) {
         print('会议未设置密码，验证通过');
         return true;
       }
 
-      // 比较密码是否正确
-      final bool isValid = meeting.password == password;
-      print('密码比较: "${meeting.password}" == "$password"');
-      print('密码验证结果: ${isValid ? "通过" : "不通过"}');
+      // 比较密码是否匹配
+      final isValid = meeting.password == password;
+      print('密码比较: "${meeting.password}" == "$password" => $isValid');
+
+      // 根据比较结果返回，不区分环境
       return isValid;
     } catch (e) {
-      print('验证会议密码时出错: $e');
-
-      // 尝试一种更直接的方式验证密码
-      try {
-        // 这里可以添加直接验证密码的API调用
-        // 目前由于没有专门的密码验证API，我们返回false
-        print('尝试备用验证方式失败，目前暂不支持');
-
-        // 如果在生产环境中有专门的密码验证API，可以在此处调用
-        // 例如:
-        // final response = await _client.post(
-        //   Uri.parse('${AppConstants.apiBaseUrl}/meeting/$meetingId/verify-password'),
-        //   headers: HttpUtils.createHeaders(),
-        //   body: jsonEncode({'password': password}),
-        // );
-        //
-        // if (response.statusCode == 200) {
-        //   final data = HttpUtils.decodeResponse(response);
-        //   return data['code'] == 200 && data['data'] == true;
-        // }
-
-        // 目前直接返回false可能导致无法验证，这里可以考虑在开发阶段返回true方便测试
-        // 在开发阶段可以临时返回true，方便测试
-        return true;
-      } catch (innerError) {
-        print('备用验证方式也失败: $innerError');
-      }
-
-      return false; // 如果无法验证，返回失败结果
+      // 捕获到异常时，输出并向上传递
+      print('密码验证过程出错: $e');
+      rethrow;
+    } finally {
+      // 无论成功失败，都释放锁
+      lock.release();
+      print('释放密码验证锁: $meetingId');
     }
   }
 
@@ -1159,4 +1148,44 @@ class ApiMeetingService implements MeetingService {
       throw Exception('上传会议文件时出错: $e');
     }
   }
+}
+
+// 添加全局作用域的锁机制，防止并发验证
+class _Lock {
+  bool _locked = false;
+  final _completer = Completer<void>();
+
+  bool get isLocked => _locked;
+
+  Future<void> acquire() async {
+    if (_locked) {
+      // 等待锁释放
+      await _completer.future;
+      // 递归调用获取锁
+      return acquire();
+    }
+    // 获取锁
+    _locked = true;
+  }
+
+  void release() {
+    if (!_locked) return;
+    _locked = false;
+    // 如果有等待的Completer，完成它
+    if (!_completer.isCompleted) {
+      final oldCompleter = _completer;
+      oldCompleter.complete();
+    }
+  }
+}
+
+// 创建针对每个会议ID的锁实例
+final Map<String, _Lock> _meetingLocks = {};
+
+// 获取指定会议的锁
+_Lock _getLockForMeeting(String meetingId) {
+  if (!_meetingLocks.containsKey(meetingId)) {
+    _meetingLocks[meetingId] = _Lock();
+  }
+  return _meetingLocks[meetingId]!;
 }
