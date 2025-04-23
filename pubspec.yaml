@@ -68,6 +68,8 @@ dependencies:
   dio: ^5.8.0+1
   pretty_dio_logger: ^1.4.0
   url_launcher: ^6.3.1
+
+  local_auth: ^2.3.0
   
   # 文件选择器
   file_picker: ^10.1.2

@@ -85,18 +85,6 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                           }
                         },
                       ),
-
-                      SwitchListTile(
-                        title: const Text('生物识别登录'),
-                        subtitle: const Text('使用指纹或面部识别快速登录'),
-                        value: false, // 应当从用户偏好设置中获取实际值
-                        onChanged: (value) {
-                          // TODO: 实现生物识别登录功能
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('生物识别登录功能开发中')),
-                          );
-                        },
-                      ),
                     ],
                   ),
 
