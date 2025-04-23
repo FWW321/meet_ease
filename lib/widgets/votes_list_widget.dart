@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/meeting_vote.dart';
 import '../providers/meeting_process_providers.dart';
 import '../providers/user_providers.dart';
+import '../utils/time_utils.dart';
 
 /// 会议投票列表组件
 class VotesListWidget extends ConsumerWidget {
@@ -58,13 +59,13 @@ class VotesListWidget extends ConsumerWidget {
         }
 
         // 将投票按状态分组
-        final now = DateTime.now();
+        final now = TimeUtils.nowInShanghaiTimeZone();
         final groupedVotes =
             votes.map((vote) {
               // 根据截止时间自动确定状态
               if (vote.status == VoteStatus.active &&
                   vote.endTime != null &&
-                  now.isAfter(vote.endTime!)) {
+                  now.isAfter(TimeUtils.utcToShanghaiTimeZone(vote.endTime!))) {
                 // 如果当前时间超过了截止时间，则自动视为已结束
                 return vote.copyWith(status: VoteStatus.closed);
               }
@@ -161,12 +162,15 @@ class VotesListWidget extends ConsumerWidget {
 
   // 构建投票卡片
   Widget _buildVoteCard(BuildContext context, MeetingVote vote, WidgetRef ref) {
-    final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
     final statusColor = _getVoteStatusColor(vote.status);
     final statusText = _getVoteStatusText(vote.status);
 
     // 判断是否可以投票（进行中状态且未过截止时间）
-    final bool canVote = vote.status == VoteStatus.active;
+    final now = TimeUtils.nowInShanghaiTimeZone();
+    final bool canVote =
+        vote.status == VoteStatus.active &&
+        (vote.endTime == null ||
+            now.isBefore(TimeUtils.utcToShanghaiTimeZone(vote.endTime!)));
 
     return InkWell(
       onTap: canVote ? () => _showVoteDialog(context, vote, ref) : null,
@@ -260,7 +264,7 @@ class VotesListWidget extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '开始于: ${dateFormat.format(vote.startTime!)}',
+                    '开始于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(vote.startTime!), format: 'yyyy-MM-dd HH:mm')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -269,7 +273,7 @@ class VotesListWidget extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    '截止于: ${dateFormat.format(vote.endTime!)}',
+                    '截止于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(vote.endTime!), format: 'yyyy-MM-dd HH:mm')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -348,9 +352,13 @@ class VotesListWidget extends ConsumerWidget {
     Future<void> _selectDateTime(BuildContext context) async {
       final DateTime? pickedDate = await showDatePicker(
         context: context,
-        initialDate: DateTime.now().add(const Duration(days: 1)),
-        firstDate: DateTime.now(),
-        lastDate: DateTime.now().add(const Duration(days: 365)),
+        initialDate: TimeUtils.nowInShanghaiTimeZone().add(
+          const Duration(days: 1),
+        ),
+        firstDate: TimeUtils.nowInShanghaiTimeZone(),
+        lastDate: TimeUtils.nowInShanghaiTimeZone().add(
+          const Duration(days: 365),
+        ),
       );
 
       if (pickedDate != null) {
@@ -369,8 +377,10 @@ class VotesListWidget extends ConsumerWidget {
             pickedTime.minute,
           );
 
-          final formatter = DateFormat('yyyy-MM-dd HH:mm');
-          endTimeController.text = formatter.format(endTime!);
+          endTimeController.text = TimeUtils.formatDateTime(
+            endTime!,
+            format: 'yyyy-MM-dd HH:mm',
+          );
         }
       }
     }
@@ -541,7 +551,7 @@ class VotesListWidget extends ConsumerWidget {
                             options.map((text) {
                               return VoteOption(
                                 id:
-                                    'option_${DateTime.now().millisecondsSinceEpoch}_${options.indexOf(text)}',
+                                    'option_${TimeUtils.nowInShanghaiTimeZone().millisecondsSinceEpoch}_${options.indexOf(text)}',
                                 text: text,
                                 votesCount: 0,
                                 voterIds: [],
@@ -550,7 +560,8 @@ class VotesListWidget extends ConsumerWidget {
 
                         // 创建投票
                         final vote = MeetingVote(
-                          id: 'vote_${DateTime.now().millisecondsSinceEpoch}',
+                          id:
+                              'vote_${TimeUtils.nowInShanghaiTimeZone().millisecondsSinceEpoch}',
                           meetingId: meetingId,
                           title: titleController.text,
                           description:
@@ -565,7 +576,7 @@ class VotesListWidget extends ConsumerWidget {
                           totalVotes: 0,
                           creatorId: 'default', // 使用默认值
                           creatorName: '未知用户', // 使用默认值
-                          createdAt: DateTime.now(),
+                          createdAt: TimeUtils.nowInShanghaiTimeZone(),
                         );
 
                         // 创建投票
@@ -590,8 +601,9 @@ class VotesListWidget extends ConsumerWidget {
   // 显示投票对话框
   void _showVoteDialog(BuildContext context, MeetingVote vote, WidgetRef ref) {
     // 检查投票是否已经结束（当前时间已超过截止时间）
-    final now = DateTime.now();
-    if (vote.endTime != null && now.isAfter(vote.endTime!)) {
+    final now = TimeUtils.nowInShanghaiTimeZone();
+    if (vote.endTime != null &&
+        now.isAfter(TimeUtils.utcToShanghaiTimeZone(vote.endTime!))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('该投票已结束，无法参与投票'),
@@ -655,6 +667,12 @@ class VotesListWidget extends ConsumerWidget {
     // 单选或多选的选中状态
     final selectedOptions = <String>[];
 
+    // 计算总票数以显示百分比
+    final totalVotes = options.fold(
+      0,
+      (sum, option) => sum + option.votesCount,
+    );
+
     showDialog(
       context: context,
       builder:
@@ -679,6 +697,20 @@ class VotesListWidget extends ConsumerWidget {
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
 
+                        // 显示当前投票统计信息
+                        if (totalVotes > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 12),
+                            child: Text(
+                              '当前已有 $totalVotes 人参与投票',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+
                         const SizedBox(height: 16),
 
                         // 显示投票选项
@@ -692,36 +724,101 @@ class VotesListWidget extends ConsumerWidget {
                                     option.id,
                                   );
 
+                                  // 计算选项的百分比
+                                  final percentage =
+                                      totalVotes > 0
+                                          ? (option.votesCount /
+                                                  totalVotes *
+                                                  100)
+                                              .toStringAsFixed(1)
+                                          : '0.0';
+
+                                  // 创建带有计数的选项标题
+                                  final optionTitle = Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(child: Text(option.text)),
+                                      Text(
+                                        '${option.votesCount} 票 ($percentage%)',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  );
+
                                   if (vote.type == VoteType.singleChoice) {
-                                    return RadioListTile<String>(
-                                      title: Text(option.text),
-                                      value: option.id,
-                                      groupValue:
-                                          selectedOptions.isEmpty
-                                              ? null
-                                              : selectedOptions.first,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedOptions.clear();
-                                          if (value != null) {
-                                            selectedOptions.add(value);
-                                          }
-                                        });
-                                      },
+                                    return Column(
+                                      children: [
+                                        RadioListTile<String>(
+                                          title: optionTitle,
+                                          value: option.id,
+                                          groupValue:
+                                              selectedOptions.isEmpty
+                                                  ? null
+                                                  : selectedOptions.first,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              selectedOptions.clear();
+                                              if (value != null) {
+                                                selectedOptions.add(value);
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        // 进度条显示
+                                        if (totalVotes > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16.0,
+                                            ),
+                                            child: LinearProgressIndicator(
+                                              value:
+                                                  option.votesCount /
+                                                  totalVotes,
+                                              backgroundColor: Colors.grey[200],
+                                              minHeight: 6,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 8),
+                                      ],
                                     );
                                   } else {
-                                    return CheckboxListTile(
-                                      title: Text(option.text),
-                                      value: isSelected,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          if (value == true) {
-                                            selectedOptions.add(option.id);
-                                          } else {
-                                            selectedOptions.remove(option.id);
-                                          }
-                                        });
-                                      },
+                                    return Column(
+                                      children: [
+                                        CheckboxListTile(
+                                          title: optionTitle,
+                                          value: isSelected,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              if (value == true) {
+                                                selectedOptions.add(option.id);
+                                              } else {
+                                                selectedOptions.remove(
+                                                  option.id,
+                                                );
+                                              }
+                                            });
+                                          },
+                                        ),
+                                        // 进度条显示
+                                        if (totalVotes > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16.0,
+                                            ),
+                                            child: LinearProgressIndicator(
+                                              value:
+                                                  option.votesCount /
+                                                  totalVotes,
+                                              backgroundColor: Colors.grey[200],
+                                              minHeight: 6,
+                                            ),
+                                          ),
+                                        const SizedBox(height: 8),
+                                      ],
                                     );
                                   }
                                 }).toList(),
@@ -740,9 +837,13 @@ class VotesListWidget extends ConsumerWidget {
                               ? null
                               : () {
                                 // 再次检查投票是否已经结束（当前时间已超过截止时间）
-                                final now = DateTime.now();
+                                final now = TimeUtils.nowInShanghaiTimeZone();
                                 if (vote.endTime != null &&
-                                    now.isAfter(vote.endTime!)) {
+                                    now.isAfter(
+                                      TimeUtils.utcToShanghaiTimeZone(
+                                        vote.endTime!,
+                                      ),
+                                    )) {
                                   Navigator.of(context).pop();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(

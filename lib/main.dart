@@ -17,6 +17,7 @@ import 'pages/splash_screen.dart';
 import 'pages/icon_generator_page.dart';
 import 'configs/app_theme.dart';
 import 'constants/app_constants.dart';
+import 'utils/time_utils.dart';
 
 Future<void> main() async {
   try {
@@ -24,6 +25,9 @@ Future<void> main() async {
 
     // 加载保存的服务器地址
     await AppConstants.loadApiDomain();
+
+    // 初始化时区数据
+    await TimeUtils.initialize();
 
     // 设置优选方向
     await SystemChrome.setPreferredOrientations([
