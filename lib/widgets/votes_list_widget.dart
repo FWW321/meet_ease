@@ -154,174 +154,169 @@ class VotesListWidget extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () => _showVoteDetailDialog(context, vote, ref),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题和状态
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      vote.title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: statusColor),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: TextStyle(color: statusColor, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-
-              // 描述
-              if (vote.description != null && vote.description!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 标题和状态
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
                   child: Text(
-                    vote.description!,
+                    vote.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: statusColor),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(color: statusColor, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
 
-              // 投票类型
+            // 描述
+            if (vote.description != null && vote.description!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      vote.type == VoteType.singleChoice
-                          ? Icons.radio_button_checked
-                          : Icons.check_box,
+                child: Text(
+                  vote.description!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+
+            // 投票类型
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    vote.type == VoteType.singleChoice
+                        ? Icons.radio_button_checked
+                        : Icons.check_box,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    vote.type == VoteType.singleChoice ? '单选' : '多选',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  if (vote.isAnonymous) ...[
+                    const SizedBox(width: 16),
+                    const Icon(
+                      Icons.visibility_off,
                       size: 16,
-                      color: Colors.grey[600],
+                      color: Colors.grey,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      vote.type == VoteType.singleChoice ? '单选' : '多选',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    const Text(
+                      '匿名投票',
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
                     ),
-                    if (vote.isAnonymous) ...[
-                      const SizedBox(width: 16),
-                      const Icon(
-                        Icons.visibility_off,
-                        size: 16,
-                        color: Colors.grey,
+                  ],
+                ],
+              ),
+            ),
+
+            // 保留开始和结束时间
+            if (vote.startTime != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  '开始于: ${dateFormat.format(vote.startTime!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+
+            if (vote.endTime != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '结束于: ${dateFormat.format(vote.endTime!)}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+
+            // 进度指示器（仅针对活动投票）
+            if (vote.status == VoteStatus.active) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                value:
+                    vote.totalVotes > 0 ? vote.totalVotes / 10 : 0, // 假设10人参与会议
+                backgroundColor: Colors.grey[200],
+                color: Colors.blue,
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '已有 ${vote.totalVotes} 人参与投票',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+
+            // 操作按钮
+            if (vote.status != VoteStatus.closed)
+              Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (vote.status == VoteStatus.pending)
+                      ElevatedButton.icon(
+                        onPressed: () => _startVote(context, vote.id, ref),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('开始投票'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '匿名投票',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
+
+                    if (vote.status == VoteStatus.active) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _showVoteDialog(context, vote, ref),
+                        icon: const Icon(Icons.how_to_vote),
+                        label: const Text('投票'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _closeVote(context, vote.id, ref),
+                        icon: const Icon(Icons.stop),
+                        label: const Text('结束投票'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ],
                 ),
               ),
-
-              // 保留开始和结束时间
-              if (vote.startTime != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    '开始于: ${dateFormat.format(vote.startTime!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-
-              if (vote.endTime != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '结束于: ${dateFormat.format(vote.endTime!)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-
-              // 进度指示器（仅针对活动投票）
-              if (vote.status == VoteStatus.active) ...[
-                const SizedBox(height: 16),
-                LinearProgressIndicator(
-                  value:
-                      vote.totalVotes > 0
-                          ? vote.totalVotes / 10
-                          : 0, // 假设10人参与会议
-                  backgroundColor: Colors.grey[200],
-                  color: Colors.blue,
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '已有 ${vote.totalVotes} 人参与投票',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-              ],
-
-              // 操作按钮
-              if (vote.status != VoteStatus.closed)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (vote.status == VoteStatus.pending)
-                        ElevatedButton.icon(
-                          onPressed: () => _startVote(context, vote.id, ref),
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('开始投票'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-
-                      if (vote.status == VoteStatus.active) ...[
-                        ElevatedButton.icon(
-                          onPressed: () => _showVoteDialog(context, vote, ref),
-                          icon: const Icon(Icons.how_to_vote),
-                          label: const Text('投票'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton.icon(
-                          onPressed: () => _closeVote(context, vote.id, ref),
-                          icon: const Icon(Icons.stop),
-                          label: const Text('结束投票'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -581,203 +576,6 @@ class VotesListWidget extends ConsumerWidget {
                     ),
                   ],
                 ),
-          ),
-    );
-  }
-
-  // 显示投票详情对话框
-  void _showVoteDetailDialog(
-    BuildContext context,
-    MeetingVote vote,
-    WidgetRef ref,
-  ) {
-    final resultsAsync = ref.watch(voteResultsProvider(vote.id));
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(vote.title),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (vote.description != null && vote.description!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(vote.description!),
-                    ),
-
-                  Text(
-                    '投票类型: ${vote.type == VoteType.singleChoice ? "单选" : "多选"}${vote.isAnonymous ? " (匿名)" : ""}',
-                    style: const TextStyle(fontStyle: FontStyle.italic),
-                  ),
-
-                  // 显示投票的时间信息
-                  if (vote.startTime != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '开始于: ${DateFormat('yyyy-MM-dd HH:mm').format(vote.startTime!)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-
-                  if (vote.endTime != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '结束于: ${DateFormat('yyyy-MM-dd HH:mm').format(vote.endTime!)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-
-                  const Divider(height: 32),
-
-                  if (vote.status == VoteStatus.active) ...[
-                    const Text(
-                      '投票正在进行中...',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ] else if (vote.status == VoteStatus.pending) ...[
-                    const Text(
-                      '投票尚未开始',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ] else ...[
-                    const Text(
-                      '投票结果:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-
-                  const SizedBox(height: 16),
-
-                  // 投票结果
-                  resultsAsync.when(
-                    loading:
-                        () => const Center(child: CircularProgressIndicator()),
-                    error:
-                        (error, stack) => Text(
-                          '加载结果失败: $error',
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                    data: (options) {
-                      final totalVotes = options.fold<int>(
-                        0,
-                        (sum, option) => sum + option.votesCount,
-                      );
-
-                      if (totalVotes == 0) {
-                        return const Text('暂无投票数据');
-                      }
-
-                      return Column(
-                        children:
-                            options.map((option) {
-                              final percentage =
-                                  totalVotes > 0
-                                      ? (option.votesCount / totalVotes * 100)
-                                          .toStringAsFixed(1)
-                                      : '0.0';
-
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(option.text),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: LinearProgressIndicator(
-                                            value:
-                                                totalVotes > 0
-                                                    ? option.votesCount /
-                                                        totalVotes
-                                                    : 0,
-                                            backgroundColor: Colors.grey[200],
-                                            color: Colors.blue,
-                                            minHeight: 10,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '$percentage% (${option.votesCount}票)',
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                    if (!vote.isAnonymous &&
-                                        option.voterIds != null &&
-                                        option.voterIds!.isNotEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Text(
-                                          '投票人: ${option.voterIds!.join(", ")}',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              if (vote.status == VoteStatus.pending)
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _startVote(context, vote.id, ref);
-                  },
-                  child: const Text('开始投票'),
-                ),
-              if (vote.status == VoteStatus.active) ...[
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _showVoteDialog(context, vote, ref);
-                  },
-                  child: const Text('投票'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _closeVote(context, vote.id, ref);
-                  },
-                  child: const Text('结束投票'),
-                ),
-              ],
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: const Text('关闭'),
-              ),
-            ],
           ),
     );
   }
