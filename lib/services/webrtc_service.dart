@@ -157,12 +157,13 @@ class MockWebRTCService implements WebRTCService {
 
     await Future.delayed(const Duration(seconds: 1));
 
-    // 初始只有当前用户
+    // 初始只有当前用户，默认麦克风关闭
     _participants = [
-      MeetingParticipant(id: userId, name: userName, isMe: true),
+      MeetingParticipant(id: userId, name: userName, isMe: true, isMuted: true),
     ];
 
     _isConnected = true;
+    _isMuted = true; // 默认麦克风静音
 
     // 发布初始参会人员列表
     _participantsController.add(_participants);
@@ -307,12 +308,13 @@ class MockWebRTCService implements WebRTCService {
         );
       } else {
         debugPrint('添加新用户到参会人员列表');
-        // 新用户加入
+        // 新用户加入，默认麦克风为静音状态
         _participants.add(
           MeetingParticipant(
             id: userId,
             name: username,
             isMe: userId == _currentUserId,
+            isMuted: true, // 默认麦克风静音
           ),
         );
       }
@@ -376,6 +378,7 @@ class MockWebRTCService implements WebRTCService {
             id: _currentUserId ?? '',
             name: _currentUserName ?? '',
             isMe: true,
+            isMuted: true, // 默认麦克风静音
           ),
     );
 
@@ -430,6 +433,7 @@ class MockWebRTCService implements WebRTCService {
       // 更新用户状态映射
       if (action == '加入会议') {
         userStates[userId] = true; // 用户在会议中
+        userMicStates.putIfAbsent(userId, () => true); // 默认麦克风状态为静音
       } else if (action == '离开会议') {
         userStates[userId] = false; // 用户不在会议中
       } else if (action == '开启麦克风') {
@@ -462,8 +466,8 @@ class MockWebRTCService implements WebRTCService {
         }
 
         if (username != null) {
-          // 获取用户麦克风状态，如果没有特定状态，默认为非静音
-          final isMuted = userMicStates[userId] ?? false;
+          // 获取用户麦克风状态，默认为静音
+          final isMuted = userMicStates[userId] ?? true;
 
           _participants.add(
             MeetingParticipant(

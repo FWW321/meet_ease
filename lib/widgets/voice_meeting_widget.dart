@@ -8,6 +8,7 @@ import '../services/webrtc_service.dart';
 import '../models/chat_message.dart';
 import '../services/service_providers.dart';
 import 'dart:convert';
+import 'package:permission_handler/permission_handler.dart';
 
 /// 语音会议组件
 class VoiceMeetingWidget extends HookConsumerWidget {
@@ -21,6 +22,64 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     this.isReadOnly = false,
     super.key,
   });
+
+  // 检查并申请麦克风权限
+  Future<bool> _checkAndRequestMicrophonePermission(
+    BuildContext context,
+  ) async {
+    // 检查麦克风权限状态
+    PermissionStatus micStatus = await Permission.microphone.status;
+
+    // 如果已经拥有权限，直接返回true
+    if (micStatus.isGranted) return true;
+
+    // 如果权限已被永久拒绝，引导用户前往设置页面
+    if (micStatus.isPermanentlyDenied) {
+      return await _showPermissionSettingsDialog(context, '麦克风');
+    }
+
+    // 请求麦克风权限
+    micStatus = await Permission.microphone.request();
+
+    // 返回权限状态
+    return micStatus.isGranted;
+  }
+
+  // 显示权限设置对话框
+  Future<bool> _showPermissionSettingsDialog(
+    BuildContext context,
+    String permissionName,
+  ) async {
+    if (!context.mounted) return false;
+
+    final bool? goToSettings = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('需要权限'),
+            content: Text('使用语音会议需要$permissionName权限，请在设置中开启'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('前往设置'),
+              ),
+            ],
+          ),
+    );
+
+    if (goToSettings == true) {
+      await openAppSettings();
+      // 返回false，因为我们不知道用户是否在设置中授予了权限
+      // 用户需要再次尝试启用麦克风
+      return false;
+    }
+
+    return false;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -135,16 +194,30 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     }
 
     // 切换麦克风状态
-    void toggleMicrophone() {
+    Future<void> toggleMicrophone() async {
       // 获取当前麦克风状态，并切换到相反状态
-      // 注意：传递给toggleMicrophoneProvider的是希望麦克风切换到的状态
-      // true表示启用麦克风，false表示禁用麦克风
       final currentMuted = isMuted(participantsAsync);
       final shouldEnable = currentMuted; // 如果当前是静音，则应该启用
 
       // 调试信息
       debugPrint('当前麦克风状态: ${currentMuted ? "静音" : "开启"}');
       debugPrint('切换麦克风到: ${shouldEnable ? "开启" : "静音"}');
+
+      // 如果要开启麦克风，需要检查麦克风权限
+      if (shouldEnable) {
+        final hasPermission = await _checkAndRequestMicrophonePermission(
+          context,
+        );
+        if (!hasPermission) {
+          // 没有麦克风权限，无法开启麦克风
+          if (context.mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('无法开启麦克风：权限被拒绝')));
+          }
+          return;
+        }
+      }
 
       ref
           .read(toggleMicrophoneProvider(shouldEnable).future)
@@ -155,6 +228,11 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           .catchError((error) {
             // 操作失败
             debugPrint('麦克风切换失败: $error');
+            if (context.mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('麦克风切换失败: $error')));
+            }
           });
     }
 
@@ -326,7 +404,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
                   isMicEnabled ? Icons.mic : Icons.mic_off,
                   color: isMicEnabled ? Colors.blue : Colors.red,
                 ),
-                onPressed: isJoined.value ? toggleMicrophone : null,
+                onPressed: isJoined.value ? () => toggleMicrophone() : null,
                 tooltip: isMicEnabled ? '关闭麦克风' : '开启麦克风',
               ),
             ],
