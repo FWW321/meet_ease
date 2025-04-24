@@ -38,7 +38,17 @@ final chatServiceProvider = Provider<ChatService>((ref) {
 
 // WebRTC服务提供者
 final webRTCServiceProvider = Provider<WebRTCService>((ref) {
-  return MockWebRTCService();
+  // 创建WebRTC服务实例
+  final webRTCService = MockWebRTCService();
+
+  // 获取聊天服务并注入
+  final chatService = ref.read(chatServiceProvider);
+  webRTCService.setChatService(chatService);
+
+  // 注入Ref对象，以便于获取当前用户信息
+  webRTCService.setRef(ref);
+
+  return webRTCService;
 });
 
 // WebSocket服务提供者
