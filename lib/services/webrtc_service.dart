@@ -249,32 +249,52 @@ class MockWebRTCService implements WebRTCService {
       return;
     }
 
-    // 解析系统消息内容
-    String? userId;
-    String? username;
-    String? action;
+    debugPrint('开始处理系统消息: ${message.content}');
 
-    // 分析系统消息格式: "userId:xxx, username:xxx, action:xxx"
+    // 处理可能包含多个操作的系统消息
+    // 例如 "userId:xxx, username:xxx, action:开启麦克风, userId:yyy, username:yyy, action:关闭麦克风"
+    // 首先按照逗号分割，然后组合相关的字段
     final parts = message.content.split(', ');
-    for (final part in parts) {
-      if (part.startsWith('userId:')) {
-        userId = part.substring('userId:'.length).trim();
-      } else if (part.startsWith('username:')) {
-        username = part.substring('username:'.length).trim();
-      } else if (part.startsWith('action:')) {
-        action = part.substring('action:'.length).trim();
+
+    // 每三个部分（userId, username, action）为一组
+    for (int i = 0; i < parts.length; i += 3) {
+      if (i + 2 >= parts.length) {
+        // 如果剩余部分不足一组，则跳过
+        debugPrint('系统消息格式不正确，剩余部分不足一组: ${parts.sublist(i).join(', ')}');
+        continue;
       }
+
+      String? userId;
+      String? username;
+      String? action;
+
+      // 提取当前组的三个部分
+      for (int j = 0; j < 3; j++) {
+        final part = parts[i + j];
+        if (part.startsWith('userId:')) {
+          userId = part.substring('userId:'.length).trim();
+        } else if (part.startsWith('username:')) {
+          username = part.substring('username:'.length).trim();
+        } else if (part.startsWith('action:')) {
+          action = part.substring('action:'.length).trim();
+        }
+      }
+
+      // 如果缺少必要信息，则忽略当前组
+      if (userId == null || username == null || action == null) {
+        debugPrint('系统消息格式不正确，缺少必要信息: ${parts.sublist(i, i + 3).join(', ')}');
+        continue;
+      }
+
+      debugPrint('处理系统消息组: userId=$userId, username=$username, action=$action');
+
+      // 根据动作类型更新参会人员列表
+      _processSystemAction(userId, username, action);
     }
+  }
 
-    // 如果缺少必要信息，则忽略
-    if (userId == null || username == null || action == null) {
-      debugPrint('系统消息格式不正确，缺少必要信息: ${message.content}');
-      return;
-    }
-
-    debugPrint('处理系统消息: userId=$userId, username=$username, action=$action');
-
-    // 根据动作类型更新参会人员列表
+  // 处理系统消息中的单个动作
+  void _processSystemAction(String userId, String username, String action) {
     if (action == '加入会议') {
       debugPrint('用户加入会议: $username (ID: $userId)');
       // 检查用户是否已在列表中
@@ -297,12 +317,6 @@ class MockWebRTCService implements WebRTCService {
         );
       }
 
-      // 打印当前参会人员列表
-      debugPrint('更新后的参会人员列表 (${_participants.length}人):');
-      for (final p in _participants) {
-        debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
-      }
-
       // 发布更新后的参会人员列表
       _participantsController.add(List.from(_participants));
     } else if (action == '离开会议') {
@@ -317,12 +331,6 @@ class MockWebRTCService implements WebRTCService {
           debugPrint('已从参会人员列表中移除用户');
         } else {
           debugPrint('未找到要移除的用户');
-        }
-
-        // 打印当前参会人员列表
-        debugPrint('更新后的参会人员列表 (${_participants.length}人):');
-        for (final p in _participants) {
-          debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
         }
 
         // 发布更新后的参会人员列表

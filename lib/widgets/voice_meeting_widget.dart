@@ -55,8 +55,10 @@ class VoiceMeetingWidget extends HookConsumerWidget {
 
               // 如果需要手动处理，可以获取WebRTC服务并调用handleSystemMessage
               if (message['content'].toString().contains('加入会议') ||
-                  message['content'].toString().contains('离开会议')) {
-                debugPrint('收到加入/离开会议系统消息，确保WebRTC服务处理');
+                  message['content'].toString().contains('离开会议') ||
+                  message['content'].toString().contains('开启麦克风') ||
+                  message['content'].toString().contains('关闭麦克风')) {
+                debugPrint('收到会议相关系统消息，确保WebRTC服务处理: ${message['content']}');
 
                 // 创建一个ChatMessage对象并手动传递给WebRTC服务
                 try {
