@@ -1,15 +1,62 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../constants/app_constants.dart';
 import '../models/chat_message.dart';
+import '../providers/chat_providers.dart';
 import 'chat_service.dart';
 
 /// 实际的API聊天服务实现
 class ApiChatService implements ChatService {
   // 消息控制器
   final _messageController = StreamController<ChatMessage>.broadcast();
+  // WebSocket连接映射，按会议ID存储
+  final Map<String, WebSocketChannel> _wsConnections = {};
+  // 是否使用外部WebSocket
+  bool _useExternalWebSocket = false;
+  // 外部WebSocket消息流订阅
+  StreamSubscription? _externalWebSocketSubscription;
+
+  /// 设置使用外部WebSocket连接 (由MeetingDetailPage建立)
+  void useExternalWebSocket(WidgetRef ref, String meetingId) {
+    // 先清理自己管理的WebSocket连接
+    if (_wsConnections.containsKey(meetingId)) {
+      _wsConnections[meetingId]?.sink.close();
+      _wsConnections.remove(meetingId);
+    }
+
+    // 取消之前的订阅
+    _externalWebSocketSubscription?.cancel();
+
+    // 订阅外部WebSocket消息流
+    _useExternalWebSocket = true;
+    _externalWebSocketSubscription = ref
+        .read(webSocketMessagesProvider.stream)
+        .listen(
+          (message) {
+            try {
+              // 从WebSocket消息创建ChatMessage对象
+              if (message is Map<String, dynamic>) {
+                final chatMessage = ChatMessage.fromJson(message);
+                // 只处理当前会议的消息
+                if (chatMessage.meetingId == meetingId) {
+                  _messageController.add(chatMessage);
+                }
+              }
+            } catch (e) {
+              print('处理外部WebSocket消息失败: $e');
+            }
+          },
+          onError: (error) {
+            print('外部WebSocket错误: $error');
+          },
+        );
+
+    print('已设置使用外部WebSocket连接');
+  }
 
   @override
   Future<List<ChatMessage>> getMeetingMessages(String meetingId) async {
@@ -183,21 +230,50 @@ class ApiChatService implements ChatService {
 
   @override
   Stream<ChatMessage> getMessageStream(String meetingId) {
-    // 因为服务器没有流式加载功能，我们可以设置一个定时器定期刷新消息
-    // 但在实际应用中应该使用WebSocket或轮询
-    Timer.periodic(const Duration(seconds: 3), (timer) {
-      getMeetingMessages(meetingId)
-          .then((messages) {
-            // 获取最新消息，这里简单实现，实际使用中可以根据时间过滤
-            if (messages.isNotEmpty) {
-              final lastMessage = messages.last;
-              _messageController.add(lastMessage);
+    // 如果使用外部WebSocket，直接返回消息流
+    if (_useExternalWebSocket) {
+      print('使用外部WebSocket连接获取消息流');
+      return _messageController.stream.where(
+        (message) => message.meetingId == meetingId,
+      );
+    }
+
+    // 否则使用内部WebSocket连接
+    // 检查是否已有该会议的WebSocket连接，如果有则复用
+    if (!_wsConnections.containsKey(meetingId)) {
+      // 创建WebSocket连接
+      final wsUrl = 'ws://${AppConstants.apiDomain}/ws/chat/$meetingId';
+      print('正在连接WebSocket: $wsUrl');
+      final wsChannel = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      // 监听WebSocket消息并将其添加到流中
+      wsChannel.stream.listen(
+        (dynamic message) {
+          try {
+            final jsonData = jsonDecode(message);
+            print('收到WebSocket消息: $jsonData');
+            if (jsonData is Map<String, dynamic>) {
+              final chatMessage = ChatMessage.fromJson(jsonData);
+              _messageController.add(chatMessage);
             }
-          })
-          .catchError((e) {
-            print('获取消息更新失败: $e');
-          });
-    });
+          } catch (e) {
+            print('解析WebSocket消息失败: $e');
+          }
+        },
+        onError: (error) {
+          print('WebSocket错误: $error');
+        },
+        onDone: () {
+          print('WebSocket连接已关闭');
+          _wsConnections.remove(meetingId);
+        },
+      );
+
+      // 保存WebSocket连接以便复用
+      _wsConnections[meetingId] = wsChannel;
+    } else {
+      print('复用已有的WebSocket连接: $meetingId');
+    }
 
     return _messageController.stream.where(
       (message) => message.meetingId == meetingId,
@@ -206,6 +282,17 @@ class ApiChatService implements ChatService {
 
   @override
   void closeMessageStream() {
+    // 取消外部WebSocket订阅
+    _externalWebSocketSubscription?.cancel();
+    _useExternalWebSocket = false;
+
+    // 关闭所有WebSocket连接
+    for (final connection in _wsConnections.values) {
+      connection.sink.close();
+    }
+    _wsConnections.clear();
+
+    // 关闭消息控制器
     _messageController.close();
   }
 }

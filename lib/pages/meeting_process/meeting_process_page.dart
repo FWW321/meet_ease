@@ -356,7 +356,6 @@ class MeetingProcessPage extends HookConsumerWidget {
                     )
                     : VoiceMeetingWidget(
                       meetingId: meetingId,
-                      userId: currentUserId.value,
                       userName:
                           ref.watch(currentUserProvider).value?.name ?? '当前用户',
                     ),

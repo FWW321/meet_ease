@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../providers/webrtc_providers.dart';
+import '../providers/user_providers.dart';
+import '../providers/chat_providers.dart';
 import '../services/webrtc_service.dart';
+import '../models/chat_message.dart';
+import '../services/service_providers.dart';
+import 'dart:convert';
 
 /// 语音会议组件
 class VoiceMeetingWidget extends HookConsumerWidget {
   final String meetingId;
-  final String userId;
   final String userName;
   final bool isReadOnly;
 
   const VoiceMeetingWidget({
     required this.meetingId,
-    required this.userId,
     required this.userName,
     this.isReadOnly = false,
     super.key,
@@ -21,18 +24,85 @@ class VoiceMeetingWidget extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 获取当前用户ID
+    final userIdAsync = ref.watch(currentUserIdProvider);
+
     // 是否已加入会议
     final isJoined = useState(false);
+
+    // 创建一个状态用于强制刷新参会人员列表
+    final refreshCounter = useState(0);
 
     // 参会人员列表
     final participantsAsync = ref.watch(webRTCParticipantsProvider);
 
+    // 聊天消息流 - 用于将系统消息传递给WebRTC服务
+    final chatMessagesAsync = ref.watch(webSocketMessagesProvider);
+
+    // 处理新的聊天消息 - 将系统消息转发给WebRTC服务处理
+    useEffect(() {
+      if (chatMessagesAsync.hasValue) {
+        try {
+          final message = chatMessagesAsync.value;
+          // 检查是否为系统消息
+          if (message != null && message['messageType'] == 'SYSTEM') {
+            // 创建ChatMessage对象
+            final chatMessage = ChatMessage.fromJson(message);
+
+            // 检查是否是加入/离开会议消息
+            if (chatMessage.content.contains('action:加入会议') ||
+                chatMessage.content.contains('action:离开会议')) {
+              debugPrint('收到会议状态变更系统消息: ${chatMessage.content}');
+
+              // 明确地将消息传递给WebRTC服务处理
+              final webRTCService = ref.read(webRTCServiceProvider);
+              if (webRTCService is MockWebRTCService) {
+                webRTCService.handleSystemMessage(chatMessage);
+
+                // 增加刷新计数器，强制UI更新
+                refreshCounter.value++;
+
+                // 额外调试日志
+                debugPrint('已将系统消息传递给WebRTC服务，刷新计数: ${refreshCounter.value}');
+
+                // 解析系统消息内容以便调试
+                String? userId;
+                String? username;
+                String? action;
+
+                final parts = chatMessage.content.split(', ');
+                for (final part in parts) {
+                  if (part.startsWith('userId:')) {
+                    userId = part.substring('userId:'.length).trim();
+                  } else if (part.startsWith('username:')) {
+                    username = part.substring('username:'.length).trim();
+                  } else if (part.startsWith('action:')) {
+                    action = part.substring('action:'.length).trim();
+                  }
+                }
+
+                debugPrint(
+                  '系统消息解析: userId=$userId, username=$username, action=$action',
+                );
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('处理系统消息出错: $e');
+        }
+      }
+      return null;
+    }, [chatMessagesAsync, refreshCounter.value]);
+
     // 麦克风状态 - 从参会人员列表中获取当前用户的麦克风状态
     final isMicEnabled = participantsAsync.when(
       data: (participants) {
+        // 获取当前用户ID
+        final userId = userIdAsync.value ?? '';
+
         // 寻找当前用户
         final currentUser = participants.firstWhere(
-          (p) => p.isMe,
+          (p) => p.isMe || p.id == userId,
           orElse:
               () => MeetingParticipant(id: userId, name: userName, isMe: true),
         );
@@ -50,9 +120,12 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     bool isMuted(AsyncValue<List<MeetingParticipant>> participantsState) {
       return participantsState.when(
         data: (participants) {
+          // 获取当前用户ID
+          final userId = userIdAsync.value ?? '';
+
           // 寻找当前用户
           final currentUser = participants.firstWhere(
-            (p) => p.isMe,
+            (p) => p.isMe || p.id == userId,
             orElse:
                 () =>
                     MeetingParticipant(id: userId, name: userName, isMe: true),
@@ -136,6 +209,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
                   (participants) => _buildParticipantsList(
                     participants,
                     context,
+                    userIdAsync.value ?? '',
                     showSpeakingStatus: false,
                     showMicStatus: false,
                   ),
@@ -147,6 +221,22 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           ),
         ],
       );
+    }
+
+    // 显示加载指示器，直到获取到用户ID
+    if (userIdAsync.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    // 处理错误情况
+    if (userIdAsync.hasError) {
+      return Center(child: Text('获取用户信息失败: ${userIdAsync.error}'));
+    }
+
+    // 确保用户ID可用
+    final userId = userIdAsync.value ?? '';
+    if (userId.isEmpty) {
+      return const Center(child: Text('用户未登录或无法获取用户ID'));
     }
 
     // 加入会议（仅执行一次）- 只有非只读模式才执行
@@ -174,7 +264,35 @@ class VoiceMeetingWidget extends HookConsumerWidget {
       return () {
         ref.read(leaveMeetingProvider.future);
       };
-    }, []);
+    }, [userId]); // 添加userId作为依赖，确保用户ID变化时重新执行
+
+    // 获取当前用户信息
+    final currentUserAsync = participantsAsync.when(
+      data: (participants) {
+        final currentUser = participants.firstWhere(
+          (p) => p.isMe || p.id == userId,
+          orElse:
+              () => MeetingParticipant(id: userId, name: userName, isMe: true),
+        );
+        return currentUser;
+      },
+      loading: () => MeetingParticipant(id: userId, name: userName, isMe: true),
+      error:
+          (_, __) => MeetingParticipant(id: userId, name: userName, isMe: true),
+    );
+
+    // 获取参会人员数量 - 使用刷新计数器作为依赖确保更新
+    final participantCount = useState(0);
+
+    // 使用Effect更新参会人员数量
+    useEffect(() {
+      participantsAsync.whenData((participants) {
+        final count =
+            participants.where((p) => !p.isMe && p.id != userId).length;
+        participantCount.value = count;
+      });
+      return null;
+    }, [participantsAsync, refreshCounter.value]);
 
     // 进行中会议的界面
     return Column(
@@ -219,14 +337,100 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           ),
         ),
 
-        const SizedBox(height: 24),
+        // 当前用户信息卡
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              // 用户头像
+              CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: Text(
+                  userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // 用户信息
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          userName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('(我)', style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          isMicEnabled ? Icons.mic : Icons.mic_off,
+                          size: 16,
+                          color: isMicEnabled ? Colors.green : Colors.red,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isMicEnabled ? '麦克风已开启' : '麦克风已静音',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isMicEnabled ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // 角色标签
+              if (currentUserAsync.isCreator)
+                _buildRoleTag('创建者', Colors.orange),
+              if (currentUserAsync.isAdmin && !currentUserAsync.isCreator)
+                _buildRoleTag('管理员', Colors.blue),
+            ],
+          ),
+        ),
 
         // 参会人员列表标题
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.people, size: 20),
-            const SizedBox(width: 8),
-            Text('参会人员', style: theme.textTheme.titleMedium),
+            Row(
+              children: [
+                const Icon(Icons.people, size: 20),
+                const SizedBox(width: 8),
+                Text('其他参会人员', style: theme.textTheme.titleMedium),
+              ],
+            ),
+
+            // 参会人数统计
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${participantCount.value} 人',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ),
           ],
         ),
 
@@ -236,7 +440,14 @@ class VoiceMeetingWidget extends HookConsumerWidget {
         Expanded(
           child: participantsAsync.when(
             data:
-                (participants) => _buildParticipantsList(participants, context),
+                (participants) => _buildParticipantsList(
+                  participants,
+                  context,
+                  userId,
+                  key: ValueKey(
+                    'participants-${refreshCounter.value}',
+                  ), // 添加key强制刷新
+                ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
                 (error, stackTrace) => Center(
@@ -257,6 +468,27 @@ class VoiceMeetingWidget extends HookConsumerWidget {
                 ),
           ),
         ),
+
+        // 添加一个手动刷新按钮，用于调试
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              icon: const Icon(Icons.refresh, size: 18),
+              onPressed: () {
+                // 增加刷新计数器触发UI更新
+                refreshCounter.value++;
+                debugPrint('手动刷新参会人员列表，计数: ${refreshCounter.value}');
+
+                // 强制重载参会人员流
+                ref.invalidate(webRTCParticipantsProvider);
+              },
+              tooltip: '刷新参会人员列表',
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -264,28 +496,41 @@ class VoiceMeetingWidget extends HookConsumerWidget {
   // 构建参会人员列表
   Widget _buildParticipantsList(
     List<MeetingParticipant> participants,
-    BuildContext context, {
+    BuildContext context,
+    String currentUserId, {
     bool showSpeakingStatus = true,
     bool showMicStatus = true,
+    Key? key,
   }) {
-    if (participants.isEmpty) {
+    // 过滤掉当前用户自己
+    final filteredParticipants =
+        participants.where((p) => !p.isMe && p.id != currentUserId).toList();
+
+    // 打印过滤后的参会人员列表以进行调试
+    debugPrint('过滤后的参会人员列表 (${filteredParticipants.length}):');
+    for (final p in filteredParticipants) {
+      debugPrint('- ${p.name} (ID: ${p.id})');
+    }
+
+    if (filteredParticipants.isEmpty) {
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.people_outline, size: 64, color: Colors.grey),
             SizedBox(height: 16),
-            Text('暂无参会人员', style: TextStyle(color: Colors.grey)),
+            Text('暂无其他参会人员', style: TextStyle(color: Colors.grey)),
           ],
         ),
       );
     }
 
     return ListView.builder(
+      key: key, // 使用key强制刷新
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: participants.length,
+      itemCount: filteredParticipants.length,
       itemBuilder: (context, index) {
-        final participant = participants[index];
+        final participant = filteredParticipants[index];
         return _buildParticipantItem(
           participant,
           context,
@@ -305,30 +550,13 @@ class VoiceMeetingWidget extends HookConsumerWidget {
   }) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: participant.isMe ? Colors.blue : Colors.grey.shade300,
+        backgroundColor: Colors.grey.shade300,
         child: Text(
           participant.name.isNotEmpty ? participant.name[0].toUpperCase() : '?',
-          style: TextStyle(
-            color: participant.isMe ? Colors.white : Colors.black,
-          ),
+          style: const TextStyle(color: Colors.black),
         ),
       ),
-      title: Row(
-        children: [
-          Text(
-            participant.name,
-            style: TextStyle(
-              fontWeight:
-                  participant.isMe ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          if (participant.isMe)
-            const Padding(
-              padding: EdgeInsets.only(left: 8),
-              child: Text('(我)', style: TextStyle(color: Colors.grey)),
-            ),
-        ],
-      ),
+      title: Text(participant.name),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

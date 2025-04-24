@@ -4,6 +4,8 @@ import '../models/meeting.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../providers/chat_providers.dart';
+import '../services/api_chat_service.dart';
+import '../services/service_providers.dart';
 import '../widgets/meeting_password_dialog.dart';
 import 'meeting_process/meeting_process_page.dart';
 import 'meeting_settings_page.dart';
@@ -387,6 +389,13 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
             'userId': currentUserId!,
           }).future,
         );
+
+        // WebSocket连接成功后，将其设置给ApiChatService使用
+        final chatService = ref.read(chatServiceProvider);
+        if (chatService is ApiChatService) {
+          chatService.useExternalWebSocket(ref, widget.meetingId);
+          print('已将外部WebSocket连接设置给ApiChatService使用');
+        }
       } catch (e) {
         if (!context.mounted) return;
 

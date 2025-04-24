@@ -172,6 +172,7 @@ class MockWebRTCService implements WebRTCService {
   // 处理聊天消息，特别是系统消息
   void _handleChatMessage(ChatMessage message) {
     if (message.isSystemMessage) {
+      debugPrint('收到系统消息: ${message.content}');
       // 处理单个系统消息
       _updateParticipantsFromSystemMessage(message);
     }
@@ -199,18 +200,26 @@ class MockWebRTCService implements WebRTCService {
     }
 
     // 如果缺少必要信息，则忽略
-    if (userId == null || username == null || action == null) return;
+    if (userId == null || username == null || action == null) {
+      debugPrint('系统消息格式不正确，缺少必要信息');
+      return;
+    }
+
+    debugPrint('处理系统消息: userId=$userId, username=$username, action=$action');
 
     // 根据动作类型更新参会人员列表
     if (action == '加入会议') {
+      debugPrint('用户加入会议: $username (ID: $userId)');
       // 检查用户是否已在列表中
       final existingIndex = _participants.indexWhere((p) => p.id == userId);
       if (existingIndex >= 0) {
+        debugPrint('用户已在列表中，更新用户信息');
         // 用户已在列表中，但可能是之前离开的用户重新加入
         _participants[existingIndex] = _participants[existingIndex].copyWith(
           name: username,
         );
       } else {
+        debugPrint('添加新用户到参会人员列表');
         // 新用户加入
         _participants.add(
           MeetingParticipant(
@@ -220,19 +229,50 @@ class MockWebRTCService implements WebRTCService {
           ),
         );
       }
-    } else if (action == '离开会议') {
-      // 用户离开会议，从列表中移除
-      _participants.removeWhere((p) => p.id == userId && !p.isMe);
-    } else if (action == '开启麦克风') {
-      // 用户开启麦克风
-      _updateUserMicrophoneStatus(userId, false); // false表示不静音
-    } else if (action == '关闭麦克风') {
-      // 用户关闭麦克风
-      _updateUserMicrophoneStatus(userId, true); // true表示静音
-    }
 
-    // 发布更新后的参会人员列表
-    _participantsController.add(_participants);
+      // 打印当前参会人员列表
+      debugPrint('更新后的参会人员列表:');
+      for (final p in _participants) {
+        debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
+      }
+
+      // 发布更新后的参会人员列表
+      _participantsController.add(List.from(_participants));
+    } else if (action == '离开会议') {
+      debugPrint('用户离开会议: $username (ID: $userId)');
+      // 不移除当前用户自己
+      if (userId != _currentUserId) {
+        final beforeCount = _participants.length;
+        _participants.removeWhere((p) => p.id == userId);
+        final afterCount = _participants.length;
+
+        if (beforeCount != afterCount) {
+          debugPrint('已从参会人员列表中移除用户');
+        } else {
+          debugPrint('未找到要移除的用户');
+        }
+
+        // 打印当前参会人员列表
+        debugPrint('更新后的参会人员列表:');
+        for (final p in _participants) {
+          debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
+        }
+
+        // 发布更新后的参会人员列表
+        _participantsController.add(List.from(_participants));
+      } else {
+        debugPrint('忽略当前用户自己的离开消息');
+      }
+    } else if (action == '开启麦克风' || action == '关闭麦克风') {
+      final isMuted = action == '关闭麦克风';
+      debugPrint('用户${isMuted ? "关闭" : "开启"}麦克风: $username (ID: $userId)');
+
+      // 更新用户麦克风状态
+      _updateUserMicrophoneStatus(userId, isMuted);
+
+      // 发布更新后的参会人员列表
+      _participantsController.add(List.from(_participants));
+    }
   }
 
   // 更新用户麦克风状态
@@ -514,5 +554,16 @@ class MockWebRTCService implements WebRTCService {
     _speakingSimulatorTimer?.cancel();
     _chatSubscription?.cancel();
     _participantsController.close();
+  }
+
+  // 直接处理系统消息
+  void handleSystemMessage(ChatMessage message) {
+    if (!message.isSystemMessage) {
+      debugPrint('非系统消息，忽略');
+      return;
+    }
+
+    debugPrint('手动处理系统消息: ${message.content}');
+    _updateParticipantsFromSystemMessage(message);
   }
 }
