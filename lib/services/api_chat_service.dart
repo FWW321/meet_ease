@@ -40,9 +40,16 @@ class ApiChatService implements ChatService {
             try {
               // 从WebSocket消息创建ChatMessage对象
               if (message is Map<String, dynamic>) {
+                // 调试每一条WebSocket消息
+                print('ApiChatService-收到WebSocket消息: ${jsonEncode(message)}');
+
                 final chatMessage = ChatMessage.fromJson(message);
                 // 只处理当前会议的消息
                 if (chatMessage.meetingId == meetingId) {
+                  // 添加调试日志确认系统消息被处理
+                  if (chatMessage.isSystemMessage) {
+                    print('ApiChatService-转发系统消息: ${chatMessage.content}');
+                  }
                   _messageController.add(chatMessage);
                 }
               }
@@ -230,6 +237,10 @@ class ApiChatService implements ChatService {
 
   @override
   Stream<ChatMessage> getMessageStream(String meetingId) {
+    print(
+      '获取会议消息流, meetingId: $meetingId, 使用外部WebSocket: $_useExternalWebSocket',
+    );
+
     // 如果使用外部WebSocket，直接返回消息流
     if (_useExternalWebSocket) {
       print('使用外部WebSocket连接获取消息流');
@@ -254,6 +265,12 @@ class ApiChatService implements ChatService {
             print('收到WebSocket消息: $jsonData');
             if (jsonData is Map<String, dynamic>) {
               final chatMessage = ChatMessage.fromJson(jsonData);
+
+              // 添加系统消息调试日志
+              if (chatMessage.isSystemMessage) {
+                print('解析得到系统消息: ${chatMessage.content}');
+              }
+
               _messageController.add(chatMessage);
             }
           } catch (e) {
@@ -275,9 +292,16 @@ class ApiChatService implements ChatService {
       print('复用已有的WebSocket连接: $meetingId');
     }
 
-    return _messageController.stream.where(
-      (message) => message.meetingId == meetingId,
-    );
+    // 过滤出本会议的消息
+    final filteredStream = _messageController.stream.where((message) {
+      final isCurrentMeeting = message.meetingId == meetingId;
+      if (isCurrentMeeting && message.isSystemMessage) {
+        print('消息流过滤：传递系统消息: ${message.content}');
+      }
+      return isCurrentMeeting;
+    });
+
+    return filteredStream;
   }
 
   @override

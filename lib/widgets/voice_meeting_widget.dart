@@ -30,61 +30,45 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     // 是否已加入会议
     final isJoined = useState(false);
 
-    // 创建一个状态用于强制刷新参会人员列表
-    final refreshCounter = useState(0);
-
     // 参会人员列表
     final participantsAsync = ref.watch(webRTCParticipantsProvider);
 
     // 聊天消息流 - 用于将系统消息传递给WebRTC服务
     final chatMessagesAsync = ref.watch(webSocketMessagesProvider);
 
-    // 处理新的聊天消息 - 将系统消息转发给WebRTC服务处理
+    // 处理新的聊天消息
     useEffect(() {
-      if (chatMessagesAsync.hasValue) {
+      if (chatMessagesAsync.hasValue && chatMessagesAsync.value != null) {
         try {
-          final message = chatMessagesAsync.value;
+          final message = chatMessagesAsync.value!;
           // 检查是否为系统消息
-          if (message != null && message['messageType'] == 'SYSTEM') {
-            // 创建ChatMessage对象
-            final chatMessage = ChatMessage.fromJson(message);
+          if (message['messageType'] == 'SYSTEM') {
+            debugPrint('VoiceMeetingWidget收到系统消息: ${message['content']}');
 
-            // 检查是否是加入/离开会议消息
-            if (chatMessage.content.contains('action:加入会议') ||
-                chatMessage.content.contains('action:离开会议')) {
-              debugPrint('收到会议状态变更系统消息: ${chatMessage.content}');
+            // 记录会议ID，确保消息是当前会议的
+            final msgMeetingId = message['meetingId']?.toString() ?? '';
+            if (msgMeetingId == meetingId) {
+              debugPrint('系统消息属于当前会议，WebRTC服务应自动处理');
 
-              // 明确地将消息传递给WebRTC服务处理
-              final webRTCService = ref.read(webRTCServiceProvider);
-              if (webRTCService is MockWebRTCService) {
-                webRTCService.handleSystemMessage(chatMessage);
+              // 如果需要手动处理，可以获取WebRTC服务并调用handleSystemMessage
+              if (message['content'].toString().contains('加入会议') ||
+                  message['content'].toString().contains('离开会议')) {
+                debugPrint('收到加入/离开会议系统消息，确保WebRTC服务处理');
 
-                // 增加刷新计数器，强制UI更新
-                refreshCounter.value++;
-
-                // 额外调试日志
-                debugPrint('已将系统消息传递给WebRTC服务，刷新计数: ${refreshCounter.value}');
-
-                // 解析系统消息内容以便调试
-                String? userId;
-                String? username;
-                String? action;
-
-                final parts = chatMessage.content.split(', ');
-                for (final part in parts) {
-                  if (part.startsWith('userId:')) {
-                    userId = part.substring('userId:'.length).trim();
-                  } else if (part.startsWith('username:')) {
-                    username = part.substring('username:'.length).trim();
-                  } else if (part.startsWith('action:')) {
-                    action = part.substring('action:'.length).trim();
+                // 创建一个ChatMessage对象并手动传递给WebRTC服务
+                try {
+                  final chatMessage = ChatMessage.fromJson(message);
+                  final webRTCService = ref.read(webRTCServiceProvider);
+                  if (webRTCService is MockWebRTCService) {
+                    webRTCService.handleSystemMessage(chatMessage);
+                    debugPrint('已手动传递系统消息给WebRTC服务');
                   }
+                } catch (e) {
+                  debugPrint('创建ChatMessage或传递给WebRTC服务失败: $e');
                 }
-
-                debugPrint(
-                  '系统消息解析: userId=$userId, username=$username, action=$action',
-                );
               }
+            } else {
+              debugPrint('系统消息不属于当前会议，忽略');
             }
           }
         } catch (e) {
@@ -92,7 +76,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
         }
       }
       return null;
-    }, [chatMessagesAsync, refreshCounter.value]);
+    }, [chatMessagesAsync]);
 
     // 麦克风状态 - 从参会人员列表中获取当前用户的麦克风状态
     final isMicEnabled = participantsAsync.when(
@@ -281,7 +265,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           (_, __) => MeetingParticipant(id: userId, name: userName, isMe: true),
     );
 
-    // 获取参会人员数量 - 使用刷新计数器作为依赖确保更新
+    // 获取参会人员数量
     final participantCount = useState(0);
 
     // 使用Effect更新参会人员数量
@@ -292,7 +276,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
         participantCount.value = count;
       });
       return null;
-    }, [participantsAsync, refreshCounter.value]);
+    }, [participantsAsync]);
 
     // 进行中会议的界面
     return Column(
@@ -440,14 +424,8 @@ class VoiceMeetingWidget extends HookConsumerWidget {
         Expanded(
           child: participantsAsync.when(
             data:
-                (participants) => _buildParticipantsList(
-                  participants,
-                  context,
-                  userId,
-                  key: ValueKey(
-                    'participants-${refreshCounter.value}',
-                  ), // 添加key强制刷新
-                ),
+                (participants) =>
+                    _buildParticipantsList(participants, context, userId),
             loading: () => const Center(child: CircularProgressIndicator()),
             error:
                 (error, stackTrace) => Center(
@@ -468,27 +446,6 @@ class VoiceMeetingWidget extends HookConsumerWidget {
                 ),
           ),
         ),
-
-        // 添加一个手动刷新按钮，用于调试
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: IconButton(
-              icon: const Icon(Icons.refresh, size: 18),
-              onPressed: () {
-                // 增加刷新计数器触发UI更新
-                refreshCounter.value++;
-                debugPrint('手动刷新参会人员列表，计数: ${refreshCounter.value}');
-
-                // 强制重载参会人员流
-                ref.invalidate(webRTCParticipantsProvider);
-              },
-              tooltip: '刷新参会人员列表',
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -500,17 +457,13 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     String currentUserId, {
     bool showSpeakingStatus = true,
     bool showMicStatus = true,
-    Key? key,
   }) {
     // 过滤掉当前用户自己
     final filteredParticipants =
         participants.where((p) => !p.isMe && p.id != currentUserId).toList();
 
-    // 打印过滤后的参会人员列表以进行调试
-    debugPrint('过滤后的参会人员列表 (${filteredParticipants.length}):');
-    for (final p in filteredParticipants) {
-      debugPrint('- ${p.name} (ID: ${p.id})');
-    }
+    // 简要日志，避免过多输出
+    debugPrint('参会人员列表更新: ${filteredParticipants.length} 人');
 
     if (filteredParticipants.isEmpty) {
       return const Center(
@@ -526,7 +479,6 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     }
 
     return ListView.builder(
-      key: key, // 使用key强制刷新
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: filteredParticipants.length,
       itemBuilder: (context, index) {

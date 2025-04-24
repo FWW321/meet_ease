@@ -89,7 +89,6 @@ class MockWebRTCService implements WebRTCService {
   String? _currentMeetingId;
   String? _currentUserId;
   String? _currentUserName;
-  Timer? _speakingSimulatorTimer;
   ChatService? _chatService;
   StreamSubscription<ChatMessage>? _chatSubscription;
   // Riverpod引用，用于获取当前用户信息
@@ -97,7 +96,20 @@ class MockWebRTCService implements WebRTCService {
 
   // 设置聊天服务
   void setChatService(ChatService chatService) {
+    debugPrint('WebRTCService-设置聊天服务');
+
+    // 先取消旧的订阅
+    _chatSubscription?.cancel();
+
     _chatService = chatService;
+
+    // 如果已经有会议ID，立即订阅新的消息流
+    if (_currentMeetingId != null) {
+      debugPrint('WebRTCService-立即订阅新聊天服务的消息流: $_currentMeetingId');
+      _chatSubscription = _chatService!
+          .getMessageStream(_currentMeetingId!)
+          .listen(_handleChatMessage);
+    }
   }
 
   // 设置Ref
@@ -137,50 +149,67 @@ class MockWebRTCService implements WebRTCService {
     // 获取会议历史消息并更新参会人员列表
     if (_chatService != null && _currentMeetingId != null) {
       try {
+        debugPrint('获取历史消息以初始化参会人员列表...');
         final messages = await _chatService!.getMeetingMessages(
           _currentMeetingId!,
         );
-        _updateParticipantsFromMessages(messages);
+        debugPrint('成功获取历史消息: ${messages.length}条');
 
-        // 订阅新消息以实时更新参会人员
+        // 先取消旧的订阅
         _chatSubscription?.cancel();
+
+        // 先订阅新消息流，再更新参会人员列表，避免错过消息
+        debugPrint('开始订阅聊天消息流...');
         _chatSubscription = _chatService!
             .getMessageStream(_currentMeetingId!)
-            .listen(_handleChatMessage);
+            .listen(
+              (message) {
+                debugPrint('WebRTC服务收到新消息: ${message.type}');
+                _handleChatMessage(message);
+              },
+              onError: (error) {
+                debugPrint('WebRTC服务聊天消息流错误: $error');
+              },
+            );
+        debugPrint('聊天消息流订阅成功');
+
+        // 更新参会人员列表
+        _updateParticipantsFromMessages(messages);
+        debugPrint('成功从历史消息初始化参会人员列表');
       } catch (e) {
         debugPrint('获取会议消息失败: $e');
       }
     }
 
-    // 模拟说话状态变化（简化版，只有当前用户会偶尔"说话"）
-    _speakingSimulatorTimer = Timer.periodic(const Duration(seconds: 8), (
-      timer,
-    ) {
-      if (!_isConnected) {
-        timer.cancel();
-        return;
-      }
-
-      // 随机控制当前用户说话状态
-      final isSpeaking = DateTime.now().millisecondsSinceEpoch % 3 == 0;
-
-      // 更新说话状态
-      _updateCurrentUserSpeakingStatus(isSpeaking);
-    });
+    // 移除定时器轮询，只使用WebSocket消息更新
   }
 
   // 处理聊天消息，特别是系统消息
   void _handleChatMessage(ChatMessage message) {
+    debugPrint('WebRTCService收到消息: 类型=${message.type}, 内容=${message.content}');
+
     if (message.isSystemMessage) {
-      debugPrint('收到系统消息: ${message.content}');
-      // 处理单个系统消息
-      _updateParticipantsFromSystemMessage(message);
+      debugPrint('WebRTCService收到系统消息: ${message.content}');
+
+      // 检查消息内容是否包含关键动作
+      if (message.content.contains('action:加入会议') ||
+          message.content.contains('action:离开会议') ||
+          message.content.contains('action:开启麦克风') ||
+          message.content.contains('action:关闭麦克风')) {
+        debugPrint('WebRTCService处理会议相关系统消息: ${message.content}');
+        _updateParticipantsFromSystemMessage(message);
+      } else {
+        debugPrint('WebRTCService忽略非会议相关系统消息');
+      }
     }
   }
 
   // 从系统消息更新参会人员
   void _updateParticipantsFromSystemMessage(ChatMessage message) {
-    if (!message.isSystemMessage) return;
+    if (!message.isSystemMessage) {
+      debugPrint('非系统消息，忽略: ${message.content}');
+      return;
+    }
 
     // 解析系统消息内容
     String? userId;
@@ -201,7 +230,7 @@ class MockWebRTCService implements WebRTCService {
 
     // 如果缺少必要信息，则忽略
     if (userId == null || username == null || action == null) {
-      debugPrint('系统消息格式不正确，缺少必要信息');
+      debugPrint('系统消息格式不正确，缺少必要信息: ${message.content}');
       return;
     }
 
@@ -231,7 +260,7 @@ class MockWebRTCService implements WebRTCService {
       }
 
       // 打印当前参会人员列表
-      debugPrint('更新后的参会人员列表:');
+      debugPrint('更新后的参会人员列表 (${_participants.length}人):');
       for (final p in _participants) {
         debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
       }
@@ -253,7 +282,7 @@ class MockWebRTCService implements WebRTCService {
         }
 
         // 打印当前参会人员列表
-        debugPrint('更新后的参会人员列表:');
+        debugPrint('更新后的参会人员列表 (${_participants.length}人):');
         for (final p in _participants) {
           debugPrint('- ${p.name} (ID: ${p.id}, isMe: ${p.isMe})');
         }
@@ -277,20 +306,17 @@ class MockWebRTCService implements WebRTCService {
 
   // 更新用户麦克风状态
   void _updateUserMicrophoneStatus(String userId, bool isMuted) {
-    // 查找用户
-    final userIndex = _participants.indexWhere((p) => p.id == userId);
-    if (userIndex >= 0) {
-      // 更新用户的麦克风状态
-      _participants[userIndex] = _participants[userIndex].copyWith(
+    final index = _participants.indexWhere((p) => p.id == userId);
+    if (index >= 0) {
+      _participants[index] = _participants[index].copyWith(
         isMuted: isMuted,
+        isSpeaking: isMuted ? false : _participants[index].isSpeaking,
       );
-
-      // 如果用户正在说话但麦克风静音，需要更新说话状态
-      if (isMuted && _participants[userIndex].isSpeaking) {
-        _participants[userIndex] = _participants[userIndex].copyWith(
-          isSpeaking: false,
-        );
-      }
+      debugPrint(
+        '已更新用户 ${_participants[index].name} 的麦克风状态: ${isMuted ? "已静音" : "未静音"}',
+      );
+    } else {
+      debugPrint('未找到要更新麦克风状态的用户: $userId');
     }
   }
 
@@ -430,7 +456,6 @@ class MockWebRTCService implements WebRTCService {
 
   @override
   Future<void> leaveMeeting() async {
-    _speakingSimulatorTimer?.cancel();
     _chatSubscription?.cancel();
     _isConnected = false;
     _participants = [];
@@ -551,7 +576,6 @@ class MockWebRTCService implements WebRTCService {
 
   @override
   void dispose() {
-    _speakingSimulatorTimer?.cancel();
     _chatSubscription?.cancel();
     _participantsController.close();
   }
