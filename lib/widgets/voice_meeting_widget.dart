@@ -38,6 +38,9 @@ class VoiceMeetingWidget extends HookConsumerWidget {
 
     // 处理新的聊天消息
     useEffect(() {
+      // 创建一个标志，表示组件是否已被销毁
+      bool isDisposed = false;
+
       if (chatMessagesAsync.hasValue && chatMessagesAsync.value != null) {
         try {
           final message = chatMessagesAsync.value!;
@@ -57,11 +60,13 @@ class VoiceMeetingWidget extends HookConsumerWidget {
 
                 // 创建一个ChatMessage对象并手动传递给WebRTC服务
                 try {
-                  final chatMessage = ChatMessage.fromJson(message);
-                  final webRTCService = ref.read(webRTCServiceProvider);
-                  if (webRTCService is MockWebRTCService) {
-                    webRTCService.handleSystemMessage(chatMessage);
-                    debugPrint('已手动传递系统消息给WebRTC服务');
+                  if (!isDisposed) {
+                    final chatMessage = ChatMessage.fromJson(message);
+                    final webRTCService = ref.read(webRTCServiceProvider);
+                    if (webRTCService is MockWebRTCService) {
+                      webRTCService.handleSystemMessage(chatMessage);
+                      debugPrint('已手动传递系统消息给WebRTC服务');
+                    }
                   }
                 } catch (e) {
                   debugPrint('创建ChatMessage或传递给WebRTC服务失败: $e');
@@ -75,7 +80,12 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           debugPrint('处理系统消息出错: $e');
         }
       }
-      return null;
+
+      // 返回清理函数，在组件销毁时将标志设置为true
+      return () {
+        isDisposed = true;
+        debugPrint('VoiceMeetingWidget系统消息处理器已清理');
+      };
     }, [chatMessagesAsync]);
 
     // 麦克风状态 - 从参会人员列表中获取当前用户的麦克风状态

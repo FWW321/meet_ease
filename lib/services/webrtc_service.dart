@@ -100,15 +100,36 @@ class MockWebRTCService implements WebRTCService {
 
     // 先取消旧的订阅
     _chatSubscription?.cancel();
+    _chatSubscription = null;
 
     _chatService = chatService;
 
     // 如果已经有会议ID，立即订阅新的消息流
-    if (_currentMeetingId != null) {
+    if (_currentMeetingId != null && _chatService != null) {
       debugPrint('WebRTCService-立即订阅新聊天服务的消息流: $_currentMeetingId');
-      _chatSubscription = _chatService!
-          .getMessageStream(_currentMeetingId!)
-          .listen(_handleChatMessage);
+
+      try {
+        final messageStream = _chatService!.getMessageStream(
+          _currentMeetingId!,
+        );
+
+        _chatSubscription = messageStream.listen(
+          (message) {
+            // 确保在处理消息时会议ID仍然有效
+            if (_currentMeetingId != null) {
+              _handleChatMessage(message);
+            }
+          },
+          onError: (error) {
+            debugPrint('WebRTCService-聊天消息流错误: $error');
+          },
+          onDone: () {
+            debugPrint('WebRTCService-聊天消息流已关闭');
+          },
+        );
+      } catch (e) {
+        debugPrint('WebRTCService-订阅聊天消息流失败: $e');
+      }
     }
   }
 
@@ -157,25 +178,42 @@ class MockWebRTCService implements WebRTCService {
 
         // 先取消旧的订阅
         _chatSubscription?.cancel();
+        _chatSubscription = null;
 
         // 先订阅新消息流，再更新参会人员列表，避免错过消息
-        debugPrint('开始订阅聊天消息流...');
-        _chatSubscription = _chatService!
-            .getMessageStream(_currentMeetingId!)
-            .listen(
-              (message) {
+        // 确保当前会议ID仍然有效(可能在异步操作期间已经改变)
+        if (_currentMeetingId != null && _chatService != null) {
+          debugPrint('开始订阅聊天消息流...');
+          final messageStream = _chatService!.getMessageStream(
+            _currentMeetingId!,
+          );
+
+          _chatSubscription = messageStream.listen(
+            (message) {
+              // 再次检查会议ID是否仍然有效
+              if (_currentMeetingId != null) {
                 debugPrint('WebRTC服务收到新消息: ${message.type}');
                 _handleChatMessage(message);
-              },
-              onError: (error) {
-                debugPrint('WebRTC服务聊天消息流错误: $error');
-              },
-            );
-        debugPrint('聊天消息流订阅成功');
+              }
+            },
+            onError: (error) {
+              debugPrint('WebRTC服务聊天消息流错误: $error');
+            },
+            onDone: () {
+              debugPrint('WebRTC服务聊天消息流已关闭');
+            },
+          );
+          debugPrint('聊天消息流订阅成功');
+        } else {
+          debugPrint('会议ID已变更，取消订阅消息流');
+        }
 
         // 更新参会人员列表
-        _updateParticipantsFromMessages(messages);
-        debugPrint('成功从历史消息初始化参会人员列表');
+        if (_currentMeetingId != null) {
+          // 再次检查会议ID是否有效
+          _updateParticipantsFromMessages(messages);
+          debugPrint('成功从历史消息初始化参会人员列表');
+        }
       } catch (e) {
         debugPrint('获取会议消息失败: $e');
       }
@@ -456,7 +494,15 @@ class MockWebRTCService implements WebRTCService {
 
   @override
   Future<void> leaveMeeting() async {
-    _chatSubscription?.cancel();
+    debugPrint('WebRTCService-离开会议');
+
+    // 取消消息订阅
+    if (_chatSubscription != null) {
+      await _chatSubscription!.cancel();
+      _chatSubscription = null;
+      debugPrint('WebRTCService-已取消聊天消息订阅');
+    }
+
     _isConnected = false;
     _participants = [];
     _currentMeetingId = null;
@@ -464,9 +510,13 @@ class MockWebRTCService implements WebRTCService {
     _currentUserName = null;
 
     // 发布空列表
-    _participantsController.add(_participants);
+    if (!_participantsController.isClosed) {
+      _participantsController.add(_participants);
+      debugPrint('WebRTCService-已发布空参会人员列表');
+    }
 
     await Future.delayed(const Duration(milliseconds: 300));
+    debugPrint('WebRTCService-离开会议完成');
   }
 
   @override
@@ -576,8 +626,29 @@ class MockWebRTCService implements WebRTCService {
 
   @override
   void dispose() {
-    _chatSubscription?.cancel();
-    _participantsController.close();
+    debugPrint('WebRTCService-正在销毁');
+
+    // 取消消息订阅
+    if (_chatSubscription != null) {
+      _chatSubscription!.cancel();
+      _chatSubscription = null;
+      debugPrint('WebRTCService-已取消聊天消息订阅');
+    }
+
+    // 关闭流控制器
+    if (!_participantsController.isClosed) {
+      _participantsController.close();
+      debugPrint('WebRTCService-已关闭参会人员流控制器');
+    }
+
+    // 清空资源
+    _participants = [];
+    _currentMeetingId = null;
+    _currentUserId = null;
+    _currentUserName = null;
+    _isConnected = false;
+
+    debugPrint('WebRTCService-销毁完成');
   }
 
   // 直接处理系统消息

@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../constants/app_constants.dart';
 import '../models/chat_message.dart';
 import '../providers/chat_providers.dart';
+import '../services/service_providers.dart';
 import 'chat_service.dart';
 
 /// 实际的API聊天服务实现
@@ -30,37 +31,42 @@ class ApiChatService implements ChatService {
 
     // 取消之前的订阅
     _externalWebSocketSubscription?.cancel();
+    _externalWebSocketSubscription = null;
 
     // 订阅外部WebSocket消息流
     _useExternalWebSocket = true;
-    _externalWebSocketSubscription = ref
-        .read(webSocketMessagesProvider.stream)
-        .listen(
-          (message) {
-            try {
-              // 从WebSocket消息创建ChatMessage对象
-              if (message is Map<String, dynamic>) {
-                // 调试每一条WebSocket消息
-                print('ApiChatService-收到WebSocket消息: ${jsonEncode(message)}');
 
-                final chatMessage = ChatMessage.fromJson(message);
-                // 只处理当前会议的消息
-                if (chatMessage.meetingId == meetingId) {
-                  // 添加调试日志确认系统消息被处理
-                  if (chatMessage.isSystemMessage) {
-                    print('ApiChatService-转发系统消息: ${chatMessage.content}');
-                  }
-                  _messageController.add(chatMessage);
-                }
-              }
-            } catch (e) {
-              print('处理外部WebSocket消息失败: $e');
+    // 创建一个本地变量存储WebSocketService以直接访问消息流
+    final webSocketService = ref.read(webSocketServiceProvider);
+
+    _externalWebSocketSubscription = webSocketService.messageStream.listen(
+      (message) {
+        try {
+          // 从WebSocket消息创建ChatMessage对象
+          // 调试每一条WebSocket消息
+          print('ApiChatService-收到WebSocket消息: ${jsonEncode(message)}');
+
+          final chatMessage = ChatMessage.fromJson(message);
+          // 只处理当前会议的消息
+          if (chatMessage.meetingId == meetingId) {
+            // 添加调试日志确认系统消息被处理
+            if (chatMessage.isSystemMessage) {
+              print('ApiChatService-转发系统消息: ${chatMessage.content}');
             }
-          },
-          onError: (error) {
-            print('外部WebSocket错误: $error');
-          },
-        );
+            _messageController.add(chatMessage);
+          }
+        } catch (e) {
+          print('处理外部WebSocket消息失败: $e');
+        }
+      },
+      onError: (error) {
+        print('外部WebSocket错误: $error');
+      },
+      onDone: () {
+        print('外部WebSocket连接已关闭');
+        _useExternalWebSocket = false;
+      },
+    );
 
     print('已设置使用外部WebSocket连接');
   }
@@ -306,8 +312,14 @@ class ApiChatService implements ChatService {
 
   @override
   void closeMessageStream() {
+    print('关闭聊天消息流');
+
     // 取消外部WebSocket订阅
-    _externalWebSocketSubscription?.cancel();
+    if (_externalWebSocketSubscription != null) {
+      _externalWebSocketSubscription!.cancel();
+      _externalWebSocketSubscription = null;
+      print('已取消外部WebSocket订阅');
+    }
     _useExternalWebSocket = false;
 
     // 关闭所有WebSocket连接
@@ -315,8 +327,12 @@ class ApiChatService implements ChatService {
       connection.sink.close();
     }
     _wsConnections.clear();
+    print('已关闭所有WebSocket连接');
 
-    // 关闭消息控制器
-    _messageController.close();
+    // 关闭消息控制器 (如果尚未关闭)
+    if (!_messageController.isClosed) {
+      _messageController.close();
+      print('已关闭消息控制器');
+    }
   }
 }
