@@ -10,19 +10,25 @@ Future<List<String>?> showUserSelectionDialog({
   required BuildContext context,
   required List<String> initialSelectedUserIds,
 }) async {
+  // 保存context引用，避免跨越异步间隙使用BuildContext
+  final contextCaptured = context;
+
   // 创建临时选择状态以便在弹窗中使用
-  final tempSelectedUserIds = List<String>.from(initialSelectedUserIds);
+  // 过滤掉userId为0的系统用户
+  final tempSelectedUserIds = List<String>.from(initialSelectedUserIds)
+    ..removeWhere((id) => id == '0');
+
+  // 获取provider容器
+  final container = ProviderScope.containerOf(contextCaptured);
 
   // 重置Riverpod状态
-  ProviderScope.containerOf(
-    context,
-  ).read(userSelectProvider.notifier).updateAll(tempSelectedUserIds);
+  container.read(userSelectProvider.notifier).updateAll(tempSelectedUserIds);
 
   // 标记对话框是否已经初始化
   bool isInitialized = false;
 
   final bool? result = await showDialog<bool>(
-    context: context,
+    context: contextCaptured,
     barrierDismissible: false, // 防止误触背景关闭对话框
     builder: (BuildContext dialogContext) {
       // 获取屏幕尺寸
@@ -49,7 +55,7 @@ Future<List<String>?> showUserSelectionDialog({
                 width: maxDialogWidth,
                 constraints: BoxConstraints(maxHeight: maxDialogHeight),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).dialogBackgroundColor,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(16), // 更大的圆角
                   boxShadow: [
                     BoxShadow(
@@ -70,14 +76,12 @@ Future<List<String>?> showUserSelectionDialog({
                       // 标题栏 - 固定在顶部，使用更现代的样式
                       Container(
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).primaryColor.withOpacity(0.05),
+                          color: Theme.of(context).primaryColor.withAlpha(13),
                           border: Border(
                             bottom: BorderSide(
                               color: Theme.of(
                                 context,
-                              ).dividerColor.withOpacity(0.5),
+                              ).dividerColor.withAlpha(128),
                             ),
                           ),
                         ),
@@ -106,7 +110,7 @@ Future<List<String>?> showUserSelectionDialog({
                               },
                               visualDensity: VisualDensity.compact,
                               style: IconButton.styleFrom(
-                                backgroundColor: Colors.grey.withOpacity(0.1),
+                                backgroundColor: Colors.grey.withAlpha(26),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -139,7 +143,7 @@ Future<List<String>?> showUserSelectionDialog({
                           color: Theme.of(context).scaffoldBackgroundColor,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withAlpha(13),
                               blurRadius: 5,
                               offset: const Offset(0, -2),
                             ),
@@ -262,7 +266,8 @@ Future<List<String>?> showUserSelectionDialog({
 
   // 如果确认了选择，返回选择的用户ID
   if (result == true) {
-    return ProviderScope.containerOf(context).read(userSelectProvider);
+    // 使用之前保存的container引用，避免再次使用BuildContext
+    return container.read(userSelectProvider);
   }
 
   // 取消选择返回null

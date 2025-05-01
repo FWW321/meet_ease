@@ -121,10 +121,12 @@ class UserSearchResultList extends ConsumerWidget {
 
     return currentUserIdAsync.when(
       data: (currentUserId) {
-        // 过滤掉当前用户
+        // 过滤掉当前用户和系统用户(userId为0)
         final filteredResults =
             searchResults
-                .where((user) => user.userId != currentUserId)
+                .where(
+                  (user) => user.userId != currentUserId && user.userId != '0',
+                )
                 .toList();
 
         // 对搜索结果进行处理，将已选择的用户置顶
@@ -200,7 +202,7 @@ class UserSearchResultList extends ConsumerWidget {
                 // 为已选择项添加背景色
                 tileColor:
                     isSelected
-                        ? Theme.of(context).primaryColor.withOpacity(0.05)
+                        ? Theme.of(context).primaryColor.withAlpha(13)
                         : null,
               ),
             );
