@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/meeting.dart';
+import '../models/meeting_recommendation.dart';
 import '../providers/meeting_providers.dart';
 import '../widgets/meeting_list_item.dart';
 import '../constants/app_constants.dart';
@@ -20,6 +21,8 @@ class MeetingPage extends HookConsumerWidget {
     final isSearchingState = useState<bool>(false);
     // 文本控制器
     final textController = useTextEditingController();
+    // 显示模式 - 添加新的状态控制是否显示推荐会议
+    final showRecommendedState = useState<bool>(true);
 
     // 监听搜索框变化
     useEffect(() {
@@ -37,6 +40,8 @@ class MeetingPage extends HookConsumerWidget {
     final meetingsAsync =
         isSearchingState.value && searchQueryState.value.isNotEmpty
             ? ref.watch(searchMeetingsProvider(searchQueryState.value))
+            : showRecommendedState.value
+            ? ref.watch(recommendedMeetingsProvider)
             : ref.watch(meetingListProvider);
 
     return Scaffold(
@@ -88,6 +93,8 @@ class MeetingPage extends HookConsumerWidget {
                 if (value.isNotEmpty) {
                   searchQueryState.value = value;
                   isSearchingState.value = true;
+                  // 搜索时关闭推荐模式
+                  showRecommendedState.value = false;
                 }
               },
             ),
@@ -135,20 +142,29 @@ class MeetingPage extends HookConsumerWidget {
               ),
             ),
 
-          // 过滤栏 - 仅在非搜索状态下显示
+          // 过滤栏 - 增加推荐选项，并在非搜索状态下显示
           if (!isSearchingState.value)
-            _buildFilterChips(context, selectedFilterState),
+            _buildFilterChips(
+              context,
+              selectedFilterState,
+              showRecommendedState,
+            ),
 
           // 会议列表
           Expanded(
             child: meetingsAsync.when(
               data: (meetings) {
-                // 过滤会议状态 (仅在非搜索模式时)
+                // 过滤会议状态 (仅在非搜索、非推荐模式时)
                 final filteredMeetings =
-                    !isSearchingState.value && selectedFilterState.value != null
-                        ? meetings
-                            .where((m) => m.status == selectedFilterState.value)
-                            .toList()
+                    !isSearchingState.value &&
+                            !showRecommendedState.value &&
+                            selectedFilterState.value != null
+                        ? meetings.where((m) {
+                          if (m is Meeting) {
+                            return m.status == selectedFilterState.value;
+                          }
+                          return false;
+                        }).toList()
                         : meetings;
 
                 if (filteredMeetings.isEmpty) {
@@ -168,6 +184,7 @@ class MeetingPage extends HookConsumerWidget {
                   filteredMeetings,
                   ref,
                   isSearchingState.value ? searchQueryState.value : null,
+                  showRecommendedState.value,
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -203,6 +220,7 @@ class MeetingPage extends HookConsumerWidget {
           // 如果创建成功，刷新会议列表
           if (result == true) {
             ref.invalidate(meetingListProvider);
+            ref.invalidate(recommendedMeetingsProvider);
             if (searchQueryState.value.isNotEmpty) {
               ref.invalidate(searchMeetingsProvider(searchQueryState.value));
             }
@@ -218,6 +236,7 @@ class MeetingPage extends HookConsumerWidget {
   Widget _buildFilterChips(
     BuildContext context,
     ValueNotifier<MeetingStatus?> selectedFilter,
+    ValueNotifier<bool> showRecommended,
   ) {
     return Container(
       height: 50,
@@ -228,10 +247,29 @@ class MeetingPage extends HookConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
+              label: const Text('推荐'),
+              selected: showRecommended.value,
+              selectedColor: Colors.blue.withAlpha(40),
+              onSelected: (selected) {
+                showRecommended.value = selected;
+                // 选择推荐时，清除状态过滤
+                if (selected) {
+                  selectedFilter.value = null;
+                }
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
               label: const Text('全部'),
-              selected: selectedFilter.value == null,
+              selected: selectedFilter.value == null && !showRecommended.value,
               onSelected: (selected) {
                 selectedFilter.value = null;
+                // 选择全部时，关闭推荐模式
+                if (selected) {
+                  showRecommended.value = false;
+                }
               },
             ),
           ),
@@ -242,6 +280,10 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.upcoming,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.upcoming : null;
+                // 选择状态过滤时，关闭推荐模式
+                if (selected) {
+                  showRecommended.value = false;
+                }
               },
             ),
           ),
@@ -252,6 +294,10 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.ongoing,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.ongoing : null;
+                // 选择状态过滤时，关闭推荐模式
+                if (selected) {
+                  showRecommended.value = false;
+                }
               },
             ),
           ),
@@ -263,6 +309,10 @@ class MeetingPage extends HookConsumerWidget {
               onSelected: (selected) {
                 selectedFilter.value =
                     selected ? MeetingStatus.completed : null;
+                // 选择状态过滤时，关闭推荐模式
+                if (selected) {
+                  showRecommended.value = false;
+                }
               },
             ),
           ),
@@ -271,6 +321,10 @@ class MeetingPage extends HookConsumerWidget {
             selected: selectedFilter.value == MeetingStatus.cancelled,
             onSelected: (selected) {
               selectedFilter.value = selected ? MeetingStatus.cancelled : null;
+              // 选择状态过滤时，关闭推荐模式
+              if (selected) {
+                showRecommended.value = false;
+              }
             },
           ),
         ],
@@ -316,15 +370,18 @@ class MeetingPage extends HookConsumerWidget {
   // 构建会议列表视图
   Widget _buildMeetingListView(
     BuildContext context,
-    List<Meeting> meetings,
+    List<dynamic> meetings,
     WidgetRef ref,
     String? searchQuery,
+    bool isRecommended,
   ) {
     return RefreshIndicator(
       onRefresh: () async {
         // 刷新数据
         if (searchQuery != null && searchQuery.isNotEmpty) {
           ref.invalidate(searchMeetingsProvider(searchQuery));
+        } else if (isRecommended) {
+          ref.invalidate(recommendedMeetingsProvider);
         } else {
           ref.invalidate(meetingListProvider);
         }
@@ -333,9 +390,22 @@ class MeetingPage extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         itemCount: meetings.length,
         itemBuilder: (context, index) {
-          final meeting = meetings[index];
+          // 获取会议对象，可能是Meeting或MeetingRecommendation
+          final meetingObj = meetings[index];
+          final Meeting meeting;
+          String? matchScore;
+
+          if (meetingObj is MeetingRecommendation) {
+            meeting = meetingObj.meeting;
+            // 将匹配度转换为百分比
+            matchScore = '${(meetingObj.matchScore * 100).toStringAsFixed(0)}%';
+          } else {
+            meeting = meetingObj as Meeting;
+          }
+
           return MeetingListItem(
             meeting: meeting,
+            matchScore: matchScore,
             onTap: () {
               Navigator.push(
                 context,

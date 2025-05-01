@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'dart:async'; // 添加async支持
 import '../models/meeting.dart';
+import '../models/meeting_recommendation.dart';
 import '../models/user.dart';
 import '../services/meeting_service.dart';
+import 'user_providers.dart';
 
 part 'meeting_providers.g.dart';
 
@@ -259,5 +261,22 @@ class MeetingOperations extends _$MeetingOperations {
       state = AsyncValue.error(e, stackTrace);
       rethrow;
     }
+  }
+}
+
+/// 推荐会议列表提供者
+@riverpod
+Future<List<MeetingRecommendation>> recommendedMeetings(
+  RecommendedMeetingsRef ref,
+) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  final userId = await ref.watch(currentUserIdProvider.future);
+
+  try {
+    return await meetingService.getRecommendedMeetings(userId);
+  } catch (e) {
+    // 记录错误但返回空列表，防止应用崩溃
+    print('获取推荐会议失败: $e');
+    return [];
   }
 }

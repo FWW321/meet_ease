@@ -5,10 +5,12 @@ import '../models/meeting.dart';
 class MeetingListItem extends StatelessWidget {
   final Meeting meeting;
   final VoidCallback onTap;
+  final String? matchScore;
 
   const MeetingListItem({
     required this.meeting,
     required this.onTap,
+    this.matchScore,
     super.key,
   });
 
@@ -73,7 +75,7 @@ class MeetingListItem extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
+                      color: statusColor.withAlpha(25),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: statusColor),
                     ),
@@ -142,6 +144,20 @@ class MeetingListItem extends StatelessWidget {
                     const Text(
                       '已签到',
                       style: TextStyle(fontSize: 12, color: Colors.green),
+                    ),
+                  ],
+                  // 显示匹配度
+                  if (matchScore != null) ...[
+                    const Spacer(),
+                    const Icon(Icons.recommend, size: 16, color: Colors.blue),
+                    const SizedBox(width: 4),
+                    Text(
+                      '匹配度: $matchScore',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ],

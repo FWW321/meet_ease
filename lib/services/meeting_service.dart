@@ -1,5 +1,6 @@
 import '../models/meeting.dart';
 import '../models/user.dart';
+import '../models/meeting_recommendation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -81,6 +82,9 @@ abstract class MeetingService {
     String uploaderId,
     dynamic file,
   );
+
+  /// 获取推荐会议
+  Future<List<MeetingRecommendation>> getRecommendedMeetings(String userId);
 }
 
 /// 模拟会议服务实现
@@ -569,6 +573,23 @@ class MockMeetingService implements MeetingService {
     // 这里需要根据实际情况实现文件上传的逻辑
     // 返回true表示上传成功，返回false表示上传失败
     return false;
+  }
+
+  @override
+  Future<List<MeetingRecommendation>> getRecommendedMeetings(
+    String userId,
+  ) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 创建一些模拟推荐会议数据
+    return [
+      MeetingRecommendation(matchScore: 0.85, meeting: _meetings.first),
+      MeetingRecommendation(
+        matchScore: 0.65,
+        meeting: _meetings.length > 1 ? _meetings[1] : _meetings.first,
+      ),
+    ];
   }
 }
 
@@ -1146,6 +1167,38 @@ class ApiMeetingService implements MeetingService {
       }
     } catch (e) {
       throw Exception('上传会议文件时出错: $e');
+    }
+  }
+
+  @override
+  Future<List<MeetingRecommendation>> getRecommendedMeetings(
+    String userId,
+  ) async {
+    try {
+      final url =
+          '${AppConstants.apiBaseUrl}/meetings/recommend/public/$userId';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        // 使用HttpUtils.decodeResponse解决编码问题
+        final jsonData = HttpUtils.decodeResponse(response);
+
+        if (jsonData['code'] == 200 && jsonData['data'] != null) {
+          final List<dynamic> recommendationsData = jsonData['data'];
+
+          return recommendationsData
+              .map((data) => MeetingRecommendation.fromJson(data))
+              .toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      print('获取推荐会议失败: $e');
+      rethrow;
     }
   }
 }

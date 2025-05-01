@@ -6,7 +6,7 @@ part of 'meeting_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$meetingListHash() => r'10d0ed1cd12d7102b3a5b7f982bb332a188111b8';
+String _$meetingListHash() => r'a56c0cca30b22641e44f845c386021191eb29515';
 
 /// 会议列表提供者
 ///
@@ -24,7 +24,7 @@ final meetingListProvider = AutoDisposeFutureProvider<List<Meeting>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MeetingListRef = AutoDisposeFutureProviderRef<List<Meeting>>;
-String _$meetingDetailHash() => r'fb1e1c50bbca60500357413be36c736a19cdf917';
+String _$meetingDetailHash() => r'8c96711bb3f1555611b678c6f565c50295d02b37';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -464,6 +464,29 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
+String _$recommendedMeetingsHash() =>
+    r'c0ca0f0c7e2b77c49905be59e5e8c9478ad7e1fa';
+
+/// 推荐会议列表提供者
+///
+/// Copied from [recommendedMeetings].
+@ProviderFor(recommendedMeetings)
+final recommendedMeetingsProvider =
+    AutoDisposeFutureProvider<List<MeetingRecommendation>>.internal(
+      recommendedMeetings,
+      name: r'recommendedMeetingsProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$recommendedMeetingsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef RecommendedMeetingsRef =
+    AutoDisposeFutureProviderRef<List<MeetingRecommendation>>;
 String _$createMeetingHash() => r'ad7ce223cd00374078eca4dbfa608e7cf52b7c69';
 
 /// 创建会议提供者
@@ -484,7 +507,7 @@ final createMeetingProvider =
 
 typedef _$CreateMeeting = AutoDisposeAsyncNotifier<Meeting?>;
 String _$validateMeetingPasswordHash() =>
-    r'2f52ef677a6da34b1b51ac59a84535c7fc7c62bd';
+    r'2a007aa4a6e5475f5630a0ba82fff5a920686d1c';
 
 abstract class _$ValidateMeetingPassword
     extends BuildlessAutoDisposeAsyncNotifier<bool?> {
