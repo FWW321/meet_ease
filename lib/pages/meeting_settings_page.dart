@@ -761,6 +761,9 @@ class _AdminsTab extends HookConsumerWidget {
       meetingParticipantsProvider(meeting.id),
     );
 
+    // 获取管理员列表
+    final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
+
     return Column(
       children: [
         // 管理员列表
@@ -779,28 +782,53 @@ class _AdminsTab extends HookConsumerWidget {
               const Divider(),
 
               // 现有管理员列表
-              if (meeting.admins.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Center(
-                    child: Text(
-                      '尚未添加管理员',
-                      style: TextStyle(color: Colors.grey),
+              managersAsync.when(
+                data: (managers) {
+                  if (managers.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24.0),
+                      child: Center(
+                        child: Text(
+                          '尚未添加管理员',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children:
+                        managers
+                            .map(
+                              (admin) => _UserTile(
+                                userId: admin.id,
+                                label: '管理员',
+                                canRemove: meeting.isCreatorOnly(currentUserId),
+                                onRemove: () {
+                                  // 移除管理员
+                                  _removeAdmin(context, ref, admin.id);
+                                },
+                              ),
+                            )
+                            .toList(),
+                  );
+                },
+                loading:
+                    () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
-                  ),
-                )
-              else
-                ...meeting.admins.map(
-                  (adminId) => _UserTile(
-                    userId: adminId,
-                    label: '管理员',
-                    canRemove: meeting.isCreatorOnly(currentUserId),
-                    onRemove: () {
-                      // 移除管理员
-                      _removeAdmin(context, ref, adminId);
-                    },
-                  ),
-                ),
+                error:
+                    (error, _) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Center(
+                        child: Text(
+                          '加载管理员列表失败: $error',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ),
+              ),
             ],
           ),
         ),
@@ -809,13 +837,22 @@ class _AdminsTab extends HookConsumerWidget {
         if (meeting.isCreatorOnly(currentUserId))
           participantsAsync.when(
             data: (participants) {
+              // 获取管理员ID列表用于过滤
+              final adminIds =
+                  managersAsync.whenOrNull(
+                    data:
+                        (managers) =>
+                            managers.map((admin) => admin.id).toList(),
+                  ) ??
+                  [];
+
               // 过滤掉创建者和现有管理员
               final availableParticipants =
                   participants
                       .where(
                         (user) =>
                             user.id != meeting.organizerId &&
-                            !meeting.admins.contains(user.id),
+                            !adminIds.contains(user.id),
                       )
                       .toList();
 
@@ -976,6 +1013,9 @@ class _BlacklistTab extends HookConsumerWidget {
       meetingParticipantsProvider(meeting.id),
     );
 
+    // 获取管理员列表
+    final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
+
     return Column(
       children: [
         // 黑名单列表
@@ -1010,14 +1050,23 @@ class _BlacklistTab extends HookConsumerWidget {
         if (meeting.canUserManage(currentUserId))
           participantsAsync.when(
             data: (participants) {
-              // 过滤掉已在黑名单中的用户和创建者
+              // 获取管理员ID列表用于过滤
+              final adminIds =
+                  managersAsync.whenOrNull(
+                    data:
+                        (managers) =>
+                            managers.map((admin) => admin.id).toList(),
+                  ) ??
+                  [];
+
+              // 过滤掉已在黑名单中的用户和创建者以及管理员
               final availableParticipants =
                   participants
                       .where(
                         (user) =>
                             !meeting.blacklist.contains(user.id) &&
                             user.id != meeting.organizerId &&
-                            !meeting.admins.contains(user.id),
+                            !adminIds.contains(user.id),
                       )
                       .toList();
 
@@ -1184,22 +1233,21 @@ class _UserTile extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 获取用户信息
-    final userAsync = ref.watch(userProvider(userId));
+    // 使用userNameProvider获取用户名，而不是整个用户信息
+    final userNameAsync = ref.watch(userNameProvider(userId));
 
-    return userAsync.when(
+    return userNameAsync.when(
       data:
-          (user) => ListTile(
+          (userName) => ListTile(
             leading: CircleAvatar(
-              backgroundImage:
-                  user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-              child:
-                  user.avatarUrl == null
-                      ? Text(user.name.substring(0, 1))
-                      : null,
+              backgroundColor: _getLabelColor(label).withAlpha(51),
+              child: Text(
+                userName.isNotEmpty ? userName[0].toUpperCase() : '?',
+                style: TextStyle(color: _getLabelColor(label)),
+              ),
             ),
-            title: Text(user.name),
-            subtitle: Text(user.email),
+            title: Text(userName),
+            subtitle: label == '创建者' ? const Text('会议创建者') : null,
             trailing:
                 canRemove && onRemove != null
                     ? IconButton(
@@ -1209,22 +1257,61 @@ class _UserTile extends HookConsumerWidget {
                     )
                     : Chip(
                       label: Text(label, style: const TextStyle(fontSize: 12)),
-                      backgroundColor: Colors.grey.shade100,
+                      backgroundColor: _getLabelColor(label).withAlpha(25),
+                      side: BorderSide(
+                        color: _getLabelColor(label).withAlpha(128),
+                      ),
+                      labelStyle: TextStyle(color: _getLabelColor(label)),
                     ),
           ),
       loading:
-          () => const ListTile(
+          () => ListTile(
             leading: CircleAvatar(
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             title: Text('加载中...'),
+            trailing: Chip(
+              label: Text(label, style: const TextStyle(fontSize: 12)),
+              backgroundColor: _getLabelColor(label).withAlpha(25),
+            ),
           ),
       error:
-          (error, stackTrace) => ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.error)),
-            title: Text('加载失败'),
-            subtitle: Text('$error'),
+          (_, __) => ListTile(
+            leading: CircleAvatar(
+              backgroundColor: _getLabelColor(label).withAlpha(51),
+              child: Text('?', style: TextStyle(color: _getLabelColor(label))),
+            ),
+            title: Text('用户 $userId'),
+            trailing:
+                canRemove && onRemove != null
+                    ? IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      tooltip: '移除',
+                      onPressed: onRemove,
+                    )
+                    : Chip(
+                      label: Text(label, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: _getLabelColor(label).withAlpha(25),
+                      side: BorderSide(
+                        color: _getLabelColor(label).withAlpha(128),
+                      ),
+                      labelStyle: TextStyle(color: _getLabelColor(label)),
+                    ),
           ),
     );
+  }
+
+  // 根据标签获取颜色
+  Color _getLabelColor(String label) {
+    switch (label) {
+      case '创建者':
+        return Colors.orange;
+      case '管理员':
+        return Colors.blue;
+      case '已封禁':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }
