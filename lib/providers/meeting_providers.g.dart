@@ -487,6 +487,27 @@ final recommendedMeetingsProvider =
 // ignore: unused_element
 typedef RecommendedMeetingsRef =
     AutoDisposeFutureProviderRef<List<MeetingRecommendation>>;
+String _$myPrivateMeetingsHash() => r'dad7ff8d7ee2d5d7d5a8f1ec5debf8242addc9c8';
+
+/// 我的私密会议列表提供者
+///
+/// Copied from [myPrivateMeetings].
+@ProviderFor(myPrivateMeetings)
+final myPrivateMeetingsProvider =
+    AutoDisposeFutureProvider<List<Meeting>>.internal(
+      myPrivateMeetings,
+      name: r'myPrivateMeetingsProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$myPrivateMeetingsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MyPrivateMeetingsRef = AutoDisposeFutureProviderRef<List<Meeting>>;
 String _$createMeetingHash() => r'ad7ce223cd00374078eca4dbfa608e7cf52b7c69';
 
 /// 创建会议提供者

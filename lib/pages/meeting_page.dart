@@ -23,6 +23,8 @@ class MeetingPage extends HookConsumerWidget {
     final textController = useTextEditingController();
     // 显示模式 - 添加新的状态控制是否显示推荐会议
     final showRecommendedState = useState<bool>(true);
+    // 显示我的私密会议
+    final showMyPrivateState = useState<bool>(false);
 
     // 监听搜索框变化
     useEffect(() {
@@ -40,6 +42,8 @@ class MeetingPage extends HookConsumerWidget {
     final meetingsAsync =
         isSearchingState.value && searchQueryState.value.isNotEmpty
             ? ref.watch(searchMeetingsProvider(searchQueryState.value))
+            : showMyPrivateState.value
+            ? ref.watch(myPrivateMeetingsProvider)
             : showRecommendedState.value
             ? ref.watch(recommendedMeetingsProvider)
             : ref.watch(meetingListProvider);
@@ -93,8 +97,9 @@ class MeetingPage extends HookConsumerWidget {
                 if (value.isNotEmpty) {
                   searchQueryState.value = value;
                   isSearchingState.value = true;
-                  // 搜索时关闭推荐模式
+                  // 搜索时关闭推荐模式和我的模式
                   showRecommendedState.value = false;
+                  showMyPrivateState.value = false;
                 }
               },
             ),
@@ -148,16 +153,18 @@ class MeetingPage extends HookConsumerWidget {
               context,
               selectedFilterState,
               showRecommendedState,
+              showMyPrivateState,
             ),
 
           // 会议列表
           Expanded(
             child: meetingsAsync.when(
               data: (meetings) {
-                // 过滤会议状态 (仅在非搜索、非推荐模式时)
+                // 过滤会议状态 (仅在非搜索、非推荐、非我的模式时)
                 final filteredMeetings =
                     !isSearchingState.value &&
                             !showRecommendedState.value &&
+                            !showMyPrivateState.value &&
                             selectedFilterState.value != null
                         ? meetings.where((m) {
                           if (m is Meeting) {
@@ -221,6 +228,7 @@ class MeetingPage extends HookConsumerWidget {
           if (result == true) {
             ref.invalidate(meetingListProvider);
             ref.invalidate(recommendedMeetingsProvider);
+            ref.invalidate(myPrivateMeetingsProvider);
             if (searchQueryState.value.isNotEmpty) {
               ref.invalidate(searchMeetingsProvider(searchQueryState.value));
             }
@@ -237,6 +245,7 @@ class MeetingPage extends HookConsumerWidget {
     BuildContext context,
     ValueNotifier<MeetingStatus?> selectedFilter,
     ValueNotifier<bool> showRecommended,
+    ValueNotifier<bool> showMyPrivate,
   ) {
     return Container(
       height: 50,
@@ -252,9 +261,26 @@ class MeetingPage extends HookConsumerWidget {
               selectedColor: Colors.blue.withAlpha(40),
               onSelected: (selected) {
                 showRecommended.value = selected;
-                // 选择推荐时，清除状态过滤
+                // 选择推荐时，清除状态过滤，关闭我的
                 if (selected) {
                   selectedFilter.value = null;
+                  showMyPrivate.value = false;
+                }
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: const Text('我的'),
+              selected: showMyPrivate.value,
+              selectedColor: Colors.green.withAlpha(40),
+              onSelected: (selected) {
+                showMyPrivate.value = selected;
+                // 选择我的时，清除状态过滤，关闭推荐
+                if (selected) {
+                  selectedFilter.value = null;
+                  showRecommended.value = false;
                 }
               },
             ),
@@ -263,12 +289,16 @@ class MeetingPage extends HookConsumerWidget {
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
               label: const Text('全部'),
-              selected: selectedFilter.value == null && !showRecommended.value,
+              selected:
+                  selectedFilter.value == null &&
+                  !showRecommended.value &&
+                  !showMyPrivate.value,
               onSelected: (selected) {
                 selectedFilter.value = null;
-                // 选择全部时，关闭推荐模式
+                // 选择全部时，关闭推荐模式和我的模式
                 if (selected) {
                   showRecommended.value = false;
+                  showMyPrivate.value = false;
                 }
               },
             ),
@@ -280,9 +310,10 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.upcoming,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.upcoming : null;
-                // 选择状态过滤时，关闭推荐模式
+                // 选择状态过滤时，关闭推荐模式和我的模式
                 if (selected) {
                   showRecommended.value = false;
+                  showMyPrivate.value = false;
                 }
               },
             ),
@@ -294,9 +325,10 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.ongoing,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.ongoing : null;
-                // 选择状态过滤时，关闭推荐模式
+                // 选择状态过滤时，关闭推荐模式和我的模式
                 if (selected) {
                   showRecommended.value = false;
+                  showMyPrivate.value = false;
                 }
               },
             ),
@@ -309,9 +341,10 @@ class MeetingPage extends HookConsumerWidget {
               onSelected: (selected) {
                 selectedFilter.value =
                     selected ? MeetingStatus.completed : null;
-                // 选择状态过滤时，关闭推荐模式
+                // 选择状态过滤时，关闭推荐模式和我的模式
                 if (selected) {
                   showRecommended.value = false;
+                  showMyPrivate.value = false;
                 }
               },
             ),
@@ -321,9 +354,10 @@ class MeetingPage extends HookConsumerWidget {
             selected: selectedFilter.value == MeetingStatus.cancelled,
             onSelected: (selected) {
               selectedFilter.value = selected ? MeetingStatus.cancelled : null;
-              // 选择状态过滤时，关闭推荐模式
+              // 选择状态过滤时，关闭推荐模式和我的模式
               if (selected) {
                 showRecommended.value = false;
+                showMyPrivate.value = false;
               }
             },
           ),
@@ -384,6 +418,7 @@ class MeetingPage extends HookConsumerWidget {
           ref.invalidate(recommendedMeetingsProvider);
         } else {
           ref.invalidate(meetingListProvider);
+          ref.invalidate(myPrivateMeetingsProvider);
         }
       },
       child: ListView.builder(

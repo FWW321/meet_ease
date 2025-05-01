@@ -280,3 +280,18 @@ Future<List<MeetingRecommendation>> recommendedMeetings(
     return [];
   }
 }
+
+/// 我的私密会议列表提供者
+@riverpod
+Future<List<Meeting>> myPrivateMeetings(MyPrivateMeetingsRef ref) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  final userId = await ref.watch(currentUserIdProvider.future);
+
+  try {
+    return await meetingService.getMyPrivateMeetings(userId);
+  } catch (e) {
+    // 记录错误但返回空列表，防止应用崩溃
+    print('获取我的私密会议失败: $e');
+    return [];
+  }
+}

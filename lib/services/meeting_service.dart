@@ -85,6 +85,9 @@ abstract class MeetingService {
 
   /// 获取推荐会议
   Future<List<MeetingRecommendation>> getRecommendedMeetings(String userId);
+
+  /// 获取我的私密会议
+  Future<List<Meeting>> getMyPrivateMeetings(String userId);
 }
 
 /// 模拟会议服务实现
@@ -591,6 +594,21 @@ class MockMeetingService implements MeetingService {
       ),
     ];
   }
+
+  @override
+  Future<List<Meeting>> getMyPrivateMeetings(String userId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 返回我的私密会议模拟数据
+    return _meetings
+        .where(
+          (m) =>
+              m.visibility == MeetingVisibility.private &&
+              (m.organizerId == userId || m.participants.contains(userId)),
+        )
+        .toList();
+  }
 }
 
 /// API会议服务实现 - 将来用于实际的后端API调用
@@ -647,7 +665,7 @@ class ApiMeetingService implements MeetingService {
               endTime: endTime,
               location: record['location'],
               status: meetingStatus,
-              type: MeetingType.regular, // 默认类型，API未提供
+              type: MeetingType.regular, // 默认为常规会议
               visibility: MeetingVisibility.public, // 默认可见性，API未提供
               organizerId: record['organizerId'].toString(),
               organizerName: '', // API未提供组织者名称
@@ -750,7 +768,7 @@ class ApiMeetingService implements MeetingService {
             endTime: endTime,
             location: meetingData['location'] ?? '',
             status: meetingStatus,
-            type: MeetingType.regular, // 默认类型，API未提供
+            type: MeetingType.regular, // 默认为常规会议
             visibility: MeetingVisibility.public, // 默认可见性，API未提供
             organizerId: meetingData['organizerId'].toString(),
             organizerName: '', // API未提供组织者名称
@@ -1198,6 +1216,73 @@ class ApiMeetingService implements MeetingService {
       return [];
     } catch (e) {
       print('获取推荐会议失败: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<Meeting>> getMyPrivateMeetings(String userId) async {
+    try {
+      final url =
+          '${AppConstants.apiBaseUrl}/meetings/recommend/private/$userId';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        // 使用HttpUtils.decodeResponse解决编码问题
+        final jsonData = HttpUtils.decodeResponse(response);
+
+        if (jsonData['code'] == 200 && jsonData['data'] != null) {
+          final List<dynamic> meetingsData = jsonData['data'];
+          final currentTime = DateTime.now();
+
+          // 将API返回的会议记录转换为Meeting对象列表
+          return meetingsData.map<Meeting>((record) {
+            // 解析会议状态
+            MeetingStatus meetingStatus = _parseMeetingStatus(
+              record['status'] ?? '待开始',
+            );
+
+            // 解析开始和结束时间
+            final startTime = DateTime.parse(record['startTime']);
+            final endTime = DateTime.parse(record['endTime']);
+
+            // 根据当前时间更新会议状态
+            // 如果当前时间在会议开始和结束时间之间，将状态设为"进行中"
+            if (currentTime.isAfter(startTime) &&
+                currentTime.isBefore(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.ongoing;
+            }
+            // 如果当前时间超过会议结束时间，将状态设为"已结束"
+            else if (currentTime.isAfter(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.completed;
+            }
+
+            return Meeting(
+              id: record['meetingId'].toString(),
+              title: record['title'],
+              startTime: startTime,
+              endTime: endTime,
+              location: record['location'] ?? '',
+              status: meetingStatus,
+              type: MeetingType.regular, // 默认为常规会议
+              visibility: MeetingVisibility.private, // 私密会议
+              organizerId: record['organizerId'].toString(),
+              organizerName: '', // API未提供组织者名称
+              description: record['description'],
+              createdAt: DateTime.parse(record['createdAt']),
+            );
+          }).toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      print('获取我的私密会议失败: $e');
       rethrow;
     }
   }
