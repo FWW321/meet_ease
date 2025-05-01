@@ -29,6 +29,7 @@ abstract class MeetingService {
   Future<bool> validateMeetingPassword(String meetingId, String password);
 
   /// 更新会议密码
+  /// @deprecated 此方法已废弃，会议密码在创建时确定，不支持后续修改
   Future<void> updateMeetingPassword(String meetingId, String? password);
 
   /// 获取会议参与者
@@ -497,18 +498,8 @@ class MockMeetingService implements MeetingService {
 
   @override
   Future<void> updateMeetingPassword(String meetingId, String? password) async {
-    // 模拟网络延迟
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    final index = _meetings.indexWhere((m) => m.id == meetingId);
-    if (index != -1) {
-      _meetings[index] = _meetings[index].copyWith(
-        password: password,
-        updatedAt: DateTime.now(),
-      );
-    } else {
-      throw Exception('会议不存在');
-    }
+    // 该方法已废弃，直接抛出异常
+    throw UnimplementedError('会议密码在创建时确定，不支持后续修改');
   }
 
   @override
@@ -987,8 +978,70 @@ class ApiMeetingService implements MeetingService {
     DateTime? endTime,
     MeetingType? type,
   }) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 获取会议详情，检查是否可以更新startTime
+      Meeting? currentMeeting;
+      if (startTime != null) {
+        currentMeeting = await getMeetingById(meetingId);
+
+        // 如果会议不是即将开始状态，则不允许修改startTime
+        if (currentMeeting.status != MeetingStatus.upcoming) {
+          throw Exception('只有即将开始的会议才能修改开始时间');
+        }
+      }
+
+      // 构建查询参数
+      final Map<String, String> queryParams = {'meetingId': meetingId};
+
+      // 添加可选参数
+      if (title != null) {
+        queryParams['title'] = title;
+      }
+
+      if (location != null) {
+        queryParams['location'] = location;
+      }
+
+      if (startTime != null) {
+        queryParams['startTime'] = startTime.toIso8601String();
+      }
+
+      if (endTime != null) {
+        queryParams['endTime'] = endTime.toIso8601String();
+      }
+
+      if (type != null) {
+        queryParams['meetingType'] = _getMeetingTypeString(type);
+      }
+
+      // 创建URI并添加查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/update',
+      ).replace(queryParameters: queryParams);
+
+      // 发送PUT请求
+      final response = await _client.put(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        if (responseData['code'] == 200) {
+          // 操作成功，可以处理返回的消息
+          print('更新会议成功: ${responseData['data']}');
+        } else {
+          throw Exception(responseData['message'] ?? '更新会议失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '更新会议请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('更新会议时出错: $e');
+    }
   }
 
   @override
@@ -1198,32 +1251,8 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<void> updateMeetingPassword(String meetingId, String? password) async {
-    try {
-      // TODO: 后续改为实际API调用
-      print('正在更新会议密码，会议ID: $meetingId，新密码: ${password ?? '(无密码)'}');
-
-      // 目前我们没有实际的密码更新API，所以这里只是模拟成功
-      // 实际项目中应该调用API来更新会议密码
-      // final response = await _client.put(
-      //   Uri.parse('${AppConstants.apiBaseUrl}/meeting/$meetingId/password'),
-      //   headers: HttpUtils.createHeaders(),
-      //   body: jsonEncode({'password': password}),
-      // );
-      //
-      // if (response.statusCode != 200) {
-      //   final errorMessage = HttpUtils.extractErrorMessage(
-      //     response,
-      //     defaultMessage: '更新会议密码失败'
-      //   );
-      //   throw Exception(errorMessage);
-      // }
-
-      // 成功更新
-      return;
-    } catch (e) {
-      print('更新会议密码时出错: $e');
-      throw Exception('更新会议密码失败: $e');
-    }
+    // 该方法已废弃，直接抛出异常
+    throw UnimplementedError('会议密码在创建时确定，不支持后续修改');
   }
 
   @override
