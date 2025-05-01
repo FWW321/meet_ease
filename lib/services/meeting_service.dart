@@ -909,14 +909,60 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<void> addMeetingAdmin(String meetingId, String userId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 构建API请求
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.apiBaseUrl}/meeting/admin/add').replace(
+              queryParameters: {'meetingId': meetingId, 'userId': userId},
+            ),
+            headers: HttpUtils.createHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      // 解析响应
+      final responseData = HttpUtils.decodeResponse(response);
+
+      if (responseData['code'] != 200) {
+        throw Exception(responseData['message'] ?? '添加管理员失败');
+      }
+
+      // 操作成功
+      return;
+    } catch (e) {
+      // 重抛出异常
+      throw Exception('添加管理员时出错: $e');
+    }
   }
 
   @override
   Future<void> removeMeetingAdmin(String meetingId, String userId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 构建API请求
+      final response = await http
+          .post(
+            Uri.parse(
+              '${AppConstants.apiBaseUrl}/meeting/admin/remove',
+            ).replace(
+              queryParameters: {'meetingId': meetingId, 'userId': userId},
+            ),
+            headers: HttpUtils.createHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      // 解析响应
+      final responseData = HttpUtils.decodeResponse(response);
+
+      if (responseData['code'] != 200) {
+        throw Exception(responseData['message'] ?? '移除管理员失败');
+      }
+
+      // 操作成功
+      return;
+    } catch (e) {
+      // 重抛出异常
+      throw Exception('移除管理员时出错: $e');
+    }
   }
 
   @override

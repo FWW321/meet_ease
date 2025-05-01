@@ -5,6 +5,7 @@ import '../models/meeting.dart';
 import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
+import '../widgets/user_selection_dialog.dart';
 
 /// 会议设置页面 - 仅会议创建者和管理员可访问
 class MeetingSettingsPage extends HookConsumerWidget {
@@ -764,6 +765,9 @@ class _AdminsTab extends HookConsumerWidget {
     // 获取管理员列表
     final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
 
+    // 检查当前用户是否为会议创建者
+    final isCreator = meeting.isCreatorOnly(currentUserId);
+
     return Column(
       children: [
         // 管理员列表
@@ -803,7 +807,7 @@ class _AdminsTab extends HookConsumerWidget {
                               (admin) => _UserTile(
                                 userId: admin.id,
                                 label: '管理员',
-                                canRemove: meeting.isCreatorOnly(currentUserId),
+                                canRemove: isCreator,
                                 onRemove: () {
                                   // 移除管理员
                                   _removeAdmin(context, ref, admin.id);
@@ -834,142 +838,136 @@ class _AdminsTab extends HookConsumerWidget {
         ),
 
         // 底部添加按钮，只有创建者可以添加管理员
-        if (meeting.isCreatorOnly(currentUserId))
-          participantsAsync.when(
-            data: (participants) {
-              // 获取管理员ID列表用于过滤
-              final adminIds =
-                  managersAsync.whenOrNull(
-                    data:
-                        (managers) =>
-                            managers.map((admin) => admin.id).toList(),
-                  ) ??
-                  [];
-
-              // 过滤掉创建者和现有管理员
-              final availableParticipants =
-                  participants
-                      .where(
-                        (user) =>
-                            user.id != meeting.organizerId &&
-                            !adminIds.contains(user.id),
-                      )
-                      .toList();
-
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed:
-                        availableParticipants.isEmpty
-                            ? null
-                            : () => _showAddAdminDialog(
-                              context,
-                              ref,
-                              availableParticipants,
-                            ),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(12.0),
-                    ),
-                    child: const Text('添加管理员'),
-                  ),
+        if (isCreator)
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _showAddAdminDialog(context, ref),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(12.0),
                 ),
-              );
-            },
-            loading:
-                () => const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            error:
-                (error, stackTrace) => Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Center(child: Text('加载参与者失败: $error')),
-                ),
+                child: const Text('添加管理员'),
+              ),
+            ),
           ),
       ],
     );
   }
 
-  void _showAddAdminDialog(
-    BuildContext context,
-    WidgetRef ref,
-    List<User> availableParticipants,
-  ) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('添加管理员'),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: availableParticipants.length,
-                itemBuilder: (context, index) {
-                  final user = availableParticipants[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage:
-                          user.avatarUrl != null
-                              ? NetworkImage(user.avatarUrl!)
-                              : null,
-                      child:
-                          user.avatarUrl == null
-                              ? Text(user.name.substring(0, 1))
-                              : null,
-                    ),
-                    title: Text(user.name),
-                    subtitle: Text(user.email),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _addAdmin(context, ref, user.id);
-                    },
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
-              ),
-            ],
+  void _showAddAdminDialog(BuildContext context, WidgetRef ref) async {
+    // 检查当前用户是否为会议创建者
+    if (!meeting.isCreatorOnly(currentUserId)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('只有会议创建者可以添加管理员'),
+            backgroundColor: Colors.red,
           ),
+        );
+      }
+      return;
+    }
+
+    // 获取管理员ID列表和创建者ID，用于过滤
+    final managersAsync = ref.read(meetingManagersProvider(meeting.id));
+    final adminIds =
+        managersAsync.whenOrNull(
+          data: (managers) => managers.map((admin) => admin.id).toList(),
+        ) ??
+        [];
+    final creatorId = meeting.organizerId;
+
+    // 使用UserSelectionDialog来选择管理员，从所有用户中选择
+    final selectedUserIds = await showUserSelectionDialog(
+      context: context,
+      initialSelectedUserIds: [], // 初始没有选择的管理员
     );
+
+    // 如果用户取消了选择，则返回null
+    if (selectedUserIds == null || selectedUserIds.isEmpty) return;
+
+    // 过滤掉创建者ID和已有管理员ID
+    final validSelectedIds =
+        selectedUserIds
+            .where((id) => id != creatorId && !adminIds.contains(id))
+            .toList();
+
+    if (validSelectedIds.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('所选用户都已是管理员或创建者'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // 添加所有选中的用户为管理员
+    for (final userId in validSelectedIds) {
+      _addAdmin(context, ref, userId);
+    }
   }
 
-  void _addAdmin(BuildContext context, WidgetRef ref, String userId) {
-    // 添加管理员
-    final meetingService = ref.read(meetingServiceProvider);
-    meetingService
-        .addMeetingAdmin(meeting.id, userId)
-        .then((_) {
-          // 刷新会议详情
-          ref.invalidate(meetingDetailProvider(meeting.id));
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('管理员添加成功'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        })
-        .catchError((error) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('添加管理员失败: $error'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        });
+  void _addAdmin(BuildContext context, WidgetRef ref, String userId) async {
+    // 检查当前用户是否为会议创建者
+    if (!meeting.isCreatorOnly(currentUserId)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('只有会议创建者可以添加管理员'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // 添加管理员
+      final meetingService = ref.read(meetingServiceProvider);
+      await meetingService.addMeetingAdmin(meeting.id, userId);
+
+      // 刷新会议详情
+      ref.invalidate(meetingDetailProvider(meeting.id));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('管理员添加成功'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('添加管理员失败: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _removeAdmin(BuildContext context, WidgetRef ref, String userId) {
+    // 检查当前用户是否为会议创建者
+    if (!meeting.isCreatorOnly(currentUserId)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('只有会议创建者可以移除管理员'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     // 移除管理员
     final meetingService = ref.read(meetingServiceProvider);
     meetingService
