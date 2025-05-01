@@ -382,10 +382,56 @@ class MockMeetingProcessService implements MeetingProcessService {
   // 笔记管理实现
   @override
   Future<List<MeetingNote>> getMeetingNotes(String meetingId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    // 由于API还没有提供获取会议笔记列表的功能，这里使用本地存储临时实现
+    // 后续API实现后，应该替换为实际的API调用
+    try {
+      // 获取SharedPreferences实例
+      final prefs = await SharedPreferences.getInstance();
 
-    // 过滤获取指定会议的笔记
-    return _notes.where((note) => note.meetingId == meetingId).toList();
+      // 构建存储键名
+      final String storageKey = 'meeting_notes_$meetingId';
+
+      // 获取存储的笔记列表JSON字符串
+      final String? notesJson = prefs.getString(storageKey);
+
+      if (notesJson != null && notesJson.isNotEmpty) {
+        // 解析JSON并转换为MeetingNote对象列表
+        final List<dynamic> notesList = jsonDecode(notesJson);
+        return notesList.map<MeetingNote>((noteData) {
+          // 解析创建和更新时间
+          final DateTime createdAt = DateTime.parse(noteData['createdAt']);
+          DateTime? updatedAt;
+          if (noteData['updatedAt'] != null) {
+            updatedAt = DateTime.parse(noteData['updatedAt']);
+          }
+
+          // 解析标签列表
+          List<String>? tags;
+          if (noteData['tags'] != null) {
+            tags = (noteData['tags'] as List<dynamic>).cast<String>();
+          }
+
+          return MeetingNote(
+            id: noteData['id'],
+            meetingId: noteData['meetingId'],
+            content: noteData['content'],
+            creatorId: noteData['creatorId'],
+            creatorName: noteData['creatorName'],
+            isShared: noteData['isShared'],
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            tags: tags,
+          );
+        }).toList();
+      }
+
+      // 如果没有找到存储的笔记，返回空列表
+      return [];
+    } catch (e) {
+      print('获取会议笔记列表出错: $e');
+      // 出错时返回空列表而不是抛出异常，确保UI不会崩溃
+      return [];
+    }
   }
 
   @override
@@ -708,12 +754,278 @@ class ApiMeetingProcessService implements MeetingProcessService {
 
   @override
   Future<List<MeetingNote>> getMeetingNotes(String meetingId) async {
-    throw UnimplementedError('API服务尚未实现');
+    // 由于API还没有提供获取会议笔记列表的功能，这里使用本地存储临时实现
+    // 后续API实现后，应该替换为实际的API调用
+    try {
+      // 获取SharedPreferences实例
+      final prefs = await SharedPreferences.getInstance();
+
+      // 构建存储键名
+      final String storageKey = 'meeting_notes_$meetingId';
+
+      // 获取存储的笔记列表JSON字符串
+      final String? notesJson = prefs.getString(storageKey);
+
+      if (notesJson != null && notesJson.isNotEmpty) {
+        // 解析JSON并转换为MeetingNote对象列表
+        final List<dynamic> notesList = jsonDecode(notesJson);
+        return notesList.map<MeetingNote>((noteData) {
+          // 解析创建和更新时间
+          final DateTime createdAt = DateTime.parse(noteData['createdAt']);
+          DateTime? updatedAt;
+          if (noteData['updatedAt'] != null) {
+            updatedAt = DateTime.parse(noteData['updatedAt']);
+          }
+
+          // 解析标签列表
+          List<String>? tags;
+          if (noteData['tags'] != null) {
+            tags = (noteData['tags'] as List<dynamic>).cast<String>();
+          }
+
+          return MeetingNote(
+            id: noteData['id'],
+            meetingId: noteData['meetingId'],
+            content: noteData['content'],
+            creatorId: noteData['creatorId'],
+            creatorName: noteData['creatorName'],
+            isShared: noteData['isShared'],
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            tags: tags,
+          );
+        }).toList();
+      }
+
+      // 如果没有找到存储的笔记，返回空列表
+      return [];
+    } catch (e) {
+      print('获取会议笔记列表出错: $e');
+      // 出错时返回空列表而不是抛出异常，确保UI不会崩溃
+      return [];
+    }
   }
 
   @override
   Future<MeetingNote> addMeetingNote(MeetingNote note) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 从note对象中获取必要参数
+      final meetingId = note.meetingId;
+      final userId = note.creatorId;
+      final content = note.content;
+      final isPublic = note.isShared ? '1' : '0';
+
+      // 构建URL和请求参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/notes/create',
+      ).replace(
+        queryParameters: {
+          'meetingId': meetingId,
+          'userId': userId,
+          'content': content,
+          'isPublic': isPublic,
+        },
+      );
+
+      // 发送请求
+      final response = await client.post(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加日志
+        print('创建会议笔记响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final data = responseData['data'];
+
+          // 从响应中解析笔记信息
+          final noteId = data['noteId'].toString();
+          final createdAt = DateTime.parse(data['createdAt']);
+
+          // 创建新的笔记对象
+          final newNote = MeetingNote(
+            id: noteId,
+            meetingId: data['meetingId'].toString(),
+            content: data['noteContent'],
+            creatorId: data['userId'].toString(),
+            creatorName: note.creatorName, // API响应中没有creatorName，使用请求中的值
+            isShared: data['isPublic'] == true,
+            createdAt: createdAt,
+            tags: note.tags, // API暂未支持标签，使用请求中的值
+          );
+
+          // 将新笔记保存到本地存储
+          await _saveNoteToLocal(newNote);
+
+          return newNote;
+        } else {
+          throw Exception('创建会议笔记失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('创建会议笔记失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('创建会议笔记出错: $e');
+      throw Exception('创建会议笔记时出错: $e');
+    }
+  }
+
+  /// 通过上传文件添加会议笔记
+  Future<MeetingNote> addMeetingNoteByFile(
+    String meetingId,
+    String userId,
+    String creatorName,
+    File file,
+    bool isShared,
+    List<String>? tags,
+  ) async {
+    try {
+      // 创建MultipartRequest
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${AppConstants.apiBaseUrl}/meeting/notes/upload'),
+      );
+
+      // 添加头部
+      request.headers.addAll(
+        HttpUtils.createHeaders(
+          additionalHeaders: {'Content-Type': 'multipart/form-data'},
+        ),
+      );
+
+      // 添加表单字段
+      request.fields['meetingId'] = meetingId;
+      request.fields['userId'] = userId;
+      request.fields['isPublic'] = isShared ? '1' : '0';
+
+      // 添加文件
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'file',
+          file.path,
+          filename: file.path.split('/').last,
+        ),
+      );
+
+      // 打印请求内容用于调试
+      print(
+        '上传笔记文件请求参数: meetingId=$meetingId, userId=$userId, isPublic=${isShared ? '1' : '0'}, 文件名=${file.path.split('/').last}',
+      );
+
+      // 发送请求
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加日志
+        print('上传笔记文件响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final data = responseData['data'];
+
+          // 从响应中解析笔记信息 - 根据提供的响应示例格式解析
+          final noteId = data['noteId'].toString();
+          final noteContent = data['noteContent'] as String;
+          final isPublic = data['isPublic'] == true || data['isPublic'] == 1;
+          DateTime createdAt;
+
+          try {
+            // 尝试解析创建时间
+            createdAt = DateTime.parse(data['createdAt'].toString());
+          } catch (e) {
+            print('解析创建时间失败: $e');
+            createdAt = DateTime.now();
+          }
+
+          // 创建新的笔记对象
+          final newNote = MeetingNote(
+            id: noteId,
+            meetingId: data['meetingId'].toString(),
+            content: noteContent,
+            creatorId: data['userId'].toString(),
+            creatorName: creatorName, // API返回没有包含创建者名称
+            isShared: isPublic,
+            createdAt: createdAt,
+            tags: tags, // API返回没有包含标签信息
+          );
+
+          // 将新笔记保存到本地存储
+          await _saveNoteToLocal(newNote);
+
+          return newNote;
+        } else {
+          throw Exception('上传笔记文件失败: ${responseData['message'] ?? "未知错误"}');
+        }
+      } else {
+        throw Exception('上传笔记文件失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('上传笔记文件出错: $e');
+      throw Exception('上传笔记文件时出错: $e');
+    }
+  }
+
+  // 将笔记保存到本地存储
+  Future<void> _saveNoteToLocal(MeetingNote note) async {
+    try {
+      // 获取SharedPreferences实例
+      final prefs = await SharedPreferences.getInstance();
+
+      // 构建存储键名
+      final String storageKey = 'meeting_notes_${note.meetingId}';
+
+      // 获取现有的笔记列表
+      final existingNotesJson = prefs.getString(storageKey) ?? '[]';
+      final List<dynamic> existingNotes = jsonDecode(existingNotesJson);
+
+      // 检查是否已存在相同ID的笔记
+      final existingNoteIndex = existingNotes.indexWhere(
+        (item) => item['id'] == note.id,
+      );
+
+      // 准备要存储的笔记数据
+      final noteData = {
+        'id': note.id,
+        'meetingId': note.meetingId,
+        'content': note.content,
+        'creatorId': note.creatorId,
+        'creatorName': note.creatorName,
+        'isShared': note.isShared,
+        'createdAt': note.createdAt.toIso8601String(),
+        if (note.updatedAt != null)
+          'updatedAt': note.updatedAt!.toIso8601String(),
+        if (note.tags != null) 'tags': note.tags,
+      };
+
+      // 更新笔记列表
+      if (existingNoteIndex >= 0) {
+        // 更新现有笔记
+        existingNotes[existingNoteIndex] = noteData;
+      } else {
+        // 添加新笔记
+        existingNotes.add(noteData);
+      }
+
+      // 将更新后的笔记列表保存回本地存储
+      await prefs.setString(storageKey, jsonEncode(existingNotes));
+    } catch (e) {
+      print('保存笔记到本地存储出错: $e');
+      // 继续抛出异常，让调用者处理
+      rethrow;
+    }
   }
 
   @override

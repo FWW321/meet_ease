@@ -168,6 +168,18 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
     }
   }
 
+  // 刷新笔记列表
+  Future<void> refreshNotes() async {
+    state = const AsyncValue.loading();
+    try {
+      final service = ref.read(meetingProcessServiceProvider);
+      final updatedNotes = await service.getMeetingNotes(meetingId);
+      state = AsyncValue.data(updatedNotes);
+    } catch (e, stackTrace) {
+      state = AsyncValue.error(e, stackTrace);
+    }
+  }
+
   // 更新笔记
   Future<void> updateNote(MeetingNote note) async {
     state = const AsyncValue.loading();
