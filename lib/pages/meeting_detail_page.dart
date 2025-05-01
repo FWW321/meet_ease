@@ -693,72 +693,78 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
             ),
 
             // 显示管理员列表
-            if (meeting.admins.isNotEmpty) ...[
-              const Divider(),
-              const Padding(
-                padding: EdgeInsets.only(top: 8, bottom: 8),
-                child: Text(
-                  '管理员',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                ),
-              ),
-              ...meeting.admins
-                  .map(
-                    (adminId) => Consumer(
-                      builder: (context, ref, child) {
-                        final adminNameAsync = ref.watch(
-                          userNameProvider(adminId),
-                        );
+            Consumer(
+              builder: (context, ref, child) {
+                final managersAsync = ref.watch(
+                  meetingManagersProvider(widget.meetingId),
+                );
 
-                        return adminNameAsync.when(
-                          data:
-                              (name) => ListTile(
+                return managersAsync.when(
+                  data: (managers) {
+                    if (managers.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8, bottom: 8),
+                          child: Text(
+                            '管理员',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        ...managers
+                            .map(
+                              (manager) => ListTile(
                                 leading: CircleAvatar(
                                   backgroundColor: Colors.blue.withAlpha(51),
                                   child: Text(
-                                    name.isNotEmpty
-                                        ? name[0].toUpperCase()
+                                    manager.name.isNotEmpty
+                                        ? manager.name[0].toUpperCase()
                                         : '?',
                                     style: const TextStyle(color: Colors.blue),
                                   ),
                                 ),
-                                title: Text(name),
+                                title: Text(manager.name),
                                 trailing: _buildRoleTag('管理员', Colors.blue),
                                 dense: true,
                               ),
-                          loading:
-                              () => const ListTile(
-                                leading: CircleAvatar(
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                ),
-                                title: Text('加载中...'),
-                                dense: true,
-                              ),
-                          error:
-                              (_, __) => ListTile(
-                                leading: const CircleAvatar(
-                                  backgroundColor: Colors.red,
-                                  child: Icon(
-                                    Icons.error,
-                                    size: 16,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                title: Text('管理员 ID: $adminId'),
-                                dense: true,
-                              ),
-                        );
-                      },
-                    ),
-                  )
-                  .toList(),
-            ],
+                            )
+                            .toList(),
+                      ],
+                    );
+                  },
+                  loading:
+                      () => const Padding(
+                        padding: EdgeInsets.only(top: 16.0),
+                        child: Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
+                  error:
+                      (error, _) => Padding(
+                        padding: const EdgeInsets.only(top: 16.0),
+                        child: Text(
+                          '加载管理员列表失败: $error',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                );
+              },
+            ),
           ],
         ),
       ),

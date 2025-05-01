@@ -464,6 +464,139 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
+String _$meetingManagersHash() => r'62eb41133535fe4f4983a6dc3b475fe30840a7a4';
+
+/// 会议管理员列表提供者
+///
+/// Copied from [meetingManagers].
+@ProviderFor(meetingManagers)
+const meetingManagersProvider = MeetingManagersFamily();
+
+/// 会议管理员列表提供者
+///
+/// Copied from [meetingManagers].
+class MeetingManagersFamily extends Family<AsyncValue<List<User>>> {
+  /// 会议管理员列表提供者
+  ///
+  /// Copied from [meetingManagers].
+  const MeetingManagersFamily();
+
+  /// 会议管理员列表提供者
+  ///
+  /// Copied from [meetingManagers].
+  MeetingManagersProvider call(String meetingId) {
+    return MeetingManagersProvider(meetingId);
+  }
+
+  @override
+  MeetingManagersProvider getProviderOverride(
+    covariant MeetingManagersProvider provider,
+  ) {
+    return call(provider.meetingId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'meetingManagersProvider';
+}
+
+/// 会议管理员列表提供者
+///
+/// Copied from [meetingManagers].
+class MeetingManagersProvider extends AutoDisposeFutureProvider<List<User>> {
+  /// 会议管理员列表提供者
+  ///
+  /// Copied from [meetingManagers].
+  MeetingManagersProvider(String meetingId)
+    : this._internal(
+        (ref) => meetingManagers(ref as MeetingManagersRef, meetingId),
+        from: meetingManagersProvider,
+        name: r'meetingManagersProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$meetingManagersHash,
+        dependencies: MeetingManagersFamily._dependencies,
+        allTransitiveDependencies:
+            MeetingManagersFamily._allTransitiveDependencies,
+        meetingId: meetingId,
+      );
+
+  MeetingManagersProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.meetingId,
+  }) : super.internal();
+
+  final String meetingId;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<User>> Function(MeetingManagersRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: MeetingManagersProvider._internal(
+        (ref) => create(ref as MeetingManagersRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        meetingId: meetingId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<User>> createElement() {
+    return _MeetingManagersProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is MeetingManagersProvider && other.meetingId == meetingId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, meetingId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin MeetingManagersRef on AutoDisposeFutureProviderRef<List<User>> {
+  /// The parameter `meetingId` of this provider.
+  String get meetingId;
+}
+
+class _MeetingManagersProviderElement
+    extends AutoDisposeFutureProviderElement<List<User>>
+    with MeetingManagersRef {
+  _MeetingManagersProviderElement(super.provider);
+
+  @override
+  String get meetingId => (origin as MeetingManagersProvider).meetingId;
+}
+
 String _$recommendedMeetingsHash() =>
     r'c0ca0f0c7e2b77c49905be59e5e8c9478ad7e1fa';
 

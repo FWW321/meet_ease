@@ -34,6 +34,9 @@ abstract class MeetingService {
   /// 获取会议参与者
   Future<List<User>> getMeetingParticipants(String meetingId);
 
+  /// 获取会议管理员列表
+  Future<List<User>> getMeetingManagers(String meetingId);
+
   /// 添加会议管理员
   Future<void> addMeetingAdmin(String meetingId, String userId);
 
@@ -273,6 +276,15 @@ class MockMeetingService implements MeetingService {
 
     // 随机选择几个用户作为会议参与者
     return _users.take(6).toList();
+  }
+
+  @override
+  Future<List<User>> getMeetingManagers(String meetingId) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // 随机选择几个用户作为会议管理者
+    return _users.take(3).toList();
   }
 
   @override
@@ -855,6 +867,43 @@ class ApiMeetingService implements MeetingService {
       // 如果API调用失败，返回空列表
       print('获取会议参与者失败: $e');
       return [];
+    }
+  }
+
+  @override
+  Future<List<User>> getMeetingManagers(String meetingId) async {
+    try {
+      // 构建API请求
+      final response = await http
+          .get(
+            Uri.parse('${AppConstants.apiBaseUrl}/meeting/$meetingId/managers'),
+            headers: HttpUtils.createHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      // 解析响应
+      final responseData = HttpUtils.decodeResponse(response);
+
+      if (responseData['code'] == 200 && responseData['data'] != null) {
+        final adminsData = responseData['data']['admins'] as List<dynamic>;
+
+        // 将返回数据转换为User对象
+        final managers =
+            adminsData.map((admin) {
+              return User(
+                id: admin['user_id'].toString(),
+                name: admin['username'] ?? '',
+                email: '', // API可能未提供邮箱
+              );
+            }).toList();
+
+        return managers;
+      } else {
+        throw Exception('获取会议管理员失败: ${responseData['message']}');
+      }
+    } catch (e) {
+      // 重抛出异常
+      throw Exception('获取会议管理员时出错: $e');
     }
   }
 

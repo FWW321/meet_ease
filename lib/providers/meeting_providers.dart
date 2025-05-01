@@ -62,6 +62,13 @@ Future<List<User>> meetingParticipants(Ref ref, String meetingId) async {
   return meetingService.getMeetingParticipants(meetingId);
 }
 
+/// 会议管理员列表提供者
+@riverpod
+Future<List<User>> meetingManagers(Ref ref, String meetingId) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  return meetingService.getMeetingManagers(meetingId);
+}
+
 /// 创建会议提供者
 @riverpod
 class CreateMeeting extends _$CreateMeeting {
