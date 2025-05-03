@@ -53,6 +53,7 @@ class Meeting {
   final List<String> blacklist; // 黑名单 ID 列表
   final List<String> allowedUsers; // 允许参加的用户 ID 列表（仅当visibility为private时有效）
   final String? password; // 会议密码，为空表示不需要密码
+  final Map<String, dynamic>? participationInfo; // 用户参与会议的相关信息（加入时间、离开时间等）
 
   const Meeting({
     required this.id,
@@ -75,6 +76,7 @@ class Meeting {
     this.blacklist = const [],
     this.allowedUsers = const [],
     this.password,
+    this.participationInfo,
   });
 
   // 复制并修改对象的方法
@@ -99,6 +101,7 @@ class Meeting {
     List<String>? blacklist,
     List<String>? allowedUsers,
     String? password,
+    Map<String, dynamic>? participationInfo,
   }) {
     return Meeting(
       id: id ?? this.id,
@@ -121,6 +124,7 @@ class Meeting {
       blacklist: blacklist ?? this.blacklist,
       allowedUsers: allowedUsers ?? this.allowedUsers,
       password: password ?? this.password,
+      participationInfo: participationInfo ?? this.participationInfo,
     );
   }
 

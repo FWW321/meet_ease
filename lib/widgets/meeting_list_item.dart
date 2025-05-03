@@ -6,11 +6,13 @@ class MeetingListItem extends StatelessWidget {
   final Meeting meeting;
   final VoidCallback onTap;
   final String? matchScore;
+  final bool showParticipationInfo;
 
   const MeetingListItem({
     required this.meeting,
     required this.onTap,
     this.matchScore,
+    this.showParticipationInfo = false,
     super.key,
   });
 
@@ -162,10 +164,82 @@ class MeetingListItem extends StatelessWidget {
                   ],
                 ],
               ),
+
+              // 显示参会信息（如果有）
+              if (showParticipationInfo &&
+                  meeting.participationInfo != null) ...[
+                const Divider(height: 24),
+
+                // 参会时间
+                if (meeting.participationInfo!['joinTime']?.isNotEmpty ??
+                    false) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.login, size: 16, color: Colors.green),
+                      const SizedBox(width: 4),
+                      Text(
+                        '加入: ${_formatParticipationTime(meeting.participationInfo!['joinTime'])}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                ],
+
+                // 离开时间
+                if (meeting.participationInfo!['leaveTime']?.isNotEmpty ??
+                    false) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.logout, size: 16, color: Colors.orange),
+                      const SizedBox(width: 4),
+                      Text(
+                        '离开: ${_formatParticipationTime(meeting.participationInfo!['leaveTime'])}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                ],
+
+                // 参会时长
+                if (meeting.participationInfo!['durationDisplay']?.isNotEmpty ??
+                    false) ...[
+                  Row(
+                    children: [
+                      const Icon(Icons.timer, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                        '时长: ${meeting.participationInfo!['durationDisplay']}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  // 格式化参会时间
+  String _formatParticipationTime(String timeStr) {
+    try {
+      final dateTime = DateTime.parse(timeStr);
+      return DateFormat('yyyy-MM-dd HH:mm:ss').format(dateTime);
+    } catch (e) {
+      return timeStr;
+    }
   }
 }

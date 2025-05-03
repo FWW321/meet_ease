@@ -45,7 +45,13 @@ Future<Meeting> meetingDetail(Ref ref, String meetingId) async {
 @riverpod
 Future<List<Meeting>> myMeetings(Ref ref) async {
   final meetingService = ref.watch(meetingServiceProvider);
-  return meetingService.getMyMeetings();
+  try {
+    return await meetingService.getMyMeetings();
+  } catch (e) {
+    // 记录错误并重新抛出，以便UI可以显示错误
+    print('获取我的会议列表失败: $e');
+    throw Exception('无法加载我的会议列表: $e');
+  }
 }
 
 /// 搜索会议提供者

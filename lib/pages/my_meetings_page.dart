@@ -60,6 +60,7 @@ class MyMeetingsPage extends HookConsumerWidget {
                       AppConstants.meetingDetailRoute,
                       arguments: meeting.id,
                     ),
+                showParticipationInfo: true,
               );
             },
           );

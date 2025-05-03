@@ -178,7 +178,7 @@ class _MeetingDetailProviderElement
   String get meetingId => (origin as MeetingDetailProvider).meetingId;
 }
 
-String _$myMeetingsHash() => r'3e04900385d264907b3ea664daaf765a7c6e31f2';
+String _$myMeetingsHash() => r'344978d82f356fa00bbc9a0c293cf79071b4e2c1';
 
 /// 我的会议提供者 (已签到)
 ///
