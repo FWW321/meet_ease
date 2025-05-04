@@ -589,6 +589,16 @@ class _AdminsTab extends HookConsumerWidget {
     // 检查当前用户是否为会议创建者
     final isCreator = meeting.isCreatorOnly(currentUserId);
 
+    // 打印调试信息
+    managersAsync.whenOrNull(
+      data:
+          (managers) => print(
+            '找到${managers.length}个管理员: ${managers.map((m) => '${m.id}-${m.name}').join(', ')}',
+          ),
+      error: (error, _) => print('获取管理员列表出错: $error'),
+      loading: () => print('正在加载管理员列表...'),
+    );
+
     return Column(
       children: [
         // 管理员列表
@@ -602,6 +612,21 @@ class _AdminsTab extends HookConsumerWidget {
                 label: '创建者',
                 canRemove: false,
                 onRemove: null,
+              ),
+
+              // 刷新按钮
+              ListTile(
+                title: const Text('手动刷新管理员列表'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    // 刷新管理员列表
+                    ref.invalidate(meetingManagersProvider(meeting.id));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('正在刷新管理员列表...')),
+                    );
+                  },
+                ),
               ),
 
               const Divider(),
@@ -644,12 +669,24 @@ class _AdminsTab extends HookConsumerWidget {
                       child: Center(child: CircularProgressIndicator()),
                     ),
                 error:
-                    (error, _) => Padding(
+                    (error, stackTrace) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16.0),
                       child: Center(
-                        child: Text(
-                          '加载管理员列表失败: $error',
-                          style: TextStyle(color: Colors.red),
+                        child: Column(
+                          children: [
+                            Text(
+                              '加载管理员列表失败: $error',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                            if (stackTrace != null)
+                              Text(
+                                '堆栈: $stackTrace',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
@@ -754,6 +791,8 @@ class _AdminsTab extends HookConsumerWidget {
 
       // 刷新会议详情
       ref.invalidate(meetingDetailProvider(meeting.id));
+      // 立即刷新管理员列表
+      ref.invalidate(meetingManagersProvider(meeting.id));
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -796,6 +835,9 @@ class _AdminsTab extends HookConsumerWidget {
         .then((_) {
           // 刷新会议详情
           ref.invalidate(meetingDetailProvider(meeting.id));
+          // 立即刷新管理员列表
+          ref.invalidate(meetingManagersProvider(meeting.id));
+
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

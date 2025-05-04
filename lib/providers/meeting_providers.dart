@@ -71,8 +71,18 @@ Future<List<User>> meetingParticipants(Ref ref, String meetingId) async {
 /// 会议管理员列表提供者
 @riverpod
 Future<List<User>> meetingManagers(Ref ref, String meetingId) async {
+  // 将请求包装在keepAliveLink中以便能实现强制刷新
+  ref.keepAlive();
+
   final meetingService = ref.watch(meetingServiceProvider);
-  return meetingService.getMeetingManagers(meetingId);
+  try {
+    final managers = await meetingService.getMeetingManagers(meetingId);
+    print('获取到${managers.length}个管理员');
+    return managers;
+  } catch (e) {
+    print('获取管理员列表出错: $e');
+    throw e;
+  }
 }
 
 /// 创建会议提供者

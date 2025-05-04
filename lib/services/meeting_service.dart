@@ -1002,15 +1002,18 @@ class ApiMeetingService implements MeetingService {
       final responseData = HttpUtils.decodeResponse(response);
 
       if (responseData['code'] == 200 && responseData['data'] != null) {
-        final adminsData = responseData['data']['admins'] as List<dynamic>;
+        final data = responseData['data'];
+
+        // 获取管理员列表
+        final adminsData = data['admins'] as List<dynamic>? ?? [];
 
         // 将返回数据转换为User对象
         final managers =
             adminsData.map((admin) {
               return User(
-                id: admin['user_id'].toString(),
+                id: admin['user_id'].toString(), // 确保转换为字符串
                 name: admin['username'] ?? '',
-                email: '', // API可能未提供邮箱
+                email: '', // API未提供邮箱
               );
             }).toList();
 

@@ -464,7 +464,7 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
-String _$meetingManagersHash() => r'62eb41133535fe4f4983a6dc3b475fe30840a7a4';
+String _$meetingManagersHash() => r'5b41ef77a7d7ebe6f6d6e3bc4aa02e4639d42032';
 
 /// 会议管理员列表提供者
 ///
