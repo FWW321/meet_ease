@@ -47,6 +47,11 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
       print('会议标题: ${meeting.title}');
       print('会议密码: ${meeting.password != null ? meeting.password : "无密码"}');
       print('会议状态: ${meeting.status}');
+      print('会议可见性: ${meeting.visibility}');
+      print('会议可见性值: ${meeting.visibility.toString()}');
+      print('是否为私有会议: ${meeting.visibility == MeetingVisibility.private}');
+      print('是否为公开会议: ${meeting.visibility == MeetingVisibility.public}');
+      print('是否为可搜索会议: ${meeting.visibility == MeetingVisibility.searchable}');
     });
 
     return Scaffold(
@@ -440,8 +445,15 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
   // 构建会议参与者列表
   Widget _buildParticipantsList(BuildContext context, Meeting meeting) {
+    // 添加调试日志
+    print('_buildParticipantsList - 会议可见性: ${meeting.visibility}');
+    print(
+      '_buildParticipantsList - 是否为私有会议: ${meeting.visibility == MeetingVisibility.private}',
+    );
+
     // 如果不是私有会议，直接返回空组件，不显示参会人员列表
     if (meeting.visibility != MeetingVisibility.private) {
+      print('_buildParticipantsList - 不是私有会议，不显示参会人员列表');
       return const SizedBox.shrink();
     }
 
@@ -607,16 +619,23 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
   // 构建组织者和管理员列表（用于公开和可搜索会议）
   Widget _buildOrganizersAndAdminsList(BuildContext context, Meeting meeting) {
+    // 添加调试日志
+    print('_buildOrganizersAndAdminsList - 会议可见性: ${meeting.visibility}');
+
     // 如果是私有会议，不显示此组件（私有会议显示完整参会人员列表）
     if (meeting.visibility == MeetingVisibility.private) {
+      print('_buildOrganizersAndAdminsList - 这是私有会议，不显示组织者和管理员列表');
       return const SizedBox.shrink();
     }
 
     String descriptionText;
     if (meeting.visibility == MeetingVisibility.public) {
       descriptionText = '这是一个公开会议，任何人都可以参加';
-    } else {
+    } else if (meeting.visibility == MeetingVisibility.searchable) {
       descriptionText = '这是一个可搜索会议，知道会议ID的人都可以参加';
+    } else {
+      // 添加一个兜底处理，虽然这个分支不应该被执行
+      descriptionText = '私有会议';
     }
 
     return Card(

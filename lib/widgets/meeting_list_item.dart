@@ -22,6 +22,7 @@ class MeetingListItem extends StatelessWidget {
     final statusColor = getMeetingStatusColor(meeting.status);
     final statusText = getMeetingStatusText(meeting.status);
     final typeText = getMeetingTypeText(meeting.type);
+    final visibilityText = getMeetingVisibilityText(meeting.visibility);
 
     // 计算时间显示
     final now = DateTime.now();
@@ -44,6 +45,24 @@ class MeetingListItem extends StatelessWidget {
       // 其他日期
       timeDisplay =
           '${dateFormat.format(startTime)} - ${dateFormat.format(endTime)}';
+    }
+
+    // 获取可见性图标和颜色
+    IconData visibilityIcon;
+    Color visibilityColor;
+    switch (meeting.visibility) {
+      case MeetingVisibility.public:
+        visibilityIcon = Icons.public;
+        visibilityColor = Colors.green;
+        break;
+      case MeetingVisibility.searchable:
+        visibilityIcon = Icons.search;
+        visibilityColor = Colors.orange;
+        break;
+      case MeetingVisibility.private:
+        visibilityIcon = Icons.lock;
+        visibilityColor = Colors.red;
+        break;
     }
 
     return Card(
@@ -117,7 +136,7 @@ class MeetingListItem extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              // 会议类型和组织者
+              // 会议类型、可见性和组织者
               Row(
                 children: [
                   Text(
@@ -128,7 +147,19 @@ class MeetingListItem extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
+                  // 新增：会议可见性
+                  Icon(visibilityIcon, size: 16, color: visibilityColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    visibilityText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: visibilityColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   const Icon(Icons.person, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
                   Text(

@@ -180,6 +180,25 @@ class MockMeetingService implements MeetingService {
       admins: const [],
       blacklist: const [],
     ),
+    // 添加一个私有会议
+    Meeting(
+      id: '6',
+      title: '高管战略会议',
+      startTime: DateTime.now().add(const Duration(days: 2)),
+      endTime: DateTime.now().add(const Duration(days: 2, hours: 2)),
+      location: '会议室F',
+      status: MeetingStatus.upcoming,
+      type: MeetingType.regular,
+      visibility: MeetingVisibility.private,
+      organizerId: 'user1',
+      organizerName: '张三',
+      description: '讨论公司下半年战略规划',
+      participantCount: 5,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      admins: ['user4'],
+      blacklist: const [],
+      allowedUsers: ['user2', 'user3', 'user4', 'user5'],
+    ),
   ];
 
   // 模拟用户数据
@@ -764,6 +783,10 @@ class ApiMeetingService implements MeetingService {
             }
           }
 
+          // 解析会议可见性
+          final visibility = _parseMeetingVisibility(meetingData['visibility']);
+          print('从API解析的会议可见性: ${meetingData['visibility']} => $visibility');
+
           return Meeting(
             id: meetingData['meetingId'].toString(),
             title: meetingData['title'],
@@ -772,7 +795,7 @@ class ApiMeetingService implements MeetingService {
             location: meetingData['location'] ?? '',
             status: meetingStatus,
             type: MeetingType.regular, // 默认为常规会议
-            visibility: MeetingVisibility.public, // 默认可见性，API未提供
+            visibility: visibility, // 使用解析的可见性而不是硬编码默认值
             organizerId: meetingData['organizerId'].toString(),
             organizerName: '', // API未提供组织者名称
             description: meetingData['description'],
@@ -1607,4 +1630,21 @@ _Lock _getLockForMeeting(String meetingId) {
     _meetingLocks[meetingId] = _Lock();
   }
   return _meetingLocks[meetingId]!;
+}
+
+// 添加辅助函数将可见性字符串转换为枚举值
+MeetingVisibility _parseMeetingVisibility(String? visibilityStr) {
+  if (visibilityStr == null || visibilityStr.isEmpty) {
+    return MeetingVisibility.public; // 默认值
+  }
+
+  switch (visibilityStr.toUpperCase()) {
+    case 'PRIVATE':
+      return MeetingVisibility.private;
+    case 'SEARCHABLE':
+      return MeetingVisibility.searchable;
+    case 'PUBLIC':
+    default:
+      return MeetingVisibility.public;
+  }
 }
