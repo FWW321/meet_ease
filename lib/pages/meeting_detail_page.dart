@@ -41,19 +41,6 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   Widget build(BuildContext context) {
     final meetingAsync = ref.watch(meetingDetailProvider(widget.meetingId));
 
-    // 添加日志输出会议详情
-    meetingAsync.whenData((meeting) {
-      print('会议详情加载完成 - ID: ${meeting.id}');
-      print('会议标题: ${meeting.title}');
-      print('会议密码: ${meeting.password != null ? meeting.password : "无密码"}');
-      print('会议状态: ${meeting.status}');
-      print('会议可见性: ${meeting.visibility}');
-      print('会议可见性值: ${meeting.visibility.toString()}');
-      print('是否为私有会议: ${meeting.visibility == MeetingVisibility.private}');
-      print('是否为公开会议: ${meeting.visibility == MeetingVisibility.public}');
-      print('是否为可搜索会议: ${meeting.visibility == MeetingVisibility.searchable}');
-    });
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('会议详情'),
@@ -61,25 +48,40 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
           // 右上角操作菜单
           meetingAsync.when(
             data: (meeting) {
-              // 只有创建者可以看到更多操作按钮
-              if (currentUserId != null &&
-                  meeting.isCreatorOnly(currentUserId!)) {
+              // 判断是否显示菜单
+              if (currentUserId != null) {
                 return PopupMenuButton<String>(
                   onSelected: (value) {
                     if (value == 'cancel' &&
-                        meeting.status == MeetingStatus.upcoming) {
+                        meeting.status == MeetingStatus.upcoming &&
+                        meeting.isCreatorOnly(currentUserId!)) {
                       _showCancelConfirmDialog(context, ref, currentUserId!);
+                    } else if (value == 'leave') {
+                      _showLeaveRequestDialog(context, ref, meeting);
                     }
                   },
                   itemBuilder: (context) {
                     final items = <PopupMenuItem<String>>[];
 
-                    // 只有即将开始的会议可以取消
-                    if (meeting.status == MeetingStatus.upcoming) {
+                    // 只有创建者可以取消即将开始的会议
+                    if (meeting.status == MeetingStatus.upcoming &&
+                        meeting.isCreatorOnly(currentUserId!)) {
                       items.add(
                         const PopupMenuItem(
                           value: 'cancel',
                           child: Text('取消会议'),
+                        ),
+                      );
+                    }
+
+                    // 只有私有会议可以申请请假（即将开始和进行中的会议）
+                    if ((meeting.status == MeetingStatus.upcoming ||
+                            meeting.status == MeetingStatus.ongoing) &&
+                        meeting.visibility == MeetingVisibility.private) {
+                      items.add(
+                        const PopupMenuItem(
+                          value: 'leave',
+                          child: Text('申请请假'),
                         ),
                       );
                     }
@@ -997,6 +999,129 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                 },
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
                 child: const Text('确定取消'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // 显示请假申请对话框
+  void _showLeaveRequestDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Meeting meeting,
+  ) {
+    final reasonController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('申请请假'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('请输入请假理由'),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: reasonController,
+                  decoration: const InputDecoration(
+                    labelText: '请假理由',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('请输入请假理由'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+
+                  // 显示加载指示器
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder:
+                        (context) =>
+                            const Center(child: CircularProgressIndicator()),
+                  );
+
+                  try {
+                    // 调用请假服务
+                    final meetingService = ref.read(meetingServiceProvider);
+                    final result = await meetingService.submitLeaveRequest(
+                      currentUserId!,
+                      widget.meetingId,
+                      reason,
+                    );
+
+                    print('请假申请结果: $result');
+
+                    if (!mounted) {
+                      print('组件已卸载，不执行后续操作');
+                      return;
+                    }
+
+                    // 确保context仍然有效
+                    if (!context.mounted) {
+                      print('context已卸载，不执行后续操作');
+                      return;
+                    }
+
+                    // 关闭加载指示器
+                    Navigator.of(context, rootNavigator: true).pop();
+
+                    // 显示成功提示
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('请假申请已成功提交'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } catch (e) {
+                    print('请假申请出错: $e');
+
+                    if (!mounted) {
+                      print('组件已卸载，不执行后续操作');
+                      return;
+                    }
+
+                    // 确保context仍然有效
+                    if (!context.mounted) {
+                      print('context已卸载，不执行后续操作');
+                      return;
+                    }
+
+                    // 关闭加载指示器
+                    Navigator.of(context, rootNavigator: true).pop();
+
+                    // 显示错误提示
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('提交请假申请失败: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                child: const Text('提交'),
               ),
             ],
           ),

@@ -92,6 +92,13 @@ abstract class MeetingService {
 
   /// 获取我的私密会议
   Future<List<Meeting>> getMyPrivateMeetings(String userId);
+
+  /// 提交请假申请
+  Future<String> submitLeaveRequest(
+    String userId,
+    String meetingId,
+    String reason,
+  );
 }
 
 /// 模拟会议服务实现
@@ -630,6 +637,18 @@ class MockMeetingService implements MeetingService {
               (m.organizerId == userId || m.participants.contains(userId)),
         )
         .toList();
+  }
+
+  @override
+  Future<String> submitLeaveRequest(
+    String userId,
+    String meetingId,
+    String reason,
+  ) async {
+    // 实现提交请假申请的逻辑
+    // 这里需要根据实际情况实现提交请假申请的逻辑
+    // 返回请假申请提交后的处理结果
+    return '请假申请提交成功';
   }
 }
 
@@ -1611,6 +1630,43 @@ class ApiMeetingService implements MeetingService {
     } catch (e) {
       print('获取我的私密会议失败: $e');
       rethrow;
+    }
+  }
+
+  @override
+  Future<String> submitLeaveRequest(
+    String userId,
+    String meetingId,
+    String reason,
+  ) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/leave/submit'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode({
+          'userId': userId,
+          'meetingId': meetingId,
+          'reason': reason,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          return responseData['data'] ?? '请假申请提交成功';
+        } else {
+          final message = responseData['message'] ?? '提交请假申请失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '提交请假申请请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('提交请假申请时出错: $e');
     }
   }
 }
