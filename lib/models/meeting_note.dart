@@ -3,6 +3,7 @@ class MeetingNote {
   final String id;
   final String meetingId;
   final String content; // 笔记内容
+  final String? noteName; // 笔记名称
   final String creatorId; // 创建者ID
   final String creatorName; // 创建者姓名
   final bool isShared; // 是否共享给所有参会者
@@ -14,6 +15,7 @@ class MeetingNote {
     required this.id,
     required this.meetingId,
     required this.content,
+    this.noteName,
     required this.creatorId,
     required this.creatorName,
     this.isShared = false,
@@ -27,6 +29,7 @@ class MeetingNote {
     String? id,
     String? meetingId,
     String? content,
+    String? noteName,
     String? creatorId,
     String? creatorName,
     bool? isShared,
@@ -38,6 +41,7 @@ class MeetingNote {
       id: id ?? this.id,
       meetingId: meetingId ?? this.meetingId,
       content: content ?? this.content,
+      noteName: noteName ?? this.noteName,
       creatorId: creatorId ?? this.creatorId,
       creatorName: creatorName ?? this.creatorName,
       isShared: isShared ?? this.isShared,

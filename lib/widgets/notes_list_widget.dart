@@ -144,6 +144,18 @@ class NotesListWidget extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 笔记标题
+              if (note.noteName != null && note.noteName!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    note.noteName!,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
               // 笔记内容预览
               Text(
                 note.content,
@@ -245,6 +257,7 @@ class NotesListWidget extends ConsumerWidget {
   void _showAddNoteDialog(BuildContext context, WidgetRef ref) {
     final contentController = TextEditingController();
     final tagsController = TextEditingController();
+    final nameController = TextEditingController();
     bool isShared = false;
     File? selectedFile;
     String? selectedFileName;
@@ -263,6 +276,16 @@ class NotesListWidget extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // 笔记名称输入
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: '笔记名称',
+                            hintText: '请输入笔记标题',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // 笔记内容输入
                         TextField(
                           controller: contentController,
@@ -488,6 +511,7 @@ class NotesListWidget extends ConsumerWidget {
                                           selectedFile!,
                                           isShared,
                                           tags,
+                                          nameController.text,
                                         );
 
                                     // 刷新笔记列表
@@ -502,6 +526,7 @@ class NotesListWidget extends ConsumerWidget {
                                         'temp_${DateTime.now().millisecondsSinceEpoch}', // 临时ID，服务器会返回真实ID
                                     meetingId: meetingId,
                                     content: contentController.text,
+                                    noteName: nameController.text,
                                     creatorId: userId,
                                     creatorName: userName,
                                     isShared: isShared,
@@ -590,7 +615,10 @@ class NotesListWidget extends ConsumerWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: Text('${note.creatorName}的笔记'),
+            title:
+                note.noteName != null && note.noteName!.isNotEmpty
+                    ? Text(note.noteName!)
+                    : Text('${note.creatorName}的笔记'),
             content: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,6 +634,10 @@ class NotesListWidget extends ConsumerWidget {
                       '更新于: ${dateFormat.format(note.updatedAt!)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
+                  Text(
+                    '作者: ${note.creatorName}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
 
                   const SizedBox(height: 16),
 
@@ -677,6 +709,7 @@ class NotesListWidget extends ConsumerWidget {
     final tagsController = TextEditingController(
       text: note.tags != null ? note.tags!.join(', ') : '',
     );
+    final nameController = TextEditingController(text: note.noteName ?? '');
     bool isShared = note.isShared;
 
     showDialog(
@@ -690,6 +723,16 @@ class NotesListWidget extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // 笔记名称输入
+                        TextField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: '笔记名称',
+                            hintText: '请输入笔记标题',
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         TextField(
                           controller: contentController,
                           maxLines: 10,
@@ -742,6 +785,7 @@ class NotesListWidget extends ConsumerWidget {
                         // 更新笔记
                         final updatedNote = note.copyWith(
                           content: contentController.text,
+                          noteName: nameController.text,
                           isShared: isShared,
                           tags: tags,
                           updatedAt: DateTime.now(),

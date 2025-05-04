@@ -827,6 +827,8 @@ class ApiMeetingProcessService implements MeetingProcessService {
           'userId': userId,
           'content': content,
           'isPublic': isPublic,
+          if (note.noteName != null && note.noteName!.isNotEmpty)
+            'noteName': note.noteName!,
         },
       );
 
@@ -887,6 +889,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
     File file,
     bool isShared,
     List<String>? tags,
+    String? noteName,
   ) async {
     try {
       // 创建MultipartRequest
@@ -907,6 +910,11 @@ class ApiMeetingProcessService implements MeetingProcessService {
       request.fields['userId'] = userId;
       request.fields['isPublic'] = isShared ? '1' : '0';
 
+      // 添加笔记名称参数
+      if (noteName != null && noteName.isNotEmpty) {
+        request.fields['noteName'] = noteName;
+      }
+
       // 添加文件
       request.files.add(
         await http.MultipartFile.fromPath(
@@ -918,7 +926,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
 
       // 打印请求内容用于调试
       print(
-        '上传笔记文件请求参数: meetingId=$meetingId, userId=$userId, isPublic=${isShared ? '1' : '0'}, 文件名=${file.path.split('/').last}',
+        '上传笔记文件请求参数: meetingId=$meetingId, userId=$userId, isPublic=${isShared ? '1' : '0'}, 文件名=${file.path.split('/').last}, noteName=$noteName',
       );
 
       // 发送请求
@@ -940,6 +948,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
           final noteId = data['noteId'].toString();
           final noteContent = data['noteContent'] as String;
           final isPublic = data['isPublic'] == true || data['isPublic'] == 1;
+          final receivedNoteName = data['noteName'] as String?;
           DateTime createdAt;
 
           try {
@@ -955,6 +964,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
             id: noteId,
             meetingId: data['meetingId'].toString(),
             content: noteContent,
+            noteName: receivedNoteName, // 使用API返回的笔记名称
             creatorId: data['userId'].toString(),
             creatorName: creatorName, // API返回没有包含创建者名称
             isShared: isPublic,
