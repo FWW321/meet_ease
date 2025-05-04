@@ -6,6 +6,10 @@ import '../models/user.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
 import '../widgets/user_selection_dialog.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../constants/app_constants.dart';
+import '../utils/http_utils.dart';
 
 /// 会议设置页面 - 仅会议创建者和管理员可访问
 class MeetingSettingsPage extends HookConsumerWidget {
@@ -814,7 +818,7 @@ class _AdminsTab extends HookConsumerWidget {
     }
   }
 
-  void _removeAdmin(BuildContext context, WidgetRef ref, String userId) {
+  void _removeAdmin(BuildContext context, WidgetRef ref, String userId) async {
     // 检查当前用户是否为会议创建者
     if (!meeting.isCreatorOnly(currentUserId)) {
       if (context.mounted) {
@@ -828,35 +832,56 @@ class _AdminsTab extends HookConsumerWidget {
       return;
     }
 
-    // 移除管理员
-    final meetingService = ref.read(meetingServiceProvider);
-    meetingService
-        .removeMeetingAdmin(meeting.id, userId)
-        .then((_) {
-          // 刷新会议详情
-          ref.invalidate(meetingDetailProvider(meeting.id));
-          // 立即刷新管理员列表
-          ref.invalidate(meetingManagersProvider(meeting.id));
+    try {
+      // 获取当前用户ID
+      final currentUserId = await ref.read(currentUserIdProvider.future);
 
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('管理员移除成功'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        })
-        .catchError((error) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('移除管理员失败: $error'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        });
+      // 构建API请求
+      final response = await http
+          .delete(
+            Uri.parse(
+              '${AppConstants.apiBaseUrl}/meeting/admin/remove',
+            ).replace(
+              queryParameters: {
+                'meetingId': meeting.id,
+                'userId': userId,
+                'currentUserId': currentUserId,
+              },
+            ),
+            headers: HttpUtils.createHeaders(),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      // 解析响应
+      final responseData = jsonDecode(response.body);
+
+      if (responseData['code'] != 200) {
+        throw Exception(responseData['message'] ?? '移除管理员失败');
+      }
+
+      // 刷新会议详情
+      ref.invalidate(meetingDetailProvider(meeting.id));
+      // 立即刷新管理员列表
+      ref.invalidate(meetingManagersProvider(meeting.id));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('管理员移除成功'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('移除管理员失败: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 
