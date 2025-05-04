@@ -1027,11 +1027,25 @@ class ApiMeetingService implements MeetingService {
   @override
   Future<void> addMeetingAdmin(String meetingId, String userId) async {
     try {
+      // 获取当前用户ID
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString(AppConstants.userKey);
+      String currentUserId = '';
+
+      if (userJson != null) {
+        final userData = jsonDecode(userJson);
+        currentUserId = userData['id'] ?? '';
+      }
+
       // 构建API请求
       final response = await http
           .post(
             Uri.parse('${AppConstants.apiBaseUrl}/meeting/admin/add').replace(
-              queryParameters: {'meetingId': meetingId, 'userId': userId},
+              queryParameters: {
+                'meetingId': meetingId,
+                'userId': userId,
+                'currentUserId': currentUserId,
+              },
             ),
             headers: HttpUtils.createHeaders(),
           )
@@ -1055,13 +1069,27 @@ class ApiMeetingService implements MeetingService {
   @override
   Future<void> removeMeetingAdmin(String meetingId, String userId) async {
     try {
+      // 获取当前用户ID
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString(AppConstants.userKey);
+      String currentUserId = '';
+
+      if (userJson != null) {
+        final userData = jsonDecode(userJson);
+        currentUserId = userData['id'] ?? '';
+      }
+
       // 构建API请求
       final response = await http
           .post(
             Uri.parse(
               '${AppConstants.apiBaseUrl}/meeting/admin/remove',
             ).replace(
-              queryParameters: {'meetingId': meetingId, 'userId': userId},
+              queryParameters: {
+                'meetingId': meetingId,
+                'userId': userId,
+                'currentUserId': currentUserId,
+              },
             ),
             headers: HttpUtils.createHeaders(),
           )
