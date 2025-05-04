@@ -1,3 +1,5 @@
+import 'meeting.dart';
+
 /// 用户模型
 class User {
   final String id;
@@ -9,6 +11,8 @@ class User {
   final String? phoneNumber;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final MeetingPermission? role; // 用户在会议中的角色
+  final String? signInStatus; // 用户签到状态
 
   const User({
     required this.id,
@@ -20,6 +24,8 @@ class User {
     this.phoneNumber,
     this.createdAt,
     this.updatedAt,
+    this.role,
+    this.signInStatus,
   });
 
   // 复制并修改对象的方法
@@ -33,6 +39,8 @@ class User {
     String? phoneNumber,
     DateTime? createdAt,
     DateTime? updatedAt,
+    MeetingPermission? role,
+    String? signInStatus,
   }) {
     return User(
       id: id ?? this.id,
@@ -44,6 +52,8 @@ class User {
       phoneNumber: phoneNumber ?? this.phoneNumber,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      role: role ?? this.role,
+      signInStatus: signInStatus ?? this.signInStatus,
     );
   }
 

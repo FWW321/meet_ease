@@ -984,10 +984,33 @@ class ApiMeetingService implements MeetingService {
 
           // 将API返回的参与者记录转换为User对象列表
           return participants.map<User>((record) {
+            // 获取角色类型并转换为MeetingPermission类型
+            final roleString = record['role'] as String? ?? 'PARTICIPANT';
+            MeetingPermission role;
+
+            switch (roleString) {
+              case 'HOST':
+                role = MeetingPermission.creator;
+                break;
+              case 'ADMIN':
+                role = MeetingPermission.admin;
+                break;
+              case 'PARTICIPANT':
+                role = MeetingPermission.participant;
+                break;
+              default:
+                role = MeetingPermission.participant;
+            }
+
+            // 获取签到状态
+            final signInStatus = record['sign_in_status'] as String? ?? '未签到';
+
             return User(
-              id: record['userId'].toString(),
-              name: record['userName'] ?? '未知用户',
-              email: record['email'] ?? '',
+              id: record['user_id']?.toString() ?? '',
+              name: record['username'] ?? '未知用户',
+              email: '',
+              role: role,
+              signInStatus: signInStatus,
             );
           }).toList();
         } else {

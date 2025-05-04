@@ -520,10 +520,12 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                       participants.map((user) {
                         // 确定用户角色标签
                         Widget? roleTag;
-                        if (user.id == meeting.organizerId) {
+                        if (user.role == MeetingPermission.creator) {
                           roleTag = _buildRoleTag('创建者', Colors.orange);
-                        } else if (meeting.admins.contains(user.id)) {
+                        } else if (user.role == MeetingPermission.admin) {
                           roleTag = _buildRoleTag('管理员', Colors.blue);
+                        } else if (user.role == MeetingPermission.participant) {
+                          roleTag = _buildRoleTag('参会者', Colors.green);
                         }
 
                         // 使用用户名提供者来获取最新用户名
@@ -550,10 +552,25 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                     ),
                                   ),
                                   title: Text(userName),
-                                  subtitle:
-                                      user.email.isNotEmpty
-                                          ? Text(user.email)
-                                          : null,
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (user.email.isNotEmpty)
+                                        Text(user.email),
+                                      if (user.signInStatus != null)
+                                        Text(
+                                          '签到状态: ${user.signInStatus}',
+                                          style: TextStyle(
+                                            color:
+                                                user.signInStatus == '已签到'
+                                                    ? Colors.green
+                                                    : Colors.orange,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                   trailing: roleTag,
                                 );
                               },
@@ -568,10 +585,25 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                       ),
                                     ),
                                     title: Text(user.name),
-                                    subtitle:
-                                        user.email.isNotEmpty
-                                            ? Text(user.email)
-                                            : null,
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (user.email.isNotEmpty)
+                                          Text(user.email),
+                                        if (user.signInStatus != null)
+                                          Text(
+                                            '签到状态: ${user.signInStatus}',
+                                            style: TextStyle(
+                                              color:
+                                                  user.signInStatus == '已签到'
+                                                      ? Colors.green
+                                                      : Colors.orange,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                     trailing: roleTag,
                                   ),
                               error:
@@ -590,10 +622,25 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                       ),
                                     ),
                                     title: Text(user.name),
-                                    subtitle:
-                                        user.email.isNotEmpty
-                                            ? Text(user.email)
-                                            : null,
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (user.email.isNotEmpty)
+                                          Text(user.email),
+                                        if (user.signInStatus != null)
+                                          Text(
+                                            '签到状态: ${user.signInStatus}',
+                                            style: TextStyle(
+                                              color:
+                                                  user.signInStatus == '已签到'
+                                                      ? Colors.green
+                                                      : Colors.orange,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                     trailing: roleTag,
                                   ),
                             );
