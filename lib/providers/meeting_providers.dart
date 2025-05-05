@@ -9,6 +9,7 @@ import 'user_providers.dart';
 import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import '../utils/http_utils.dart';
+import '../models/meeting_participation.dart';
 
 part 'meeting_providers.g.dart';
 
@@ -20,7 +21,7 @@ final apiClientProvider = Provider<http.Client>((ref) {
 /// 会议服务提供者 - 用于获取会议服务实例
 final meetingServiceProvider = Provider<MeetingService>((ref) {
   // 使用真实API服务从服务器获取数据
-  return ApiMeetingService();
+  return ApiMeetingService(ref);
 });
 
 /// 会议列表提供者
@@ -49,7 +50,7 @@ Future<Meeting> meetingDetail(Ref ref, String meetingId) async {
   }
 }
 
-/// 我的会议提供者 (已签到)
+/// 我的会议提供者 (我参与的会议)
 @riverpod
 Future<List<Meeting>> myMeetings(Ref ref) async {
   final meetingService = ref.watch(meetingServiceProvider);

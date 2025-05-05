@@ -201,6 +201,41 @@ class MeetingListItem extends StatelessWidget {
                   meeting.participationInfo != null) ...[
                 const Divider(height: 24),
 
+                // 签到状态 - 只为私有会议显示
+                if (meeting.visibility == MeetingVisibility.private &&
+                        meeting
+                            .participationInfo!['signInStatus']
+                            ?.isNotEmpty ??
+                    false) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        meeting.participationInfo!['signInStatus'] == '已签到'
+                            ? Icons.check_circle
+                            : Icons.cancel,
+                        size: 16,
+                        color:
+                            meeting.participationInfo!['signInStatus'] == '已签到'
+                                ? Colors.green
+                                : Colors.red,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '签到状态: ${meeting.participationInfo!['signInStatus']}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              meeting.participationInfo!['signInStatus'] ==
+                                      '已签到'
+                                  ? Colors.green
+                                  : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                ],
+
                 // 参会时间
                 if (meeting.participationInfo!['joinTime']?.isNotEmpty ??
                     false) ...[

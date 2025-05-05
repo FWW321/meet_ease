@@ -1,12 +1,15 @@
 import '../models/meeting.dart';
 import '../models/user.dart';
 import '../models/meeting_recommendation.dart';
+import '../models/meeting_participation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import '../constants/app_constants.dart';
 import '../utils/http_utils.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/user_providers.dart';
 
 /// 会议服务接口
 abstract class MeetingService {
@@ -16,7 +19,7 @@ abstract class MeetingService {
   /// 根据ID获取会议详情
   Future<Meeting> getMeetingById(String id);
 
-  /// 获取我的会议（已签到）
+  /// 获取我的会议（我参与的会议历史）
   Future<List<Meeting>> getMyMeetings();
 
   /// 搜索会议
@@ -655,6 +658,9 @@ class MockMeetingService implements MeetingService {
 /// API会议服务实现 - 将来用于实际的后端API调用
 class ApiMeetingService implements MeetingService {
   final http.Client _client = http.Client();
+  final Ref? _ref;
+
+  ApiMeetingService([this._ref]);
 
   @override
   Future<List<Meeting>> getMeetings() async {
@@ -844,132 +850,51 @@ class ApiMeetingService implements MeetingService {
   @override
   Future<List<Meeting>> getMyMeetings() async {
     try {
-      // 获取当前用户ID
-      final prefs = await SharedPreferences.getInstance();
-      final userJson = prefs.getString(AppConstants.userKey);
-      if (userJson == null) {
-        throw Exception('用户未登录，无法获取参与会议');
-      }
+      String userId;
 
-      final userData = jsonDecode(userJson);
-      final userId = userData['id'];
-
-      if (userId == null) {
-        throw Exception('获取用户ID失败');
-      }
-
-      // 调用API获取我参加的会议列表
-      final response = await _client.get(
-        Uri.parse(
-          '${AppConstants.apiBaseUrl}/meeting/user/$userId/participation-history',
-        ),
-        headers: HttpUtils.createHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = HttpUtils.decodeResponse(response);
-
-        // 检查响应码
-        if (responseData['code'] == 200 && responseData['data'] != null) {
-          final meetings = responseData['data'] as List<dynamic>;
-
-          // 将API返回的会议记录转换为Meeting对象列表
-          return meetings.map<Meeting>((record) {
-            // 根据API返回的数据解析会议类型
-            MeetingType meetingType = MeetingType.regular;
-            String meetingTypeStr = record['meetingType'] ?? '';
-            if (meetingTypeStr == '培训会议') {
-              meetingType = MeetingType.training;
-            } else if (meetingTypeStr == '面试会议') {
-              meetingType = MeetingType.interview;
-            } else if (meetingTypeStr != '常规会议') {
-              meetingType = MeetingType.other;
-            }
-
-            // 解析会议可见性
-            MeetingVisibility visibility = MeetingVisibility.public;
-            String visibilityStr = record['visibility'] ?? '';
-            if (visibilityStr == 'PRIVATE') {
-              visibility = MeetingVisibility.private;
-            } else if (visibilityStr == 'SEARCHABLE') {
-              visibility = MeetingVisibility.searchable;
-            }
-
-            // 解析会议开始和结束时间
-            DateTime? startTime;
-            if (record['meetingStartTime'] != null) {
-              startTime = DateTime.parse(record['meetingStartTime']);
-            }
-
-            DateTime? endTime;
-            if (record['meetingEndTime'] != null) {
-              endTime = DateTime.parse(record['meetingEndTime']);
-            }
-
-            // 解析加入和退出时间
-            DateTime? joinTime;
-            if (record['joinTime'] != null) {
-              joinTime = DateTime.parse(record['joinTime']);
-            }
-
-            DateTime? leaveTime;
-            if (record['leaveTime'] != null) {
-              leaveTime = DateTime.parse(record['leaveTime']);
-            }
-
-            // 判断会议状态：根据会议的开始和结束时间，而不是用户的joinTime和leaveTime
-            MeetingStatus status = MeetingStatus.upcoming;
-            final now = DateTime.now();
-
-            if (startTime != null && endTime != null) {
-              if (now.isAfter(startTime) && now.isBefore(endTime)) {
-                status = MeetingStatus.ongoing;
-              } else if (now.isAfter(endTime)) {
-                status = MeetingStatus.completed;
-              }
-            } else {
-              // 如果没有会议时间信息，则默认为已完成
-              status = MeetingStatus.completed;
-            }
-
-            // 创建参与信息
-            final Map<String, dynamic> participationInfo = {
-              'joinTime': joinTime?.toString() ?? '',
-              'leaveTime': leaveTime?.toString() ?? '',
-              'duration': record['duration']?.toString() ?? '',
-              'durationDisplay': record['durationDisplay'] ?? '',
-            };
-
-            return Meeting(
-              id: record['meetingId'].toString(),
-              title: record['title'] ?? '',
-              description: record['description'] ?? '',
-              startTime: startTime ?? DateTime.now(),
-              endTime: endTime ?? DateTime.now().add(const Duration(hours: 1)),
-              location: record['location'] ?? '',
-              status: status,
-              type: meetingType,
-              visibility: visibility,
-              organizerId: record['organizerId'].toString(),
-              isSignedIn: true, // 参与历史中的会议都是已签到的
-              organizerName: '', // API未提供组织者名称
-              participationInfo: participationInfo,
-            );
-          }).toList();
-        } else {
-          final message = responseData['message'] ?? '获取参与会议列表失败';
-          throw Exception(message);
+      // 如果有依赖注入的 Ref，则通过 Provider 获取用户ID
+      if (_ref != null) {
+        userId = await _ref.read(currentUserIdProvider.future);
+        if (userId.isEmpty) {
+          throw Exception('用户未登录，无法获取参与会议');
         }
       } else {
-        throw Exception(
-          HttpUtils.extractErrorMessage(
-            response,
-            defaultMessage: '获取参与会议列表请求失败',
-          ),
-        );
+        // 兼容性处理：如果没有 Ref，则尝试从本地存储获取
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = prefs.getString(AppConstants.userKey);
+        if (userJson == null) {
+          throw Exception('用户未登录，无法获取参与会议');
+        }
+
+        final userData = jsonDecode(userJson);
+        userId = userData['id']?.toString() ?? '';
+        if (userId.isEmpty) {
+          throw Exception('获取用户ID失败');
+        }
+      }
+
+      final url =
+          '${AppConstants.apiBaseUrl}/meeting/user/$userId/participation-history';
+      final response = await http
+          .get(Uri.parse(url), headers: HttpUtils.createHeaders())
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        // 使用HttpUtils.decodeResponse处理UTF-8编码的响应数据
+        final responseData = HttpUtils.decodeResponse(response);
+        final meetingParticipationResponse =
+            MeetingParticipationResponse.fromJson(responseData);
+
+        // 将会议参与数据转换为Meeting模型
+        return meetingParticipationResponse.data
+            .map((participation) => participation.toMeeting())
+            .toList();
+      } else {
+        throw Exception('获取参与会议历史失败: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('获取参与会议列表时出错: $e');
+      print('获取我的会议列表异常: $e');
+      throw Exception('获取我的会议列表失败: $e');
     }
   }
 
