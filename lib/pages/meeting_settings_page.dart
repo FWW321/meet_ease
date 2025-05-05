@@ -3,8 +3,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../models/meeting.dart';
 import '../models/user.dart';
+import '../models/leave.dart';
 import '../providers/meeting_providers.dart';
 import '../providers/user_providers.dart';
+import '../providers/leave_providers.dart';
 import '../widgets/user_selection_dialog.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -30,8 +32,17 @@ class MeetingSettingsPage extends HookConsumerWidget {
     // 当前选中的标签索引
     final selectedTabIndex = useState(0);
 
-    // 标签列表
-    final tabs = ['会议信息', '管理员', '黑名单'];
+    // 标签列表 - 动态构建
+    final getTabs = (Meeting meeting) {
+      final baseTabs = ['会议信息', '管理员', '黑名单'];
+
+      // 只有私有会议才添加请假标签页
+      if (meeting.visibility == MeetingVisibility.private) {
+        return [...baseTabs, '请假申请'];
+      }
+
+      return baseTabs;
+    };
 
     return Scaffold(
       appBar: AppBar(title: const Text('会议设置'), centerTitle: true),
@@ -83,6 +94,14 @@ class MeetingSettingsPage extends HookConsumerWidget {
                 ],
               ),
             );
+          }
+
+          // 获取会议类型对应的标签
+          final tabs = getTabs(meeting);
+
+          // 确保选中的标签索引不超出范围
+          if (selectedTabIndex.value >= tabs.length) {
+            selectedTabIndex.value = 0;
           }
 
           return Column(
@@ -154,6 +173,12 @@ class MeetingSettingsPage extends HookConsumerWidget {
                       meeting: meeting,
                       currentUserId: currentUserId,
                     ),
+                    // 只在私有会议中显示请假标签页
+                    if (meeting.visibility == MeetingVisibility.private)
+                      _LeavesTab(
+                        meeting: meeting,
+                        currentUserId: currentUserId,
+                      ),
                   ],
                 ),
               ),
@@ -1100,6 +1125,255 @@ class _BlacklistTab extends HookConsumerWidget {
             );
           }
         });
+  }
+}
+
+/// 请假申请标签页
+class _LeavesTab extends HookConsumerWidget {
+  final Meeting meeting;
+  final String currentUserId;
+
+  const _LeavesTab({required this.meeting, required this.currentUserId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 获取请假申请列表
+    final leavesAsync = ref.watch(meetingLeavesProvider(meeting.id));
+
+    return Column(
+      children: [
+        // 请假申请列表
+        Expanded(
+          child: leavesAsync.when(
+            data: (leaves) {
+              if (leaves.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: Center(
+                    child: Text('没有请假申请', style: TextStyle(color: Colors.grey)),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16.0),
+                itemCount: leaves.length,
+                itemBuilder: (context, index) {
+                  final leave = leaves[index];
+                  return _LeaveTile(
+                    leave: leave,
+                    onApprove: () => _approveLeave(context, ref, leave.leaveId),
+                    onReject: () => _rejectLeave(context, ref, leave.leaveId),
+                  );
+                },
+              );
+            },
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error:
+                (error, stackTrace) => Center(
+                  child: Text(
+                    '加载请假申请失败: $error',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+          ),
+        ),
+
+        // 底部按钮 - 刷新列表
+        if (meeting.canUserManage(currentUserId))
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('刷新请假申请列表'),
+                onPressed: () {
+                  // 刷新请假申请列表
+                  ref.invalidate(meetingLeavesProvider(meeting.id));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('正在刷新请假申请列表...')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(12.0),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 通过请假申请
+  void _approveLeave(
+    BuildContext context,
+    WidgetRef ref,
+    String leaveId,
+  ) async {
+    try {
+      final leaveService = ref.read(leaveServiceProvider);
+      await leaveService.approveLeave(leaveId);
+
+      // 刷新请假申请列表
+      ref.invalidate(meetingLeavesProvider(meeting.id));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已通过请假申请'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('通过请假申请失败: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // 拒绝请假申请
+  void _rejectLeave(BuildContext context, WidgetRef ref, String leaveId) async {
+    try {
+      final leaveService = ref.read(leaveServiceProvider);
+      await leaveService.rejectLeave(leaveId);
+
+      // 刷新请假申请列表
+      ref.invalidate(meetingLeavesProvider(meeting.id));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已拒绝请假申请'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('拒绝请假申请失败: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+}
+
+/// 请假申请条目组件
+class _LeaveTile extends HookConsumerWidget {
+  final Leave leave;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  const _LeaveTile({
+    required this.leave,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 使用userNameProvider获取用户名
+    final userNameAsync = ref.watch(userNameProvider(leave.userId));
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8.0),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 用户信息和创建时间
+            Row(
+              children: [
+                userNameAsync.when(
+                  data:
+                      (userName) => Text(
+                        userName,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                  loading: () => const Text('加载中...'),
+                  error:
+                      (_, __) => Text(
+                        '用户 ${leave.userId}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                ),
+                const Spacer(),
+                Text(
+                  '${leave.createdAt.year}-${leave.createdAt.month.toString().padLeft(2, '0')}-${leave.createdAt.day.toString().padLeft(2, '0')} ${leave.createdAt.hour.toString().padLeft(2, '0')}:${leave.createdAt.minute.toString().padLeft(2, '0')}',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // 请假原因
+            Text(leave.reason),
+            const SizedBox(height: 12),
+
+            // 请假状态
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: leave.getStatusColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: leave.getStatusColor().withOpacity(0.5),
+                    ),
+                  ),
+                  child: Text(
+                    leave.status,
+                    style: TextStyle(
+                      color: leave.getStatusColor(),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+
+                // 仅对待审批的请假显示审批按钮
+                if (leave.status == '待审批')
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.check, color: Colors.green),
+                        label: const Text('通过'),
+                        onPressed: onApprove,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.green,
+                        ),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        label: const Text('拒绝'),
+                        onPressed: onReject,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
