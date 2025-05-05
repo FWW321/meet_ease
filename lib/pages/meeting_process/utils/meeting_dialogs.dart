@@ -52,6 +52,19 @@ void showSignInDialog(
 ) {
   final meeting = ref.read(meetingDetailProvider(meetingId)).value;
 
+  // 检查是否为私有会议
+  if (meeting != null && meeting.visibility != MeetingVisibility.private) {
+    // 显示不支持签到的提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('只有私有会议支持签到功能'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    onComplete();
+    return;
+  }
+
   showDialog(
     context: context,
     builder:
@@ -83,22 +96,50 @@ void showSignInDialog(
             ),
             Consumer(
               builder: (context, ref, child) {
-                final signInAsyncValue = ref.watch(
-                  meetingSignInProvider(meetingId),
+                // 使用新的签到状态提供者
+                final signInStatusAsync = ref.watch(
+                  meetingSignInStatusProvider(meetingId),
                 );
-                final isLoading = signInAsyncValue.isLoading;
+                final isLoading = signInStatusAsync is AsyncLoading;
 
                 return TextButton(
                   onPressed:
                       isLoading
                           ? null
                           : () async {
-                            await ref
-                                .read(meetingSignInProvider(meetingId).notifier)
-                                .signIn();
-                            if (context.mounted) {
-                              Navigator.of(context).pop();
-                              onComplete();
+                            try {
+                              // 使用新的签到操作提供者
+                              await ref
+                                  .read(
+                                    meetingSignInOperationProvider(meetingId),
+                                  )
+                                  .signIn();
+
+                              if (context.mounted) {
+                                // 显示签到成功提示
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('签到成功'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+
+                                Navigator.of(context).pop();
+                                onComplete();
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                // 显示错误提示
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('签到失败: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+
+                                Navigator.of(context).pop();
+                                onComplete();
+                              }
                             }
                           },
                   child:

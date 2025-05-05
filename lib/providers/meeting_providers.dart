@@ -6,8 +6,16 @@ import '../models/meeting_recommendation.dart';
 import '../models/user.dart';
 import '../services/meeting_service.dart';
 import 'user_providers.dart';
+import 'package:http/http.dart' as http;
+import '../constants/app_constants.dart';
+import '../utils/http_utils.dart';
 
 part 'meeting_providers.g.dart';
+
+// HTTP客户端提供者
+final apiClientProvider = Provider<http.Client>((ref) {
+  return http.Client();
+});
 
 /// 会议服务提供者 - 用于获取会议服务实例
 final meetingServiceProvider = Provider<MeetingService>((ref) {
@@ -227,8 +235,140 @@ class MeetingSignIn extends _$MeetingSignIn {
       // 刷新相关提供者
       ref.invalidate(meetingDetailProvider(meetingId));
       ref.invalidate(myMeetingsProvider);
+
+      // 刷新直接从API获取的签到状态
+      ref.invalidate(meetingSignInStatusProvider(meetingId));
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
+    }
+  }
+}
+
+// 手动创建签到状态提供者，用于替代 @riverpod 注解无法正常生成代码的情况
+final meetingSignInStatusProvider = FutureProvider.family<String, String>((
+  ref,
+  meetingId,
+) async {
+  try {
+    // 获取当前用户ID
+    final userId = await ref.read(currentUserIdProvider.future);
+
+    if (userId.isEmpty) {
+      return '未签到';
+    }
+
+    // 获取会议详情，检查是否为私有会议
+    final meetingDetail = await ref.read(
+      meetingDetailProvider(meetingId).future,
+    );
+
+    // 如果不是私有会议，直接返回不支持签到
+    if (meetingDetail.visibility != MeetingVisibility.private) {
+      return '不支持签到';
+    }
+
+    final client = ref.read(apiClientProvider);
+
+    // 创建请求URL，添加查询参数
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/signin/status',
+    ).replace(queryParameters: {'meetingId': meetingId, 'userId': userId});
+
+    // 发起GET请求
+    final response = await client.get(uri, headers: HttpUtils.createHeaders());
+
+    if (response.statusCode == 200) {
+      final responseData = HttpUtils.decodeResponse(response);
+
+      // 检查响应码
+      if (responseData['code'] == 200) {
+        // 返回签到状态
+        return responseData['data'] as String? ?? '未签到';
+      } else {
+        print('获取签到状态失败: ${responseData['message']}');
+        return '未签到';
+      }
+    } else {
+      print('获取签到状态请求失败: ${response.statusCode}');
+      return '未签到';
+    }
+  } catch (e) {
+    print('获取签到状态出错: $e');
+    return '未签到';
+  }
+});
+
+// 签到操作提供者
+final meetingSignInOperationProvider =
+    Provider.family<MeetingSignInOperation, String>((ref, meetingId) {
+      return MeetingSignInOperation(ref, meetingId);
+    });
+
+// 签到操作类
+class MeetingSignInOperation {
+  final Ref ref;
+  final String meetingId;
+
+  MeetingSignInOperation(this.ref, this.meetingId);
+
+  // 签到方法
+  Future<bool> signIn() async {
+    try {
+      // 获取当前用户ID
+      final userId = await ref.read(currentUserIdProvider.future);
+
+      if (userId.isEmpty) {
+        throw Exception('用户未登录，无法签到');
+      }
+
+      // 获取会议详情，检查是否为私有会议
+      final meetingDetail = await ref.read(
+        meetingDetailProvider(meetingId).future,
+      );
+
+      // 验证会议是否为私有会议
+      if (meetingDetail.visibility != MeetingVisibility.private) {
+        throw Exception('只有私有会议支持签到功能');
+      }
+
+      final client = ref.read(apiClientProvider);
+
+      // 创建请求URL，添加查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/signin/submit',
+      ).replace(queryParameters: {'meetingId': meetingId, 'userId': userId});
+
+      // 发起POST请求
+      final response = await client.post(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 刷新相关提供者
+          ref.invalidate(meetingSignInStatusProvider(meetingId));
+          ref.invalidate(meetingDetailProvider(meetingId));
+          ref.invalidate(myMeetingsProvider);
+          ref.invalidate(meetingSignInProvider(meetingId));
+
+          // 签到成功
+          return true;
+        } else {
+          final message = responseData['message'] ?? '签到失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '签到请求失败'),
+        );
+      }
+    } catch (e) {
+      print('签到失败: $e');
+      throw Exception('签到时出错: $e');
     }
   }
 }

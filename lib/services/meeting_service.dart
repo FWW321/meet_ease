@@ -981,8 +981,54 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<bool> signInMeeting(String meetingId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 获取当前用户ID
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null || userId.isEmpty) {
+        throw Exception('用户未登录，无法签到');
+      }
+
+      // 先获取会议详情，检查会议类型
+      final meeting = await getMeetingById(meetingId);
+
+      // 检查会议是否为私有会议
+      if (meeting.visibility != MeetingVisibility.private) {
+        throw Exception('只有私有会议支持签到功能');
+      }
+
+      // 创建请求URL，添加查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/signin/submit',
+      ).replace(queryParameters: {'meetingId': meetingId, 'userId': userId});
+
+      // 发起POST请求
+      final response = await _client.post(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 签到成功
+          return true;
+        } else {
+          final message = responseData['message'] ?? '签到失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '签到请求失败'),
+        );
+      }
+    } catch (e) {
+      print('签到失败: $e');
+      throw Exception('签到时出错: $e');
+    }
   }
 
   @override

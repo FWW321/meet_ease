@@ -156,8 +156,8 @@ class MeetingProcessPage extends HookConsumerWidget {
       );
     }
 
-    // 签到状态
-    final signInStatusAsync = ref.watch(meetingSignInProvider(meetingId));
+    // 签到状态 - 使用新的签到状态提供者
+    final signInStatusAsync = ref.watch(meetingSignInStatusProvider(meetingId));
 
     // 功能选项列表
     final features = [
@@ -197,28 +197,35 @@ class MeetingProcessPage extends HookConsumerWidget {
     // 构建顶部操作按钮
     List<Widget> buildActions() {
       return [
-        // 签到按钮 - 仅在进行中且未签到的会议显示
-        if (meeting.status == MeetingStatus.ongoing)
+        // 签到按钮 - 仅在进行中且未签到的私有会议显示
+        if (meeting.status == MeetingStatus.ongoing &&
+            meeting.visibility == MeetingVisibility.private)
           signInStatusAsync.when(
-            data:
-                (isSignedIn) =>
-                    !isSignedIn
-                        ? IconButton(
-                          icon: const Icon(Icons.how_to_reg),
-                          tooltip: '签到',
-                          onPressed: () => isShowingSignInDialog.value = true,
-                        )
-                        : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Chip(
-                            label: const Text('已签到'),
-                            backgroundColor: Colors.green.shade100,
-                            labelStyle: const TextStyle(
-                              color: Colors.green,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
+            data: (signInStatus) {
+              // 处理不同签到状态
+              if (signInStatus == '未签到') {
+                return IconButton(
+                  icon: const Icon(Icons.how_to_reg),
+                  tooltip: '签到',
+                  onPressed: () => isShowingSignInDialog.value = true,
+                );
+              } else if (signInStatus == '已签到') {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                  child: Chip(
+                    label: const Text('已签到'),
+                    backgroundColor: Colors.green.shade100,
+                    labelStyle: const TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              } else {
+                // 不支持签到或其他状态
+                return const SizedBox.shrink();
+              }
+            },
             loading:
                 () => const SizedBox(
                   height: 20,
@@ -234,7 +241,9 @@ class MeetingProcessPage extends HookConsumerWidget {
                   color: Colors.red,
                   tooltip: '签到状态获取失败',
                   onPressed:
-                      () => ref.invalidate(meetingSignInProvider(meetingId)),
+                      () => ref.invalidate(
+                        meetingSignInStatusProvider(meetingId),
+                      ),
                 ),
           ),
 
