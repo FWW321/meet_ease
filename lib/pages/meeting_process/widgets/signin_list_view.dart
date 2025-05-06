@@ -1,34 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../../models/user.dart';
 import '../../../models/meeting.dart';
 import '../../../providers/meeting_providers.dart';
 
 /// 会议签到列表视图
-class SignInListView extends ConsumerWidget {
+class SignInListView extends HookConsumerWidget {
   final String meetingId;
 
   const SignInListView({required this.meetingId, super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 使用useState记录是否已经加载过数据
+    final hasInitialized = useState(false);
+
+    // 在构建时（而不是useEffect中）刷新数据
+    if (!hasInitialized.value) {
+      // 标记为已初始化
+      hasInitialized.value = true;
+      // 在下一帧执行刷新，避免在构建过程中修改状态
+      Future.microtask(
+        () => ref.invalidate(meetingParticipantsProvider(meetingId)),
+      );
+    }
+
     // 获取参会人员列表
     final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('签到列表')),
+      appBar: AppBar(
+        title: const Text('签到列表'),
+        actions: [
+          // 添加手动刷新按钮
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: '刷新数据',
+            onPressed: () {
+              // 手动刷新数据
+              ref.invalidate(meetingParticipantsProvider(meetingId));
+            },
+          ),
+        ],
+      ),
       body: participantsAsync.when(
         data: (participants) {
           if (participants.isEmpty) {
             return const Center(child: Text('暂无参会人员数据'));
           }
 
-          return ListView.builder(
-            itemCount: participants.length,
-            itemBuilder: (context, index) {
-              final user = participants[index];
-              return _buildUserListItem(context, user);
+          return RefreshIndicator(
+            onRefresh: () async {
+              // 下拉刷新数据
+              ref.invalidate(meetingParticipantsProvider(meetingId));
             },
+            child: ListView.builder(
+              itemCount: participants.length,
+              itemBuilder: (context, index) {
+                final user = participants[index];
+                return _buildUserListItem(context, user);
+              },
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
