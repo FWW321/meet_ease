@@ -135,6 +135,9 @@ class NotesListWidget extends ConsumerWidget {
             ? dateFormat.format(note.updatedAt!)
             : dateFormat.format(note.createdAt);
 
+    // 检查笔记创建者是否为当前用户
+    final currentUserIdAsync = ref.watch(currentUserIdProvider);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
@@ -230,17 +233,40 @@ class NotesListWidget extends ConsumerWidget {
                                 MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        tooltip: '编辑',
-                        onPressed:
-                            () => _showEditNoteDialog(context, note, ref),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        tooltip: '删除',
-                        onPressed:
-                            () => _confirmDeleteNote(context, note.id, ref),
+
+                      // 仅当当前用户是创建者时才显示删除按钮
+                      currentUserIdAsync.when(
+                        data: (currentUserId) {
+                          final isCreator = note.creatorId == currentUserId;
+                          if (isCreator) {
+                            return Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  tooltip: '删除',
+                                  onPressed:
+                                      () => _confirmDeleteNote(
+                                        context,
+                                        note.id,
+                                        ref,
+                                      ),
+                                ),
+                              ],
+                            );
+                          } else {
+                            return Container(); // 不是创建者，不显示编辑和删除按钮
+                          }
+                        },
+                        loading:
+                            () => const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        error: (_, __) => Container(),
                       ),
                     ],
                   ),
@@ -617,6 +643,9 @@ class NotesListWidget extends ConsumerWidget {
               // 使用noteDetailProvider获取最新的笔记详情
               final noteDetailAsync = ref.watch(noteDetailProvider(note.id));
 
+              // 获取当前用户ID以检查权限
+              final currentUserIdAsync = ref.watch(currentUserIdProvider);
+
               return noteDetailAsync.when(
                 loading:
                     () => const AlertDialog(
@@ -690,41 +719,82 @@ class NotesListWidget extends ConsumerWidget {
                       ),
                     ),
                     actions: [
-                      // 分享按钮
-                      TextButton.icon(
-                        icon: Icon(
-                          currentNote.isShared
-                              ? Icons.share_outlined
-                              : Icons.share,
-                          color:
-                              currentNote.isShared ? Colors.grey : Colors.blue,
-                        ),
-                        label: Text(currentNote.isShared ? '取消共享' : '共享'),
-                        onPressed: () {
-                          // 切换共享状态
-                          final notifier = ref.read(
-                            meetingNotesNotifierProvider(meetingId).notifier,
+                      // 根据当前用户是否为笔记创建者显示不同的操作按钮
+                      currentUserIdAsync.when(
+                        loading:
+                            () => const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        error:
+                            (_, __) => Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('关闭'),
+                                ),
+                              ],
+                            ),
+                        data: (currentUserId) {
+                          final isCreator =
+                              currentNote.creatorId == currentUserId;
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (isCreator) ...[
+                                // 分享按钮
+                                TextButton.icon(
+                                  icon: Icon(
+                                    currentNote.isShared
+                                        ? Icons.share_outlined
+                                        : Icons.share,
+                                    color:
+                                        currentNote.isShared
+                                            ? Colors.grey
+                                            : Colors.blue,
+                                  ),
+                                  label: Text(
+                                    currentNote.isShared ? '取消共享' : '共享',
+                                  ),
+                                  onPressed: () {
+                                    // 切换共享状态
+                                    final notifier = ref.read(
+                                      meetingNotesNotifierProvider(
+                                        meetingId,
+                                      ).notifier,
+                                    );
+                                    notifier.shareNote(
+                                      currentNote.id,
+                                      !currentNote.isShared,
+                                    );
+                                    Navigator.of(context).pop();
+                                  },
+                                ),
+                                // 编辑按钮
+                                TextButton.icon(
+                                  icon: const Icon(Icons.edit),
+                                  label: const Text('编辑'),
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                    _showEditNoteDialog(
+                                      context,
+                                      currentNote,
+                                      ref,
+                                    );
+                                  },
+                                ),
+                              ],
+                              // 关闭按钮
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('关闭'),
+                              ),
+                            ],
                           );
-                          notifier.shareNote(
-                            currentNote.id,
-                            !currentNote.isShared,
-                          );
-                          Navigator.of(context).pop();
                         },
-                      ),
-                      // 编辑按钮
-                      TextButton.icon(
-                        icon: const Icon(Icons.edit),
-                        label: const Text('编辑'),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          _showEditNoteDialog(context, currentNote, ref);
-                        },
-                      ),
-                      // 关闭按钮
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('关闭'),
                       ),
                     ],
                   );
