@@ -36,7 +36,7 @@ abstract class MeetingProcessService {
   Future<MeetingNote?> getNoteDetail(String noteId);
   Future<MeetingNote> addMeetingNote(MeetingNote note);
   Future<MeetingNote> updateMeetingNote(MeetingNote note);
-  Future<bool> removeMeetingNote(String noteId);
+  Future<bool> removeMeetingNote(String noteId, {String? userId});
   Future<bool> shareMeetingNote(String noteId, bool isShared);
 
   /// 投票管理
@@ -430,7 +430,7 @@ class MockMeetingProcessService implements MeetingProcessService {
   }
 
   @override
-  Future<bool> removeMeetingNote(String noteId) async {
+  Future<bool> removeMeetingNote(String noteId, {String? userId}) async {
     await Future.delayed(const Duration(milliseconds: 500));
 
     // 查找笔记
@@ -1055,8 +1055,57 @@ class ApiMeetingProcessService implements MeetingProcessService {
   }
 
   @override
-  Future<bool> removeMeetingNote(String noteId) async {
-    throw UnimplementedError('API服务尚未实现');
+  Future<bool> removeMeetingNote(String noteId, {String? userId}) async {
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 获取当前用户ID
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      final String? userIdParam = userId ?? prefs.getString('userId');
+
+      if (userIdParam == null || userIdParam.isEmpty) {
+        print('删除笔记失败: 未找到用户ID');
+        return false;
+      }
+
+      // 构建API请求URL，添加userId查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/notes/$noteId',
+      ).replace(queryParameters: {'userId': userIdParam});
+
+      print('删除笔记请求URL: $uri');
+
+      // 发送DELETE请求
+      final response = await client.delete(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加日志
+        print('删除笔记响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          return true;
+        } else {
+          final errorMsg = responseData['message'] ?? '删除笔记失败';
+          print('删除笔记失败: $errorMsg');
+          return false;
+        }
+      } else {
+        final errorMsg = '删除笔记请求失败: HTTP ${response.statusCode}';
+        print(errorMsg);
+        return false;
+      }
+    } catch (e) {
+      print('删除笔记出错: $e');
+      return false;
+    }
   }
 
   @override

@@ -226,11 +226,12 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
     state = const AsyncValue.loading();
     try {
       final service = ref.read(meetingProcessServiceProvider);
-      final success = await service.removeMeetingNote(noteId);
+      // 获取当前用户ID
+      final userId = await ref.read(currentUserIdProvider.future);
+      final success = await service.removeMeetingNote(noteId, userId: userId);
 
       if (success) {
         // 刷新笔记列表
-        final userId = await ref.read(currentUserIdProvider.future);
         final updatedNotes = await service.getMeetingNotes(
           meetingId,
           userId: userId,
