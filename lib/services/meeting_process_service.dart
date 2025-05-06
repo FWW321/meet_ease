@@ -10,6 +10,8 @@ import '../services/meeting_service.dart';
 import 'package:http/http.dart' as http;
 import '../utils/http_utils.dart';
 import 'package:intl/intl.dart';
+import '../services/user_service.dart';
+import '../services/api_user_service.dart';
 
 /// 会议过程管理服务接口
 abstract class MeetingProcessService {
@@ -30,7 +32,8 @@ abstract class MeetingProcessService {
   Future<bool> removeMeetingMaterial(String meetingId, String materialId);
 
   /// 笔记管理
-  Future<List<MeetingNote>> getMeetingNotes(String meetingId);
+  Future<List<MeetingNote>> getMeetingNotes(String meetingId, {String? userId});
+  Future<MeetingNote?> getNoteDetail(String noteId);
   Future<MeetingNote> addMeetingNote(MeetingNote note);
   Future<MeetingNote> updateMeetingNote(MeetingNote note);
   Future<bool> removeMeetingNote(String noteId);
@@ -381,57 +384,25 @@ class MockMeetingProcessService implements MeetingProcessService {
 
   // 笔记管理实现
   @override
-  Future<List<MeetingNote>> getMeetingNotes(String meetingId) async {
-    // 由于API还没有提供获取会议笔记列表的功能，这里使用本地存储临时实现
-    // 后续API实现后，应该替换为实际的API调用
-    try {
-      // 获取SharedPreferences实例
-      final prefs = await SharedPreferences.getInstance();
+  Future<List<MeetingNote>> getMeetingNotes(
+    String meetingId, {
+    String? userId,
+  }) async {
+    // 返回模拟数据
+    return _notes.where((note) => note.meetingId == meetingId).toList();
+  }
 
-      // 构建存储键名
-      final String storageKey = 'meeting_notes_$meetingId';
+  @override
+  Future<MeetingNote?> getNoteDetail(String noteId) async {
+    await Future.delayed(const Duration(milliseconds: 500));
 
-      // 获取存储的笔记列表JSON字符串
-      final String? notesJson = prefs.getString(storageKey);
-
-      if (notesJson != null && notesJson.isNotEmpty) {
-        // 解析JSON并转换为MeetingNote对象列表
-        final List<dynamic> notesList = jsonDecode(notesJson);
-        return notesList.map<MeetingNote>((noteData) {
-          // 解析创建和更新时间
-          final DateTime createdAt = DateTime.parse(noteData['createdAt']);
-          DateTime? updatedAt;
-          if (noteData['updatedAt'] != null) {
-            updatedAt = DateTime.parse(noteData['updatedAt']);
-          }
-
-          // 解析标签列表
-          List<String>? tags;
-          if (noteData['tags'] != null) {
-            tags = (noteData['tags'] as List<dynamic>).cast<String>();
-          }
-
-          return MeetingNote(
-            id: noteData['id'],
-            meetingId: noteData['meetingId'],
-            content: noteData['content'],
-            creatorId: noteData['creatorId'],
-            creatorName: noteData['creatorName'],
-            isShared: noteData['isShared'],
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            tags: tags,
-          );
-        }).toList();
-      }
-
-      // 如果没有找到存储的笔记，返回空列表
-      return [];
-    } catch (e) {
-      print('获取会议笔记列表出错: $e');
-      // 出错时返回空列表而不是抛出异常，确保UI不会崩溃
-      return [];
+    // 查找笔记
+    final noteIndex = _notes.indexWhere((n) => n.id == noteId);
+    if (noteIndex == -1) {
+      return null;
     }
+
+    return _notes[noteIndex];
   }
 
   @override
@@ -547,9 +518,12 @@ class MockMeetingProcessService implements MeetingProcessService {
 class ApiMeetingProcessService implements MeetingProcessService {
   // 会议服务实例
   final MeetingService _meetingService;
+  // 用户服务实例
+  final UserService _userService;
 
   // 构造函数
-  ApiMeetingProcessService(this._meetingService);
+  ApiMeetingProcessService(this._meetingService, {UserService? userService})
+    : _userService = userService ?? ApiUserService();
 
   @override
   Future<MeetingAgenda> getMeetingAgenda(String meetingId) async {
@@ -753,51 +727,88 @@ class ApiMeetingProcessService implements MeetingProcessService {
   }
 
   @override
-  Future<List<MeetingNote>> getMeetingNotes(String meetingId) async {
-    // 由于API还没有提供获取会议笔记列表的功能，这里使用本地存储临时实现
-    // 后续API实现后，应该替换为实际的API调用
+  Future<List<MeetingNote>> getMeetingNotes(
+    String meetingId, {
+    String? userId,
+  }) async {
     try {
-      // 获取SharedPreferences实例
-      final prefs = await SharedPreferences.getInstance();
+      // 创建HTTP客户端
+      final client = http.Client();
 
-      // 构建存储键名
-      final String storageKey = 'meeting_notes_$meetingId';
-
-      // 获取存储的笔记列表JSON字符串
-      final String? notesJson = prefs.getString(storageKey);
-
-      if (notesJson != null && notesJson.isNotEmpty) {
-        // 解析JSON并转换为MeetingNote对象列表
-        final List<dynamic> notesList = jsonDecode(notesJson);
-        return notesList.map<MeetingNote>((noteData) {
-          // 解析创建和更新时间
-          final DateTime createdAt = DateTime.parse(noteData['createdAt']);
-          DateTime? updatedAt;
-          if (noteData['updatedAt'] != null) {
-            updatedAt = DateTime.parse(noteData['updatedAt']);
-          }
-
-          // 解析标签列表
-          List<String>? tags;
-          if (noteData['tags'] != null) {
-            tags = (noteData['tags'] as List<dynamic>).cast<String>();
-          }
-
-          return MeetingNote(
-            id: noteData['id'],
-            meetingId: noteData['meetingId'],
-            content: noteData['content'],
-            creatorId: noteData['creatorId'],
-            creatorName: noteData['creatorName'],
-            isShared: noteData['isShared'],
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            tags: tags,
-          );
-        }).toList();
+      // 如果没有传入userId，尝试从本地获取
+      String? userIdParam = userId;
+      if (userIdParam == null) {
+        final SharedPreferences prefs = await SharedPreferences.getInstance();
+        userIdParam = prefs.getString('userId');
       }
 
-      // 如果没有找到存储的笔记，返回空列表
+      // 构建API请求URL
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/notes/list/$meetingId',
+      ).replace(
+        queryParameters: {if (userIdParam != null) 'userId': userIdParam},
+      );
+
+      // 发送GET请求
+      final response = await client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final List<dynamic> notesData = responseData['data'];
+
+          // 创建MeetingNote列表的Future
+          final futureNotes = Future.wait(
+            notesData.map<Future<MeetingNote>>((noteData) async {
+              // 解析时间
+              final DateTime createdAt = DateTime.parse(noteData['createdAt']);
+              DateTime? updatedAt;
+              if (noteData['updatedAt'] != null) {
+                updatedAt = DateTime.parse(noteData['updatedAt']);
+              }
+
+              // 获取用户ID
+              final noteUserId = noteData['userId'].toString();
+
+              // 获取用户名称
+              String creatorName;
+              try {
+                creatorName = await _userService.getUserNameById(noteUserId);
+              } catch (e) {
+                // 如果获取用户名失败，则使用备用值
+                creatorName = noteData['userName'] ?? 'Unknown';
+              }
+
+              // 创建MeetingNote对象
+              return MeetingNote(
+                id: noteData['noteId'].toString(),
+                meetingId: noteData['meetingId'].toString(),
+                content: noteData['noteContent'],
+                noteName: noteData['noteName'],
+                creatorId: noteUserId,
+                creatorName: creatorName,
+                isShared:
+                    noteData['isPublic'] == true || noteData['isPublic'] == 1,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                tags: null, // API目前不支持标签
+              );
+            }),
+          );
+
+          // 等待所有笔记处理完成并返回
+          return await futureNotes;
+        }
+      }
+
+      // 如果请求失败或没有数据，返回空列表
+      print('获取会议笔记列表失败: HTTP ${response.statusCode}');
       return [];
     } catch (e) {
       print('获取会议笔记列表出错: $e');
@@ -1475,6 +1486,74 @@ class ApiMeetingProcessService implements MeetingProcessService {
       print('获取投票选项出错: $e');
       print('堆栈跟踪: $stackTrace');
       throw Exception('获取投票选项时出错: $e');
+    }
+  }
+
+  @override
+  Future<MeetingNote?> getNoteDetail(String noteId) async {
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 构建API请求URL
+      final uri = Uri.parse('${AppConstants.apiBaseUrl}/meeting/notes/$noteId');
+
+      // 发送GET请求
+      final response = await client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final noteData = responseData['data'];
+
+          // 解析时间
+          final DateTime createdAt = DateTime.parse(noteData['createdAt']);
+          DateTime? updatedAt;
+          if (noteData['updatedAt'] != null) {
+            updatedAt = DateTime.parse(noteData['updatedAt']);
+          }
+
+          // 获取用户ID
+          final noteUserId = noteData['userId'].toString();
+
+          // 获取用户名称
+          String creatorName;
+          try {
+            creatorName = await _userService.getUserNameById(noteUserId);
+          } catch (e) {
+            // 如果获取用户名失败，则使用备用名称
+            creatorName = 'Unknown';
+          }
+
+          // 创建MeetingNote对象
+          return MeetingNote(
+            id: noteData['noteId'].toString(),
+            meetingId: noteData['meetingId'].toString(),
+            content: noteData['noteContent'],
+            noteName: noteData['noteName'],
+            creatorId: noteUserId,
+            creatorName: creatorName,
+            isShared: noteData['isPublic'] == true || noteData['isPublic'] == 1,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            tags: null, // API目前不支持标签
+          );
+        }
+      }
+
+      // 如果请求失败或没有数据，返回null
+      print('获取笔记详情失败: HTTP ${response.statusCode}');
+      return null;
+    } catch (e) {
+      print('获取笔记详情出错: $e');
+      // 出错时返回null而不是抛出异常，确保UI不会崩溃
+      return null;
     }
   }
 }

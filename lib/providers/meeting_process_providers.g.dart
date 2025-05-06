@@ -306,7 +306,7 @@ class _MeetingMaterialsProviderElement
   String get meetingId => (origin as MeetingMaterialsProvider).meetingId;
 }
 
-String _$meetingNotesHash() => r'68d04f08e20596a69590c842ea05755b59b6b283';
+String _$meetingNotesHash() => r'7cfdc6ec1c6545b1905c4cf8f5243dcbc44eaf4e';
 
 ///--------------------- 会议笔记相关 ---------------------///
 /// 会议笔记提供者
@@ -444,6 +444,138 @@ class _MeetingNotesProviderElement
 
   @override
   String get meetingId => (origin as MeetingNotesProvider).meetingId;
+}
+
+String _$noteDetailHash() => r'f53449525416cdf4a1654d6eabd6503d73cfaa6e';
+
+/// 笔记详情提供者
+///
+/// Copied from [noteDetail].
+@ProviderFor(noteDetail)
+const noteDetailProvider = NoteDetailFamily();
+
+/// 笔记详情提供者
+///
+/// Copied from [noteDetail].
+class NoteDetailFamily extends Family<AsyncValue<MeetingNote?>> {
+  /// 笔记详情提供者
+  ///
+  /// Copied from [noteDetail].
+  const NoteDetailFamily();
+
+  /// 笔记详情提供者
+  ///
+  /// Copied from [noteDetail].
+  NoteDetailProvider call(String noteId) {
+    return NoteDetailProvider(noteId);
+  }
+
+  @override
+  NoteDetailProvider getProviderOverride(
+    covariant NoteDetailProvider provider,
+  ) {
+    return call(provider.noteId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'noteDetailProvider';
+}
+
+/// 笔记详情提供者
+///
+/// Copied from [noteDetail].
+class NoteDetailProvider extends AutoDisposeFutureProvider<MeetingNote?> {
+  /// 笔记详情提供者
+  ///
+  /// Copied from [noteDetail].
+  NoteDetailProvider(String noteId)
+    : this._internal(
+        (ref) => noteDetail(ref as NoteDetailRef, noteId),
+        from: noteDetailProvider,
+        name: r'noteDetailProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$noteDetailHash,
+        dependencies: NoteDetailFamily._dependencies,
+        allTransitiveDependencies: NoteDetailFamily._allTransitiveDependencies,
+        noteId: noteId,
+      );
+
+  NoteDetailProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.noteId,
+  }) : super.internal();
+
+  final String noteId;
+
+  @override
+  Override overrideWith(
+    FutureOr<MeetingNote?> Function(NoteDetailRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: NoteDetailProvider._internal(
+        (ref) => create(ref as NoteDetailRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        noteId: noteId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<MeetingNote?> createElement() {
+    return _NoteDetailProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NoteDetailProvider && other.noteId == noteId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, noteId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin NoteDetailRef on AutoDisposeFutureProviderRef<MeetingNote?> {
+  /// The parameter `noteId` of this provider.
+  String get noteId;
+}
+
+class _NoteDetailProviderElement
+    extends AutoDisposeFutureProviderElement<MeetingNote?>
+    with NoteDetailRef {
+  _NoteDetailProviderElement(super.provider);
+
+  @override
+  String get noteId => (origin as NoteDetailProvider).noteId;
 }
 
 String _$meetingVotesHash() => r'91805351b5ec2190e6ca48b1c3696b295968862c';
@@ -1192,7 +1324,7 @@ class _MeetingMaterialsNotifierProviderElement
 }
 
 String _$meetingNotesNotifierHash() =>
-    r'5700a2593b8325defe99110f8d0c9ae42278b46c';
+    r'74f96995209f40cc2895a96f8ae2b82760cce24b';
 
 abstract class _$MeetingNotesNotifier
     extends BuildlessAutoDisposeAsyncNotifier<List<MeetingNote>> {

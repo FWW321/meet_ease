@@ -6,6 +6,7 @@ import '../models/meeting_note.dart';
 import '../models/meeting_vote.dart';
 import '../services/meeting_process_service.dart';
 import '../services/meeting_service.dart';
+import '../providers/user_providers.dart';
 
 part 'meeting_process_providers.g.dart';
 
@@ -13,6 +14,8 @@ part 'meeting_process_providers.g.dart';
 final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {
   // 获取会议服务实例
   final meetingService = ref.watch(meetingServiceProvider);
+  // 获取用户服务实例
+  final userService = ref.watch(userServiceProvider);
 
   // 根据环境配置决定使用模拟服务还是API服务
   final bool useApiService = const bool.fromEnvironment(
@@ -21,7 +24,7 @@ final meetingProcessServiceProvider = Provider<MeetingProcessService>((ref) {
   );
 
   if (useApiService) {
-    return ApiMeetingProcessService(meetingService);
+    return ApiMeetingProcessService(meetingService, userService: userService);
   } else {
     return MockMeetingProcessService();
   }
@@ -141,7 +144,16 @@ class MeetingMaterialsNotifier extends _$MeetingMaterialsNotifier {
 @riverpod
 Future<List<MeetingNote>> meetingNotes(Ref ref, String meetingId) async {
   final service = ref.watch(meetingProcessServiceProvider);
-  return service.getMeetingNotes(meetingId);
+  // 获取当前用户ID
+  final userId = await ref.watch(currentUserIdProvider.future);
+  return service.getMeetingNotes(meetingId, userId: userId);
+}
+
+/// 笔记详情提供者
+@riverpod
+Future<MeetingNote?> noteDetail(Ref ref, String noteId) async {
+  final service = ref.watch(meetingProcessServiceProvider);
+  return service.getNoteDetail(noteId);
 }
 
 /// 会议笔记管理提供者
@@ -150,7 +162,9 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
   @override
   Future<List<MeetingNote>> build(String meetingId) async {
     final service = ref.watch(meetingProcessServiceProvider);
-    return service.getMeetingNotes(meetingId);
+    // 获取当前用户ID
+    final userId = await ref.watch(currentUserIdProvider.future);
+    return service.getMeetingNotes(meetingId, userId: userId);
   }
 
   // 添加笔记
@@ -161,7 +175,11 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
       await service.addMeetingNote(note);
 
       // 刷新笔记列表
-      final updatedNotes = await service.getMeetingNotes(meetingId);
+      final userId = await ref.read(currentUserIdProvider.future);
+      final updatedNotes = await service.getMeetingNotes(
+        meetingId,
+        userId: userId,
+      );
       state = AsyncValue.data(updatedNotes);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
@@ -173,7 +191,11 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
     state = const AsyncValue.loading();
     try {
       final service = ref.read(meetingProcessServiceProvider);
-      final updatedNotes = await service.getMeetingNotes(meetingId);
+      final userId = await ref.read(currentUserIdProvider.future);
+      final updatedNotes = await service.getMeetingNotes(
+        meetingId,
+        userId: userId,
+      );
       state = AsyncValue.data(updatedNotes);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
@@ -188,7 +210,11 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
       await service.updateMeetingNote(note);
 
       // 刷新笔记列表
-      final updatedNotes = await service.getMeetingNotes(meetingId);
+      final userId = await ref.read(currentUserIdProvider.future);
+      final updatedNotes = await service.getMeetingNotes(
+        meetingId,
+        userId: userId,
+      );
       state = AsyncValue.data(updatedNotes);
     } catch (e, stackTrace) {
       state = AsyncValue.error(e, stackTrace);
@@ -204,7 +230,11 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
 
       if (success) {
         // 刷新笔记列表
-        final updatedNotes = await service.getMeetingNotes(meetingId);
+        final userId = await ref.read(currentUserIdProvider.future);
+        final updatedNotes = await service.getMeetingNotes(
+          meetingId,
+          userId: userId,
+        );
         state = AsyncValue.data(updatedNotes);
       } else {
         state = AsyncValue.error('删除笔记失败', StackTrace.current);
@@ -223,7 +253,11 @@ class MeetingNotesNotifier extends _$MeetingNotesNotifier {
 
       if (success) {
         // 刷新笔记列表
-        final updatedNotes = await service.getMeetingNotes(meetingId);
+        final userId = await ref.read(currentUserIdProvider.future);
+        final updatedNotes = await service.getMeetingNotes(
+          meetingId,
+          userId: userId,
+        );
         state = AsyncValue.data(updatedNotes);
       } else {
         state = AsyncValue.error('更新笔记分享状态失败', StackTrace.current);

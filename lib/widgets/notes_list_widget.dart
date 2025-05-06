@@ -609,92 +609,128 @@ class NotesListWidget extends ConsumerWidget {
     MeetingNote note,
     WidgetRef ref,
   ) {
-    final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
-
     showDialog(
       context: context,
       builder:
-          (context) => AlertDialog(
-            title:
-                note.noteName != null && note.noteName!.isNotEmpty
-                    ? Text(note.noteName!)
-                    : Text('${note.creatorName}的笔记'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 创建/更新时间
-                  Text(
-                    '创建于: ${dateFormat.format(note.createdAt)}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (note.updatedAt != null)
-                    Text(
-                      '更新于: ${dateFormat.format(note.updatedAt!)}',
-                      style: Theme.of(context).textTheme.bodySmall,
+          (context) => Consumer(
+            builder: (context, ref, child) {
+              // 使用noteDetailProvider获取最新的笔记详情
+              final noteDetailAsync = ref.watch(noteDetailProvider(note.id));
+
+              return noteDetailAsync.when(
+                loading:
+                    () => const AlertDialog(
+                      content: Center(child: CircularProgressIndicator()),
                     ),
-                  Text(
-                    '作者: ${note.creatorName}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 笔记内容
-                  SelectableText(note.content),
-
-                  if (note.tags != null && note.tags!.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-
-                    // 标签
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children:
-                          note.tags!.map((tag) {
-                            return Chip(
-                              label: Text(tag),
-                              labelStyle: const TextStyle(fontSize: 12),
-                            );
-                          }).toList(),
+                error:
+                    (err, stack) => AlertDialog(
+                      title: const Text('获取笔记详情失败'),
+                      content: Text('$err'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('关闭'),
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              // 分享按钮
-              TextButton.icon(
-                icon: Icon(
-                  note.isShared ? Icons.share_outlined : Icons.share,
-                  color: note.isShared ? Colors.grey : Colors.blue,
-                ),
-                label: Text(note.isShared ? '取消共享' : '共享'),
-                onPressed: () {
-                  // 切换共享状态
-                  final notifier = ref.read(
-                    meetingNotesNotifierProvider(meetingId).notifier,
+                data: (noteDetail) {
+                  // 使用新获取的详情，如果为null则使用列表中的笔记
+                  final currentNote = noteDetail ?? note;
+                  final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+
+                  return AlertDialog(
+                    title:
+                        currentNote.noteName != null &&
+                                currentNote.noteName!.isNotEmpty
+                            ? Text(currentNote.noteName!)
+                            : Text('${currentNote.creatorName}的笔记'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 创建/更新时间
+                          Text(
+                            '创建于: ${dateFormat.format(currentNote.createdAt)}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          if (currentNote.updatedAt != null)
+                            Text(
+                              '更新于: ${dateFormat.format(currentNote.updatedAt!)}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          Text(
+                            '作者: ${currentNote.creatorName}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // 笔记内容
+                          SelectableText(currentNote.content),
+
+                          if (currentNote.tags != null &&
+                              currentNote.tags!.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+
+                            // 标签
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 4,
+                              children:
+                                  currentNote.tags!.map((tag) {
+                                    return Chip(
+                                      label: Text(tag),
+                                      labelStyle: const TextStyle(fontSize: 12),
+                                    );
+                                  }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      // 分享按钮
+                      TextButton.icon(
+                        icon: Icon(
+                          currentNote.isShared
+                              ? Icons.share_outlined
+                              : Icons.share,
+                          color:
+                              currentNote.isShared ? Colors.grey : Colors.blue,
+                        ),
+                        label: Text(currentNote.isShared ? '取消共享' : '共享'),
+                        onPressed: () {
+                          // 切换共享状态
+                          final notifier = ref.read(
+                            meetingNotesNotifierProvider(meetingId).notifier,
+                          );
+                          notifier.shareNote(
+                            currentNote.id,
+                            !currentNote.isShared,
+                          );
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                      // 编辑按钮
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text('编辑'),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _showEditNoteDialog(context, currentNote, ref);
+                        },
+                      ),
+                      // 关闭按钮
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('关闭'),
+                      ),
+                    ],
                   );
-                  notifier.shareNote(note.id, !note.isShared);
-                  Navigator.of(context).pop();
                 },
-              ),
-              // 编辑按钮
-              TextButton.icon(
-                icon: const Icon(Icons.edit),
-                label: const Text('编辑'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _showEditNoteDialog(context, note, ref);
-                },
-              ),
-              // 关闭按钮
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('关闭'),
-              ),
-            ],
+              );
+            },
           ),
     );
   }
