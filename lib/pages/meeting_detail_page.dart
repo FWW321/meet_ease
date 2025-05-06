@@ -560,7 +560,17 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                     children: [
                                       if (user.email.isNotEmpty)
                                         Text(user.email),
-                                      if (user.signInStatus != null)
+                                      // 如果用户请假状态为"请假"，显示已请假，否则显示签到状态
+                                      if (user.leaveStatus == '请假')
+                                        const Text(
+                                          '状态: 已请假',
+                                          style: TextStyle(
+                                            color: Colors.green,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      else if (user.signInStatus != null)
                                         Text(
                                           '签到状态: ${user.signInStatus}',
                                           style: TextStyle(
@@ -568,6 +578,23 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                                 user.signInStatus == '已签到'
                                                     ? Colors.green
                                                     : Colors.orange,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      // 显示请假驳回或审核中状态
+                                      if (user.leaveStatus == '请假驳回')
+                                        const Text(
+                                          '请假申请已被驳回',
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontSize: 12,
+                                          ),
+                                        )
+                                      else if (user.leaveStatus == '请假审核中')
+                                        const Text(
+                                          '请假申请审核中',
+                                          style: TextStyle(
+                                            color: Colors.blue,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -593,7 +620,17 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                       children: [
                                         if (user.email.isNotEmpty)
                                           Text(user.email),
-                                        if (user.signInStatus != null)
+                                        // 如果用户请假状态为"请假"，显示已请假，否则显示签到状态
+                                        if (user.leaveStatus == '请假')
+                                          const Text(
+                                            '状态: 已请假',
+                                            style: TextStyle(
+                                              color: Colors.green,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        else if (user.signInStatus != null)
                                           Text(
                                             '签到状态: ${user.signInStatus}',
                                             style: TextStyle(
@@ -601,6 +638,23 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                                   user.signInStatus == '已签到'
                                                       ? Colors.green
                                                       : Colors.orange,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        // 显示请假驳回或审核中状态
+                                        if (user.leaveStatus == '请假驳回')
+                                          const Text(
+                                            '请假申请已被驳回',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          )
+                                        else if (user.leaveStatus == '请假审核中')
+                                          const Text(
+                                            '请假申请审核中',
+                                            style: TextStyle(
+                                              color: Colors.blue,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -630,7 +684,17 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                       children: [
                                         if (user.email.isNotEmpty)
                                           Text(user.email),
-                                        if (user.signInStatus != null)
+                                        // 如果用户请假状态为"请假"，显示已请假，否则显示签到状态
+                                        if (user.leaveStatus == '请假')
+                                          const Text(
+                                            '状态: 已请假',
+                                            style: TextStyle(
+                                              color: Colors.green,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        else if (user.signInStatus != null)
                                           Text(
                                             '签到状态: ${user.signInStatus}',
                                             style: TextStyle(
@@ -638,6 +702,23 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                                                   user.signInStatus == '已签到'
                                                       ? Colors.green
                                                       : Colors.orange,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        // 显示请假驳回或审核中状态
+                                        if (user.leaveStatus == '请假驳回')
+                                          const Text(
+                                            '请假申请已被驳回',
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontSize: 12,
+                                            ),
+                                          )
+                                        else if (user.leaveStatus == '请假审核中')
+                                          const Text(
+                                            '请假申请审核中',
+                                            style: TextStyle(
+                                              color: Colors.blue,
                                               fontSize: 12,
                                             ),
                                           ),

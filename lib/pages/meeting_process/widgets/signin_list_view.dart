@@ -79,7 +79,7 @@ class SignInListView extends HookConsumerWidget {
 
     // 如果请假状态为"请假"，显示请假状态
     if (user.leaveStatus == '请假') {
-      statusColor = Colors.orange;
+      statusColor = Colors.green;
       statusText = '已请假';
       statusIcon = Icons.event_busy;
     } else {
