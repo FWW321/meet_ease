@@ -70,6 +70,22 @@ Future<List<Meeting>> searchMeetings(Ref ref, String query) async {
   return meetingService.searchMeetings(query);
 }
 
+/// 搜索私有会议提供者
+@riverpod
+Future<List<Meeting>> searchPrivateMeetings(Ref ref, String query) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  final userId = await ref.watch(currentUserIdProvider.future);
+  return meetingService.searchPrivateMeetings(userId, query);
+}
+
+/// 搜索公有会议提供者
+@riverpod
+Future<List<Meeting>> searchPublicMeetings(Ref ref, String query) async {
+  final meetingService = ref.watch(meetingServiceProvider);
+  final userId = await ref.watch(currentUserIdProvider.future);
+  return meetingService.searchPublicMeetings(userId, query);
+}
+
 /// 会议参与者提供者
 @riverpod
 Future<List<User>> meetingParticipants(Ref ref, String meetingId) async {

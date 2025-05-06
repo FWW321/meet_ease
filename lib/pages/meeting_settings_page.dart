@@ -33,7 +33,7 @@ class MeetingSettingsPage extends HookConsumerWidget {
     final selectedTabIndex = useState(0);
 
     // 标签列表 - 动态构建
-    final getTabs = (Meeting meeting) {
+    List<String> getTabs(Meeting meeting) {
       final baseTabs = ['会议信息', '管理员', '黑名单'];
 
       // 只有私有会议才添加请假标签页
@@ -42,7 +42,7 @@ class MeetingSettingsPage extends HookConsumerWidget {
       }
 
       return baseTabs;
-    };
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('会议设置'), centerTitle: true),

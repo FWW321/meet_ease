@@ -180,7 +180,7 @@ class _MeetingDetailProviderElement
 
 String _$myMeetingsHash() => r'344978d82f356fa00bbc9a0c293cf79071b4e2c1';
 
-/// 我的会议提供者 (已签到)
+/// 我的会议提供者 (我参与的会议)
 ///
 /// Copied from [myMeetings].
 @ProviderFor(myMeetings)
@@ -327,6 +327,276 @@ class _SearchMeetingsProviderElement
 
   @override
   String get query => (origin as SearchMeetingsProvider).query;
+}
+
+String _$searchPrivateMeetingsHash() =>
+    r'2fa604fb0c0b95a8089b1b565cbbc0560d169dbf';
+
+/// 搜索私有会议提供者
+///
+/// Copied from [searchPrivateMeetings].
+@ProviderFor(searchPrivateMeetings)
+const searchPrivateMeetingsProvider = SearchPrivateMeetingsFamily();
+
+/// 搜索私有会议提供者
+///
+/// Copied from [searchPrivateMeetings].
+class SearchPrivateMeetingsFamily extends Family<AsyncValue<List<Meeting>>> {
+  /// 搜索私有会议提供者
+  ///
+  /// Copied from [searchPrivateMeetings].
+  const SearchPrivateMeetingsFamily();
+
+  /// 搜索私有会议提供者
+  ///
+  /// Copied from [searchPrivateMeetings].
+  SearchPrivateMeetingsProvider call(String query) {
+    return SearchPrivateMeetingsProvider(query);
+  }
+
+  @override
+  SearchPrivateMeetingsProvider getProviderOverride(
+    covariant SearchPrivateMeetingsProvider provider,
+  ) {
+    return call(provider.query);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'searchPrivateMeetingsProvider';
+}
+
+/// 搜索私有会议提供者
+///
+/// Copied from [searchPrivateMeetings].
+class SearchPrivateMeetingsProvider
+    extends AutoDisposeFutureProvider<List<Meeting>> {
+  /// 搜索私有会议提供者
+  ///
+  /// Copied from [searchPrivateMeetings].
+  SearchPrivateMeetingsProvider(String query)
+    : this._internal(
+        (ref) => searchPrivateMeetings(ref as SearchPrivateMeetingsRef, query),
+        from: searchPrivateMeetingsProvider,
+        name: r'searchPrivateMeetingsProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$searchPrivateMeetingsHash,
+        dependencies: SearchPrivateMeetingsFamily._dependencies,
+        allTransitiveDependencies:
+            SearchPrivateMeetingsFamily._allTransitiveDependencies,
+        query: query,
+      );
+
+  SearchPrivateMeetingsProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.query,
+  }) : super.internal();
+
+  final String query;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<Meeting>> Function(SearchPrivateMeetingsRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: SearchPrivateMeetingsProvider._internal(
+        (ref) => create(ref as SearchPrivateMeetingsRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        query: query,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<Meeting>> createElement() {
+    return _SearchPrivateMeetingsProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SearchPrivateMeetingsProvider && other.query == query;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, query.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin SearchPrivateMeetingsRef on AutoDisposeFutureProviderRef<List<Meeting>> {
+  /// The parameter `query` of this provider.
+  String get query;
+}
+
+class _SearchPrivateMeetingsProviderElement
+    extends AutoDisposeFutureProviderElement<List<Meeting>>
+    with SearchPrivateMeetingsRef {
+  _SearchPrivateMeetingsProviderElement(super.provider);
+
+  @override
+  String get query => (origin as SearchPrivateMeetingsProvider).query;
+}
+
+String _$searchPublicMeetingsHash() =>
+    r'50f27070c922478821cd3b06de22bce3a4b4928a';
+
+/// 搜索公有会议提供者
+///
+/// Copied from [searchPublicMeetings].
+@ProviderFor(searchPublicMeetings)
+const searchPublicMeetingsProvider = SearchPublicMeetingsFamily();
+
+/// 搜索公有会议提供者
+///
+/// Copied from [searchPublicMeetings].
+class SearchPublicMeetingsFamily extends Family<AsyncValue<List<Meeting>>> {
+  /// 搜索公有会议提供者
+  ///
+  /// Copied from [searchPublicMeetings].
+  const SearchPublicMeetingsFamily();
+
+  /// 搜索公有会议提供者
+  ///
+  /// Copied from [searchPublicMeetings].
+  SearchPublicMeetingsProvider call(String query) {
+    return SearchPublicMeetingsProvider(query);
+  }
+
+  @override
+  SearchPublicMeetingsProvider getProviderOverride(
+    covariant SearchPublicMeetingsProvider provider,
+  ) {
+    return call(provider.query);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'searchPublicMeetingsProvider';
+}
+
+/// 搜索公有会议提供者
+///
+/// Copied from [searchPublicMeetings].
+class SearchPublicMeetingsProvider
+    extends AutoDisposeFutureProvider<List<Meeting>> {
+  /// 搜索公有会议提供者
+  ///
+  /// Copied from [searchPublicMeetings].
+  SearchPublicMeetingsProvider(String query)
+    : this._internal(
+        (ref) => searchPublicMeetings(ref as SearchPublicMeetingsRef, query),
+        from: searchPublicMeetingsProvider,
+        name: r'searchPublicMeetingsProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$searchPublicMeetingsHash,
+        dependencies: SearchPublicMeetingsFamily._dependencies,
+        allTransitiveDependencies:
+            SearchPublicMeetingsFamily._allTransitiveDependencies,
+        query: query,
+      );
+
+  SearchPublicMeetingsProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.query,
+  }) : super.internal();
+
+  final String query;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<Meeting>> Function(SearchPublicMeetingsRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: SearchPublicMeetingsProvider._internal(
+        (ref) => create(ref as SearchPublicMeetingsRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        query: query,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<Meeting>> createElement() {
+    return _SearchPublicMeetingsProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SearchPublicMeetingsProvider && other.query == query;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, query.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin SearchPublicMeetingsRef on AutoDisposeFutureProviderRef<List<Meeting>> {
+  /// The parameter `query` of this provider.
+  String get query;
+}
+
+class _SearchPublicMeetingsProviderElement
+    extends AutoDisposeFutureProviderElement<List<Meeting>>
+    with SearchPublicMeetingsRef {
+  _SearchPublicMeetingsProviderElement(super.provider);
+
+  @override
+  String get query => (origin as SearchPublicMeetingsProvider).query;
 }
 
 String _$meetingParticipantsHash() =>

@@ -25,6 +25,12 @@ abstract class MeetingService {
   /// 搜索会议
   Future<List<Meeting>> searchMeetings(String query);
 
+  /// 搜索私有会议
+  Future<List<Meeting>> searchPrivateMeetings(String userId, String title);
+
+  /// 搜索公有会议
+  Future<List<Meeting>> searchPublicMeetings(String userId, String title);
+
   /// 签到会议
   Future<bool> signInMeeting(String meetingId);
 
@@ -652,6 +658,44 @@ class MockMeetingService implements MeetingService {
     // 这里需要根据实际情况实现提交请假申请的逻辑
     // 返回请假申请提交后的处理结果
     return '请假申请提交成功';
+  }
+
+  @override
+  Future<List<Meeting>> searchPrivateMeetings(
+    String userId,
+    String title,
+  ) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 过滤私有会议，查找标题包含搜索关键词的会议
+    return _meetings
+        .where(
+          (m) =>
+              m.visibility == MeetingVisibility.private &&
+              m.title.toLowerCase().contains(title.toLowerCase()) &&
+              (m.organizerId == userId || m.allowedUsers.contains(userId)),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<Meeting>> searchPublicMeetings(
+    String userId,
+    String title,
+  ) async {
+    // 模拟网络延迟
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // 过滤公开和可搜索会议，查找标题包含搜索关键词的会议
+    return _meetings
+        .where(
+          (m) =>
+              (m.visibility == MeetingVisibility.public ||
+                  m.visibility == MeetingVisibility.searchable) &&
+              m.title.toLowerCase().contains(title.toLowerCase()),
+        )
+        .toList();
   }
 }
 
@@ -1638,6 +1682,158 @@ class ApiMeetingService implements MeetingService {
       }
     } catch (e) {
       throw Exception('提交请假申请时出错: $e');
+    }
+  }
+
+  @override
+  Future<List<Meeting>> searchPrivateMeetings(
+    String userId,
+    String title,
+  ) async {
+    try {
+      final url = '${AppConstants.apiBaseUrl}/meeting/searchPrivate/$userId';
+      final uri = Uri.parse(
+        url,
+      ).replace(queryParameters: title.isNotEmpty ? {'title': title} : null);
+
+      final response = await _client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = HttpUtils.decodeResponse(response);
+
+        if (jsonData['code'] == 200 && jsonData['data'] != null) {
+          final List<dynamic> meetingsData = jsonData['data'];
+          final currentTime = DateTime.now();
+
+          return meetingsData.map<Meeting>((record) {
+            // 解析会议状态
+            MeetingStatus meetingStatus = _parseMeetingStatus(
+              record['status'] ?? '待开始',
+            );
+
+            // 解析开始和结束时间
+            final startTime = DateTime.parse(record['startTime']);
+            final endTime = DateTime.parse(record['endTime']);
+
+            // 根据当前时间更新会议状态
+            // 如果当前时间在会议开始和结束时间之间，将状态设为"进行中"
+            if (currentTime.isAfter(startTime) &&
+                currentTime.isBefore(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.ongoing;
+            }
+            // 如果当前时间超过会议结束时间，将状态设为"已结束"
+            else if (currentTime.isAfter(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.completed;
+            }
+
+            return Meeting(
+              id: record['meetingId'].toString(),
+              title: record['title'],
+              startTime: startTime,
+              endTime: endTime,
+              location: record['location'] ?? '',
+              status: meetingStatus,
+              type: MeetingType.regular, // 默认为常规会议
+              visibility: MeetingVisibility.private, // 私密会议
+              organizerId: record['organizerId'].toString(),
+              organizerName: record['organizerName'] ?? '',
+              description: record['description'],
+            );
+          }).toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      print('搜索私有会议失败: $e');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<Meeting>> searchPublicMeetings(
+    String userId,
+    String title,
+  ) async {
+    try {
+      final url = '${AppConstants.apiBaseUrl}/meeting/searchPublic/$userId';
+      final uri = Uri.parse(
+        url,
+      ).replace(queryParameters: title.isNotEmpty ? {'title': title} : null);
+
+      final response = await _client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = HttpUtils.decodeResponse(response);
+
+        if (jsonData['code'] == 200 && jsonData['data'] != null) {
+          final List<dynamic> meetingsData = jsonData['data'];
+          final currentTime = DateTime.now();
+
+          return meetingsData.map<Meeting>((record) {
+            // 解析会议状态
+            MeetingStatus meetingStatus = _parseMeetingStatus(
+              record['status'] ?? '待开始',
+            );
+
+            // 解析开始和结束时间
+            final startTime = DateTime.parse(record['startTime']);
+            final endTime = DateTime.parse(record['endTime']);
+
+            // 根据当前时间更新会议状态
+            // 如果当前时间在会议开始和结束时间之间，将状态设为"进行中"
+            if (currentTime.isAfter(startTime) &&
+                currentTime.isBefore(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.ongoing;
+            }
+            // 如果当前时间超过会议结束时间，将状态设为"已结束"
+            else if (currentTime.isAfter(endTime) &&
+                meetingStatus != MeetingStatus.cancelled) {
+              meetingStatus = MeetingStatus.completed;
+            }
+
+            MeetingType meetingType = MeetingType.regular;
+            // 尝试解析会议类型
+            if (record['meetingType'] != null) {
+              if (record['meetingType'] == '培训会议') {
+                meetingType = MeetingType.training;
+              } else if (record['meetingType'] == '面试会议') {
+                meetingType = MeetingType.interview;
+              } else if (record['meetingType'] == '其他') {
+                meetingType = MeetingType.other;
+              }
+            }
+
+            return Meeting(
+              id: record['meetingId'].toString(),
+              title: record['title'],
+              startTime: startTime,
+              endTime: endTime,
+              location: record['location'] ?? '',
+              status: meetingStatus,
+              type: meetingType,
+              visibility: MeetingVisibility.public, // 公开会议
+              organizerId: record['organizerId'].toString(),
+              organizerName: record['organizerName'] ?? '',
+              description: record['description'],
+            );
+          }).toList();
+        }
+      }
+
+      return [];
+    } catch (e) {
+      print('搜索公有会议失败: $e');
+      rethrow;
     }
   }
 }

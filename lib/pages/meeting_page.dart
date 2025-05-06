@@ -41,7 +41,13 @@ class MeetingPage extends HookConsumerWidget {
     // 获取会议列表
     final meetingsAsync =
         isSearchingState.value && searchQueryState.value.isNotEmpty
-            ? ref.watch(searchMeetingsProvider(searchQueryState.value))
+            ? (showMyPrivateState.value
+                ? ref.watch(
+                  searchPrivateMeetingsProvider(searchQueryState.value),
+                )
+                : ref.watch(
+                  searchPublicMeetingsProvider(searchQueryState.value),
+                ))
             : showMyPrivateState.value
             ? ref.watch(myPrivateMeetingsProvider)
             : showRecommendedState.value
@@ -97,9 +103,7 @@ class MeetingPage extends HookConsumerWidget {
                 if (value.isNotEmpty) {
                   searchQueryState.value = value;
                   isSearchingState.value = true;
-                  // 搜索时关闭推荐模式和我的模式
-                  showRecommendedState.value = false;
-                  showMyPrivateState.value = false;
+                  // 搜索时保持当前的选项状态，不再清除
                 }
               },
             ),
@@ -230,7 +234,15 @@ class MeetingPage extends HookConsumerWidget {
             ref.invalidate(recommendedMeetingsProvider);
             ref.invalidate(myPrivateMeetingsProvider);
             if (searchQueryState.value.isNotEmpty) {
-              ref.invalidate(searchMeetingsProvider(searchQueryState.value));
+              if (showMyPrivateState.value) {
+                ref.invalidate(
+                  searchPrivateMeetingsProvider(searchQueryState.value),
+                );
+              } else {
+                ref.invalidate(
+                  searchPublicMeetingsProvider(searchQueryState.value),
+                );
+              }
             }
           }
         },
@@ -409,11 +421,16 @@ class MeetingPage extends HookConsumerWidget {
     String? searchQuery,
     bool isRecommended,
   ) {
+    // 注意：获取当前MeetingPage的showMyPrivateState值
+
     return RefreshIndicator(
       onRefresh: () async {
         // 刷新数据
         if (searchQuery != null && searchQuery.isNotEmpty) {
-          ref.invalidate(searchMeetingsProvider(searchQuery));
+          // 由于无法在这里获取当前的showMyPrivateState值，
+          // 我们刷新所有可能的搜索结果
+          ref.invalidate(searchPrivateMeetingsProvider(searchQuery));
+          ref.invalidate(searchPublicMeetingsProvider(searchQuery));
         } else if (isRecommended) {
           ref.invalidate(recommendedMeetingsProvider);
         } else {
