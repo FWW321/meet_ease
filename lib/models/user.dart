@@ -13,6 +13,7 @@ class User {
   final DateTime? updatedAt;
   final MeetingPermission? role; // 用户在会议中的角色
   final String? signInStatus; // 用户签到状态
+  final String? leaveStatus; // 用户请假状态
 
   const User({
     required this.id,
@@ -26,6 +27,7 @@ class User {
     this.updatedAt,
     this.role,
     this.signInStatus,
+    this.leaveStatus,
   });
 
   // 复制并修改对象的方法
@@ -41,6 +43,7 @@ class User {
     DateTime? updatedAt,
     MeetingPermission? role,
     String? signInStatus,
+    String? leaveStatus,
   }) {
     return User(
       id: id ?? this.id,
@@ -54,6 +57,7 @@ class User {
       updatedAt: updatedAt ?? this.updatedAt,
       role: role ?? this.role,
       signInStatus: signInStatus ?? this.signInStatus,
+      leaveStatus: leaveStatus ?? this.leaveStatus,
     );
   }
 

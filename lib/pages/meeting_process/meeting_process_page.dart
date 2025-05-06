@@ -12,6 +12,7 @@ import 'models/meeting_feature.dart';
 import 'utils/meeting_dialogs.dart';
 import 'widgets/completed_meeting_view.dart';
 import 'utils/feature_panel_builder.dart';
+import 'widgets/signin_list_view.dart';
 
 // 全局聊天组件缓存提供者
 final chatWidgetCacheProvider = StateProvider<ChatWidget?>((ref) => null);
@@ -171,6 +172,18 @@ class MeetingProcessPage extends HookConsumerWidget {
       ),
     ];
 
+    // 检查用户是否是创建者或管理员
+    final isCreatorOrAdmin =
+        currentUserId.value.isNotEmpty &&
+        (meeting.isCreatorOnly(currentUserId.value) ||
+            meeting.admins.contains(currentUserId.value));
+
+    // 检查是否为私有会议
+    final isPrivateMeeting = meeting.visibility == MeetingVisibility.private;
+
+    // 是否显示签到列表按钮（只有创建者和管理员且私有会议可以查看）
+    final canViewSignInList = isCreatorOrAdmin && isPrivateMeeting;
+
     // 构建底部导航栏
     Widget buildBottomNavBar() {
       return BottomNavigationBar(
@@ -197,6 +210,20 @@ class MeetingProcessPage extends HookConsumerWidget {
     // 构建顶部操作按钮
     List<Widget> buildActions() {
       return [
+        // 签到列表按钮 - 只在私有会议且用户为创建者或管理员时显示
+        if (canViewSignInList)
+          IconButton(
+            icon: const Icon(Icons.people),
+            tooltip: '签到列表',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => SignInListView(meetingId: meetingId),
+                ),
+              );
+            },
+          ),
+
         // 签到按钮 - 仅在进行中且未签到的私有会议显示
         if (meeting.status == MeetingStatus.ongoing &&
             meeting.visibility == MeetingVisibility.private)

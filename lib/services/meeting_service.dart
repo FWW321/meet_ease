@@ -1039,12 +1039,16 @@ class ApiMeetingService implements MeetingService {
             // 获取签到状态
             final signInStatus = record['sign_in_status'] as String? ?? '未签到';
 
+            // 获取请假状态
+            final leaveStatus = record['leave_status'] as String?;
+
             return User(
               id: record['user_id']?.toString() ?? '',
               name: record['username'] ?? '未知用户',
               email: '',
               role: role,
               signInStatus: signInStatus,
+              leaveStatus: leaveStatus,
             );
           }).toList();
         } else {
