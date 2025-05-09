@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'dart:async'; // 添加超时异常支持
-import 'dart:math'; // 添加min函数支持
+import 'dart:async'; 
 import '../providers/meeting_providers.dart';
 
 /// 会议密码验证对话框
@@ -44,10 +43,6 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // 监听验证状态变化
-    final validationState = ref.watch(
-      validateMeetingPasswordProvider(widget.meetingId),
-    );
 
     return AlertDialog(
       title: Row(

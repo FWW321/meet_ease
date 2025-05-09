@@ -2,7 +2,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../models/meeting.dart';
 import '../../models/user.dart';
 import '../../providers/meeting_providers.dart';
-import '../../services/service_providers.dart';
 
 /// 当前会议提供者 - 用于在组件之间传递当前会议ID
 final currentMeetingIdProvider = StateProvider<String>((ref) => '');
