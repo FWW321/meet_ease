@@ -13,6 +13,8 @@ class MeetingPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 选中的标签页索引
+    final selectedTabIndex = useState<int>(0);
     // 过滤状态
     final selectedFilterState = useState<MeetingStatus?>(null);
     // 搜索查询
@@ -21,10 +23,11 @@ class MeetingPage extends HookConsumerWidget {
     final isSearchingState = useState<bool>(false);
     // 文本控制器
     final textController = useTextEditingController();
-    // 显示模式 - 添加新的状态控制是否显示推荐会议
-    final showRecommendedState = useState<bool>(true);
-    // 显示我的私密会议
-    final showMyPrivateState = useState<bool>(false);
+
+    // 根据标签页索引确定当前显示模式
+    final showRecommended = selectedTabIndex.value == 0;
+    final showMyPrivate = selectedTabIndex.value == 1;
+    final showAll = selectedTabIndex.value == 2;
 
     // 监听搜索框变化
     useEffect(() {
@@ -41,42 +44,25 @@ class MeetingPage extends HookConsumerWidget {
     // 获取会议列表
     final meetingsAsync =
         isSearchingState.value && searchQueryState.value.isNotEmpty
-            ? (showMyPrivateState.value
+            ? (showMyPrivate
                 ? ref.watch(
                   searchPrivateMeetingsProvider(searchQueryState.value),
                 )
                 : ref.watch(
                   searchPublicMeetingsProvider(searchQueryState.value),
                 ))
-            : showMyPrivateState.value
+            : showMyPrivate
             ? ref.watch(myPrivateMeetingsProvider)
-            : showRecommendedState.value
+            : showRecommended
             ? ref.watch(recommendedMeetingsProvider)
             : ref.watch(meetingListProvider);
 
     return Scaffold(
       body: Column(
         children: [
-          // 顶部操作区域
-          Padding(
-            padding: const EdgeInsets.only(top: 8.0, right: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  icon: const Icon(Icons.list),
-                  label: const Text('查看所有会议'),
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppConstants.meetingListRoute);
-                  },
-                ),
-              ],
-            ),
-          ),
-
           // 搜索栏
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             child: TextField(
               controller: textController,
               decoration: InputDecoration(
@@ -103,33 +89,37 @@ class MeetingPage extends HookConsumerWidget {
                 if (value.isNotEmpty) {
                   searchQueryState.value = value;
                   isSearchingState.value = true;
-                  // 搜索时保持当前的选项状态，不再清除
                 }
               },
             ),
           ),
 
           // 搜索提示
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 16, color: Colors.orange),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    '提示：可搜索会议只能通过6位数字会议码搜索',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+          if (!isSearchingState.value)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.orange,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      '提示：可搜索会议只能通过6位数字会议码搜索',
+                      style: TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
 
           // 搜索状态指示
           if (isSearchingState.value && searchQueryState.value.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
                   Expanded(
@@ -151,28 +141,67 @@ class MeetingPage extends HookConsumerWidget {
               ),
             ),
 
-          // 过滤栏 - 增加推荐选项，并在非搜索状态下显示
-          if (!isSearchingState.value)
-            _buildFilterChips(
-              context,
-              selectedFilterState,
-              showRecommendedState,
-              showMyPrivateState,
+          // 标签页和筛选条件
+          if (!isSearchingState.value) ...[
+            // 标签页切换
+            Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    _buildTabButton(
+                      context: context,
+                      title: '推荐',
+                      isSelected: showRecommended,
+                      onTap: () {
+                        selectedTabIndex.value = 0;
+                        selectedFilterState.value = null;
+                      },
+                      icon: Icons.recommend,
+                    ),
+                    _buildTabButton(
+                      context: context,
+                      title: '我的',
+                      isSelected: showMyPrivate,
+                      onTap: () {
+                        selectedTabIndex.value = 1;
+                        selectedFilterState.value = null;
+                      },
+                      icon: Icons.person_outline,
+                    ),
+                    _buildTabButton(
+                      context: context,
+                      title: '全部',
+                      isSelected: showAll,
+                      onTap: () {
+                        selectedTabIndex.value = 2;
+                        selectedFilterState.value = null;
+                      },
+                      icon: Icons.list_alt,
+                    ),
+                  ],
+                ),
+              ),
             ),
+
+            // 状态筛选器
+            _buildStatusFilters(context, selectedFilterState),
+          ],
 
           // 会议列表
           Expanded(
             child: meetingsAsync.when(
               data: (meetings) {
-                // 过滤会议状态 (仅在非搜索、非推荐、非我的模式时)
+                // 根据选择的状态筛选会议
                 final filteredMeetings =
-                    !isSearchingState.value &&
-                            !showRecommendedState.value &&
-                            !showMyPrivateState.value &&
-                            selectedFilterState.value != null
+                    selectedFilterState.value != null
                         ? meetings.where((m) {
                           if (m is Meeting) {
                             return m.status == selectedFilterState.value;
+                          } else if (m is MeetingRecommendation) {
+                            return m.meeting.status ==
+                                selectedFilterState.value;
                           }
                           return false;
                         }).toList()
@@ -195,7 +224,7 @@ class MeetingPage extends HookConsumerWidget {
                   filteredMeetings,
                   ref,
                   isSearchingState.value ? searchQueryState.value : null,
-                  showRecommendedState.value,
+                  showRecommended,
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -234,7 +263,7 @@ class MeetingPage extends HookConsumerWidget {
             ref.invalidate(recommendedMeetingsProvider);
             ref.invalidate(myPrivateMeetingsProvider);
             if (searchQueryState.value.isNotEmpty) {
-              if (showMyPrivateState.value) {
+              if (showMyPrivate) {
                 ref.invalidate(
                   searchPrivateMeetingsProvider(searchQueryState.value),
                 );
@@ -252,12 +281,62 @@ class MeetingPage extends HookConsumerWidget {
     );
   }
 
-  // 构建过滤器选择栏
-  Widget _buildFilterChips(
+  // 构建标签页按钮
+  Widget _buildTabButton({
+    required BuildContext context,
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required IconData icon,
+  }) {
+    final theme = Theme.of(context);
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color:
+                    isSelected ? theme.colorScheme.primary : Colors.transparent,
+                width: 2.0,
+              ),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color:
+                    isSelected
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withOpacity(0.7),
+                size: 20,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  color:
+                      isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.7),
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 构建状态筛选条件
+  Widget _buildStatusFilters(
     BuildContext context,
     ValueNotifier<MeetingStatus?> selectedFilter,
-    ValueNotifier<bool> showRecommended,
-    ValueNotifier<bool> showMyPrivate,
   ) {
     return Container(
       height: 50,
@@ -268,51 +347,21 @@ class MeetingPage extends HookConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
-              label: const Text('推荐'),
-              selected: showRecommended.value,
-              selectedColor: Colors.blue.withAlpha(40),
+              label: const Text('全部状态'),
+              selected: selectedFilter.value == null,
               onSelected: (selected) {
-                showRecommended.value = selected;
-                // 选择推荐时，清除状态过滤，关闭我的
                 if (selected) {
                   selectedFilter.value = null;
-                  showMyPrivate.value = false;
                 }
               },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: const Text('我的'),
-              selected: showMyPrivate.value,
-              selectedColor: Colors.green.withAlpha(40),
-              onSelected: (selected) {
-                showMyPrivate.value = selected;
-                // 选择我的时，清除状态过滤，关闭推荐
-                if (selected) {
-                  selectedFilter.value = null;
-                  showRecommended.value = false;
-                }
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: const Text('全部'),
-              selected:
-                  selectedFilter.value == null &&
-                  !showRecommended.value &&
-                  !showMyPrivate.value,
-              onSelected: (selected) {
-                selectedFilter.value = null;
-                // 选择全部时，关闭推荐模式和我的模式
-                if (selected) {
-                  showRecommended.value = false;
-                  showMyPrivate.value = false;
-                }
-              },
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color:
+                      selectedFilter.value == null
+                          ? Colors.transparent
+                          : Colors.grey.withOpacity(0.3),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -322,12 +371,15 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.upcoming,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.upcoming : null;
-                // 选择状态过滤时，关闭推荐模式和我的模式
-                if (selected) {
-                  showRecommended.value = false;
-                  showMyPrivate.value = false;
-                }
               },
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color:
+                      selectedFilter.value == MeetingStatus.upcoming
+                          ? Colors.transparent
+                          : Colors.grey.withOpacity(0.3),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -337,12 +389,15 @@ class MeetingPage extends HookConsumerWidget {
               selected: selectedFilter.value == MeetingStatus.ongoing,
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.ongoing : null;
-                // 选择状态过滤时，关闭推荐模式和我的模式
-                if (selected) {
-                  showRecommended.value = false;
-                  showMyPrivate.value = false;
-                }
               },
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color:
+                      selectedFilter.value == MeetingStatus.ongoing
+                          ? Colors.transparent
+                          : Colors.grey.withOpacity(0.3),
+                ),
+              ),
             ),
           ),
           Padding(
@@ -353,12 +408,15 @@ class MeetingPage extends HookConsumerWidget {
               onSelected: (selected) {
                 selectedFilter.value =
                     selected ? MeetingStatus.completed : null;
-                // 选择状态过滤时，关闭推荐模式和我的模式
-                if (selected) {
-                  showRecommended.value = false;
-                  showMyPrivate.value = false;
-                }
               },
+              shape: StadiumBorder(
+                side: BorderSide(
+                  color:
+                      selectedFilter.value == MeetingStatus.completed
+                          ? Colors.transparent
+                          : Colors.grey.withOpacity(0.3),
+                ),
+              ),
             ),
           ),
           FilterChip(
@@ -366,12 +424,15 @@ class MeetingPage extends HookConsumerWidget {
             selected: selectedFilter.value == MeetingStatus.cancelled,
             onSelected: (selected) {
               selectedFilter.value = selected ? MeetingStatus.cancelled : null;
-              // 选择状态过滤时，关闭推荐模式和我的模式
-              if (selected) {
-                showRecommended.value = false;
-                showMyPrivate.value = false;
-              }
             },
+            shape: StadiumBorder(
+              side: BorderSide(
+                color:
+                    selectedFilter.value == MeetingStatus.cancelled
+                        ? Colors.transparent
+                        : Colors.grey.withOpacity(0.3),
+              ),
+            ),
           ),
         ],
       ),
@@ -421,14 +482,11 @@ class MeetingPage extends HookConsumerWidget {
     String? searchQuery,
     bool isRecommended,
   ) {
-    // 注意：获取当前MeetingPage的showMyPrivateState值
-
     return RefreshIndicator(
       onRefresh: () async {
         // 刷新数据
         if (searchQuery != null && searchQuery.isNotEmpty) {
-          // 由于无法在这里获取当前的showMyPrivateState值，
-          // 我们刷新所有可能的搜索结果
+          // 刷新所有可能的搜索结果
           ref.invalidate(searchPrivateMeetingsProvider(searchQuery));
           ref.invalidate(searchPublicMeetingsProvider(searchQuery));
         } else if (isRecommended) {
