@@ -38,7 +38,7 @@ class MaterialsListItem extends ConsumerWidget {
           child: InkWell(
             onTap: () {
               if (isDownloaded) {
-                // 如果已下载，打开文件所在文件夹
+                // 如果已下载，直接打开文件
                 MaterialActions.openDownloadedMaterial(context, material, ref);
               } else {
                 // 如果未下载，则下载文件
@@ -138,8 +138,8 @@ class MaterialsListItem extends ConsumerWidget {
                                     material,
                                     ref,
                                   ),
-                              icon: const Icon(Icons.folder_open),
-                              label: const Text('已下载'),
+                              icon: const Icon(Icons.open_in_new),
+                              label: const Text('打开文件'),
                             )
                           else
                             // 如果未下载，显示下载按钮

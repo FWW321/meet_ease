@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' show File, Platform, Process;
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:open_file/open_file.dart';
 
 import '../../models/meeting_material.dart' as models;
 import '../../constants/app_constants.dart';
@@ -123,8 +124,8 @@ class MaterialActions {
       final file = File(filePath);
 
       if (await file.exists()) {
-        // 文件存在，打开文件所在文件夹
-        await _openFileLocation(filePath);
+        // 文件存在，直接打开文件
+        await _openFile(filePath);
         return;
       }
 
@@ -148,8 +149,8 @@ class MaterialActions {
         final File newFile = File(newFilePath);
 
         if (await newFile.exists()) {
-          // 找到文件，打开文件所在文件夹
-          await _openFileLocation(newFilePath);
+          // 找到文件，直接打开文件
+          await _openFile(newFilePath);
           return;
         }
       }
@@ -165,7 +166,7 @@ class MaterialActions {
 
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('打开文件位置失败: $e')));
+      ).showSnackBar(SnackBar(content: Text('打开文件失败: $e')));
     }
   }
 
@@ -289,7 +290,7 @@ class MaterialActions {
           action: SnackBarAction(
             label: '打开',
             onPressed: () {
-              _openFileLocation(filePath);
+              _openFile(filePath);
             },
           ),
         ),
@@ -447,5 +448,108 @@ class MaterialActions {
     } catch (e) {
       debugPrint('打开文件位置失败: $e');
     }
+  }
+
+  /// 直接打开文件
+  static Future<void> _openFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        debugPrint('文件不存在: $filePath');
+        return;
+      }
+
+      // 使用open_file插件打开文件
+      final result = await OpenFile.open(filePath);
+
+      if (result.type != ResultType.done) {
+        debugPrint('打开文件失败: ${result.message}');
+
+        // 如果插件打开失败，尝试备用方案
+        if (Platform.isAndroid) {
+          // 备用方案：使用MIME类型辅助打开
+          final String extension = filePath.split('.').last.toLowerCase();
+          final String mimeType = _getMimeTypeFromExtension(extension);
+
+          try {
+            // 尝试使用Android Intent方式打开
+            final Uri fileUri = Uri.parse('file://$filePath');
+            final intentUri = Uri.parse(
+              'intent:#Intent;action=android.intent.action.VIEW;'
+              'type=$mimeType;'
+              'S.browser_fallback_url=${Uri.encodeComponent(fileUri.toString())};'
+              'end',
+            );
+
+            if (await canLaunchUrl(intentUri)) {
+              await launchUrl(intentUri);
+              return;
+            }
+          } catch (e) {
+            debugPrint('备用方式打开文件失败: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('打开文件失败: $e');
+    }
+  }
+
+  /// 根据文件扩展名获取MIME类型
+  static String _getMimeTypeFromExtension(String extension) {
+    final Map<String, String> mimeTypes = {
+      // 文档
+      'pdf': 'application/pdf',
+      'doc': 'application/msword',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx':
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'txt': 'text/plain',
+      'rtf': 'application/rtf',
+      'odt': 'application/vnd.oasis.opendocument.text',
+
+      // 图片
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'bmp': 'image/bmp',
+      'svg': 'image/svg+xml',
+      'webp': 'image/webp',
+
+      // 音频
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'ogg': 'audio/ogg',
+      'aac': 'audio/aac',
+
+      // 视频
+      'mp4': 'video/mp4',
+      'avi': 'video/x-msvideo',
+      'mkv': 'video/x-matroska',
+      'mov': 'video/quicktime',
+      'wmv': 'video/x-ms-wmv',
+
+      // 压缩文件
+      'zip': 'application/zip',
+      'rar': 'application/x-rar-compressed',
+      '7z': 'application/x-7z-compressed',
+      'tar': 'application/x-tar',
+      'gz': 'application/gzip',
+
+      // 其他常见格式
+      'html': 'text/html',
+      'htm': 'text/html',
+      'xml': 'application/xml',
+      'json': 'application/json',
+      'csv': 'text/csv',
+    };
+
+    return mimeTypes[extension] ?? 'application/octet-stream';
   }
 }
