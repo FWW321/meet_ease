@@ -104,8 +104,6 @@ Widget buildOrganizersAndAdminsList(
   String descriptionText;
   if (meeting.visibility == MeetingVisibility.public) {
     descriptionText = '这是一个公开会议，任何人都可以参加';
-  } else if (meeting.visibility == MeetingVisibility.searchable) {
-    descriptionText = '这是一个可搜索会议，知道会议ID的人都可以参加';
   } else {
     // 添加一个兜底处理，虽然这个分支不应该被执行
     descriptionText = '私有会议';

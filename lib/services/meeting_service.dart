@@ -276,7 +276,7 @@ class MockMeetingService implements MeetingService {
       final idMatch = m.id.toLowerCase() == query.toLowerCase();
 
       // 对于可搜索会议，只有通过会议ID搜索才能找到
-      if (m.visibility == MeetingVisibility.searchable) {
+      if (m.visibility == MeetingVisibility.public) {
         return idMatch;
       }
 
@@ -435,7 +435,7 @@ class MockMeetingService implements MeetingService {
 
     // 生成唯一ID
     String id;
-    if (visibility == MeetingVisibility.searchable) {
+    if (visibility == MeetingVisibility.public) {
       // 为可搜索会议生成简短的会议码 (6位数字)
       id = _generateMeetingCode();
     } else {
@@ -692,7 +692,7 @@ class MockMeetingService implements MeetingService {
         .where(
           (m) =>
               (m.visibility == MeetingVisibility.public ||
-                  m.visibility == MeetingVisibility.searchable) &&
+                  m.visibility == MeetingVisibility.public) &&
               m.title.toLowerCase().contains(title.toLowerCase()),
         )
         .toList();
@@ -1384,8 +1384,6 @@ class ApiMeetingService implements MeetingService {
                 meetingData['visibility'].toString().toUpperCase();
             if (visibilityStr == 'PUBLIC') {
               returnedVisibility = MeetingVisibility.public;
-            } else if (visibilityStr == 'SEARCHABLE') {
-              returnedVisibility = MeetingVisibility.searchable;
             } else if (visibilityStr == 'PRIVATE') {
               returnedVisibility = MeetingVisibility.private;
             }
@@ -1891,8 +1889,6 @@ MeetingVisibility _parseMeetingVisibility(String? visibilityStr) {
   switch (visibilityStr.toUpperCase()) {
     case 'PRIVATE':
       return MeetingVisibility.private;
-    case 'SEARCHABLE':
-      return MeetingVisibility.searchable;
     case 'PUBLIC':
     default:
       return MeetingVisibility.public;

@@ -19,7 +19,6 @@ enum MeetingType {
 /// 会议可见性枚举
 enum MeetingVisibility {
   public, // 公开会议，所有人可见且可参加
-  searchable, // 可搜索会议，需要搜索才能显示，所有人可参加
   private, // 私有会议，只有指定人员可参加
 }
 
@@ -248,8 +247,6 @@ String getMeetingVisibilityText(MeetingVisibility visibility) {
   switch (visibility) {
     case MeetingVisibility.public:
       return '公开会议';
-    case MeetingVisibility.searchable:
-      return '可搜索会议';
     case MeetingVisibility.private:
       return '私有会议';
   }

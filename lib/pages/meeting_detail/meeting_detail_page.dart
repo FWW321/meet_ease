@@ -465,8 +465,8 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                       ],
                     ),
 
-                    // 如果是可搜索会议，显示会议码
-                    if (meeting.visibility == MeetingVisibility.searchable) ...[
+                    // 如果是公开会议，显示会议码
+                    if (meeting.visibility == MeetingVisibility.public) ...[
                       const Divider(height: 32),
                       Row(
                         children: [

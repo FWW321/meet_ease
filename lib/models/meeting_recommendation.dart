@@ -72,8 +72,6 @@ MeetingVisibility _parseVisibility(String visibility) {
   switch (visibility) {
     case 'PUBLIC':
       return MeetingVisibility.public;
-    case 'SEARCHABLE':
-      return MeetingVisibility.searchable;
     case 'PRIVATE':
       return MeetingVisibility.private;
     default:

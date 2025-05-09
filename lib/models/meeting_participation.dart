@@ -131,7 +131,7 @@ class MeetingParticipation {
       case "PRIVATE":
         return MeetingVisibility.private;
       default:
-        return MeetingVisibility.searchable;
+        return MeetingVisibility.public;
     }
   }
 }

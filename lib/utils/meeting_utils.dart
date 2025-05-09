@@ -19,8 +19,6 @@ String getMeetingVisibilityText(MeetingVisibility visibility) {
   switch (visibility) {
     case MeetingVisibility.public:
       return '公开会议';
-    case MeetingVisibility.searchable:
-      return '可搜索会议';
     case MeetingVisibility.private:
       return '私有会议';
   }
@@ -31,8 +29,6 @@ String getMeetingVisibilityDescription(MeetingVisibility visibility) {
   switch (visibility) {
     case MeetingVisibility.public:
       return '公开会议对所有人可见，所有人可参加';
-    case MeetingVisibility.searchable:
-      return '可搜索会议仅通过会议码搜索才能显示，将自动生成6位数字会议码';
     case MeetingVisibility.private:
       return '私有会议只对特定人员可见，需要选择参与人员';
   }

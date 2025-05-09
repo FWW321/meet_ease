@@ -55,10 +55,6 @@ class MeetingListItem extends StatelessWidget {
         visibilityIcon = Icons.public;
         visibilityColor = Colors.green;
         break;
-      case MeetingVisibility.searchable:
-        visibilityIcon = Icons.search;
-        visibilityColor = Colors.orange;
-        break;
       case MeetingVisibility.private:
         visibilityIcon = Icons.lock;
         visibilityColor = Colors.red;

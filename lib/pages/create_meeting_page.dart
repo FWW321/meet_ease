@@ -20,13 +20,13 @@ class CreateMeetingPage extends HookConsumerWidget {
     final locationController = useTextEditingController();
     final descriptionController = useTextEditingController();
     final passwordController = useTextEditingController();
+    final meetingTypeController = useTextEditingController(); // 新增：会议类型输入控制器
 
     // 日期和时间
     final startDate = useState(DateTime.now().add(const Duration(hours: 1)));
     final endDate = useState(DateTime.now().add(const Duration(hours: 2)));
 
-    // 会议类型和可见性
-    final meetingType = useState(models.MeetingType.regular);
+    // 会议可见性
     final meetingVisibility = useState(models.MeetingVisibility.public);
 
     // 是否启用密码
@@ -160,13 +160,26 @@ class CreateMeetingPage extends HookConsumerWidget {
                     .cast<String>()
                 : [];
 
+        // 解析会议类型
+        models.MeetingType parsedType = models.MeetingType.other;
+        final typeText = meetingTypeController.text.trim();
+
+        // 尝试匹配会议类型
+        if (typeText.contains('常规') || typeText == '常规会议') {
+          parsedType = models.MeetingType.regular;
+        } else if (typeText.contains('培训') || typeText == '培训会议') {
+          parsedType = models.MeetingType.training;
+        } else if (typeText.contains('面试') || typeText == '面试会议') {
+          parsedType = models.MeetingType.interview;
+        }
+
         await notifier.create(
           title: titleController.text.trim(),
           location: locationController.text.trim(),
           startTime: startDate.value,
           endTime: endDate.value,
           description: descriptionController.text.trim(),
-          type: meetingType.value,
+          type: parsedType,
           visibility: meetingVisibility.value,
           allowedUsers: allowedUsersList,
           password:
@@ -231,31 +244,24 @@ class CreateMeetingPage extends HookConsumerWidget {
             ),
             const SizedBox(height: 16),
 
-            // 会议类型选择
-            InputDecorator(
+            // 会议类型输入
+            TextFormField(
+              controller: meetingTypeController,
               decoration: const InputDecoration(
                 labelText: '会议类型',
+                hintText: '如：常规会议、培训会议、面试会议等',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.category),
               ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<models.MeetingType>(
-                  value: meetingType.value,
-                  isExpanded: true,
-                  onChanged: (newValue) {
-                    if (newValue != null) {
-                      meetingType.value = newValue;
-                    }
-                  },
-                  items:
-                      models.MeetingType.values.map((type) {
-                        return DropdownMenuItem<models.MeetingType>(
-                          value: type,
-                          child: Text(getMeetingTypeText(type)),
-                        );
-                      }).toList(),
-                ),
-              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return '请输入会议类型';
+                }
+                if (value.trim().length < 2) {
+                  return '会议类型至少需要2个字符';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 
@@ -724,8 +730,6 @@ class CreateMeetingPage extends HookConsumerWidget {
     switch (visibility) {
       case models.MeetingVisibility.public:
         return Colors.blue;
-      case models.MeetingVisibility.searchable:
-        return Colors.orange;
       case models.MeetingVisibility.private:
         return Colors.red;
     }
