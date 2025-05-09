@@ -3,7 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../models/meeting.dart';
 import '../../providers/meeting_providers.dart';
 import '../../providers/user_providers.dart';
-import '../../services/service_providers.dart';
 
 /// 显示取消会议确认对话框
 void showCancelConfirmDialog(

@@ -149,7 +149,6 @@ Widget buildOrganizersAndAdminsList(
                         ),
                       ),
                       title: Text(name),
-                      subtitle: const Text('会议创建者'),
                       trailing: buildRoleTag('创建者', Colors.orange),
                     ),
                 loading:
@@ -165,7 +164,6 @@ Widget buildOrganizersAndAdminsList(
                         ),
                       ),
                       title: Text('加载中...'),
-                      subtitle: Text('会议创建者'),
                     ),
                 error:
                     (_, __) => ListTile(
@@ -174,7 +172,6 @@ Widget buildOrganizersAndAdminsList(
                         child: Icon(Icons.error, size: 16, color: Colors.white),
                       ),
                       title: Text(meeting.organizerName),
-                      subtitle: const Text('会议创建者（加载失败）'),
                     ),
               );
             },
@@ -196,17 +193,7 @@ Widget buildOrganizersAndAdminsList(
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Divider(),
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8, bottom: 8),
-                        child: Text(
-                          '管理员',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      const SizedBox(height: 8),
                       ...managers
                           .map(
                             (manager) => ListTile(
@@ -270,8 +257,6 @@ Widget buildParticipantsList(
   }
 
   final participantsAsync = ref.watch(meetingParticipantsProvider(meetingId));
-  final canManageMeeting =
-      currentUserId != null && meeting.canUserManage(currentUserId);
 
   // 为私有会议设置标题和描述
   const titleText = '允许参加的人员';
@@ -284,26 +269,9 @@ Widget buildParticipantsList(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                titleText,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              // 私有会议用户是管理员时，显示管理按钮
-              if (canManageMeeting)
-                TextButton.icon(
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('管理'),
-                  onPressed: () {
-                    // TODO: 实现添加/删除参会人员的功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('管理参会人员功能即将上线')),
-                    );
-                  },
-                ),
-            ],
+          const Text(
+            titleText,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           // 显示描述文字
           const Padding(
