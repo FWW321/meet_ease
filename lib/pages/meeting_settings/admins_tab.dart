@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../models/meeting.dart';
@@ -24,139 +23,158 @@ class AdminsTab extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 获取所有参与者（排除创建者和已有管理员）
-    final participantsAsync = ref.watch(
-      meetingParticipantsProvider(meeting.id),
-    );
-
     // 获取管理员列表
     final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
 
     // 检查当前用户是否为会议创建者
     final isCreator = meeting.isCreatorOnly(currentUserId);
 
-    // 打印调试信息
-    managersAsync.whenOrNull(
-      data:
-          (managers) => print(
-            '找到${managers.length}个管理员: ${managers.map((m) => '${m.id}-${m.name}').join(', ')}',
-          ),
-      error: (error, _) => print('获取管理员列表出错: $error'),
-      loading: () => print('正在加载管理员列表...'),
-    );
+    // 获取主题色
+    final primaryColor = Theme.of(context).primaryColor;
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
-    return Column(
-      children: [
-        // 管理员列表
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              // 创建者信息（固定在顶部）
-              UserTile(
-                userId: meeting.organizerId,
-                label: '创建者',
-                canRemove: false,
-                onRemove: null,
+    return Container(
+      color: backgroundColor.withOpacity(0.5),
+      child: Column(
+        children: [
+          // 管理员列表
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-
-              // 刷新按钮
-              ListTile(
-                title: const Text('手动刷新管理员列表'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    // 刷新管理员列表
-                    ref.invalidate(meetingManagersProvider(meeting.id));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('正在刷新管理员列表...')),
-                    );
-                  },
-                ),
-              ),
-
-              const Divider(),
-
-              // 现有管理员列表
-              managersAsync.when(
+              child: managersAsync.when(
                 data: (managers) {
                   if (managers.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24.0),
-                      child: Center(
-                        child: Text(
-                          '尚未添加管理员',
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.person_off,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            '尚未添加管理员',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
 
-                  return Column(
-                    children:
-                        managers
-                            .map(
-                              (admin) => UserTile(
-                                userId: admin.id,
-                                label: '管理员',
-                                canRemove: isCreator,
-                                onRemove: () {
-                                  // 移除管理员
-                                  _removeAdmin(context, ref, admin.id);
-                                },
-                              ),
-                            )
-                            .toList(),
+                  return ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: managers.length,
+                    separatorBuilder:
+                        (context, index) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final admin = managers[index];
+                      return UserTile(
+                        userId: admin.id,
+                        label: '管理员',
+                        canRemove: isCreator,
+                        onRemove: () {
+                          // 移除管理员
+                          _removeAdmin(context, ref, admin.id);
+                        },
+                      );
+                    },
                   );
                 },
-                loading:
-                    () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
+                loading: () => const Center(child: CircularProgressIndicator()),
                 error:
-                    (error, stackTrace) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16.0),
-                      child: Center(
+                    (error, stackTrace) => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
                         child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              '加载管理员列表失败: $error',
-                              style: const TextStyle(color: Colors.red),
+                            Icon(
+                              Icons.error_outline,
+                              size: 64,
+                              color: Colors.red.shade300,
                             ),
-                            if (stackTrace != null)
-                              Text(
-                                '堆栈: $stackTrace',
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontSize: 12,
-                                ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '加载管理员列表失败',
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              error.toString(),
+                              style: TextStyle(color: Colors.red.shade700),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       ),
                     ),
               ),
-            ],
+            ),
           ),
-        ),
 
-        // 底部添加按钮，只有创建者可以添加管理员
-        if (isCreator)
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
+          // 底部添加按钮，只有创建者可以添加管理员
+          if (isCreator)
+            Container(
+              margin: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: ElevatedButton(
                 onPressed: () => _showAddAdminDialog(context, ref),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.all(12.0),
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                child: const Text('添加管理员'),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    Icon(Icons.person_add),
+                    SizedBox(width: 10),
+                    Text(
+                      '添加管理员',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 

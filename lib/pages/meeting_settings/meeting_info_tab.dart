@@ -23,272 +23,490 @@ class MeetingInfoTab extends HookConsumerWidget {
       text: meeting.description ?? '',
     );
     final locationController = useTextEditingController(text: meeting.location);
+    // 会议类型文本控制器
+    final typeController = useTextEditingController(
+      text: getMeetingTypeText(meeting.type),
+    );
 
     // 日期选择
     final startTime = useState(meeting.startTime);
     final endTime = useState(meeting.endTime);
 
-    // 会议类型
-    final meetingType = useState(meeting.type);
+    // 获取主题色
+    final primaryColor = Theme.of(context).primaryColor;
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
 
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        // 会议基本信息卡片
-        Card(
-          margin: const EdgeInsets.only(bottom: 16.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
+    // 计算时间差
+    final duration = endTime.value.difference(startTime.value);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final durationText = '${hours}小时${minutes > 0 ? ' ${minutes}分钟' : ''}';
+
+    return Container(
+      color: backgroundColor.withOpacity(0.5),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+        children: [
+          // 会议基本信息卡片
+          Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 16.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '基本信息',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                // 标题区域
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withOpacity(0.05),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16.0),
-
-                // 会议标题
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: '会议标题',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-
-                // 会议描述
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: '会议描述',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16.0),
-
-                // 会议地点
-                TextField(
-                  controller: locationController,
-                  decoration: const InputDecoration(
-                    labelText: '会议地点',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-
-                // 会议时间
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap:
-                            () => _selectDateTime(
-                              context,
-                              startTime,
-                              isStart: true,
-                            ),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: '开始时间',
-                            border: OutlineInputBorder(),
-                          ),
-                          child: Text(
-                            '${startTime.value.year}-${startTime.value.month.toString().padLeft(2, '0')}-${startTime.value.day.toString().padLeft(2, '0')} ${startTime.value.hour.toString().padLeft(2, '0')}:${startTime.value.minute.toString().padLeft(2, '0')}',
-                          ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.edit_note_rounded,
+                        color: primaryColor,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12.0),
+                      Text(
+                        '编辑会议详情',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: primaryColor,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 16.0),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap:
-                            () => _selectDateTime(
-                              context,
-                              endTime,
-                              isStart: false,
-                            ),
-                        child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: '结束时间',
-                            border: OutlineInputBorder(),
-                          ),
-                          child: Text(
-                            '${endTime.value.year}-${endTime.value.month.toString().padLeft(2, '0')}-${endTime.value.day.toString().padLeft(2, '0')} ${endTime.value.hour.toString().padLeft(2, '0')}:${endTime.value.minute.toString().padLeft(2, '0')}',
+                    ],
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 会议状态指示
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(
+                            meeting.status,
+                          ).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _getStatusColor(
+                              meeting.status,
+                            ).withOpacity(0.5),
                           ),
                         ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(meeting.status),
+                              size: 16,
+                              color: _getStatusColor(meeting.status),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              getMeetingStatusText(meeting.status),
+                              style: TextStyle(
+                                color: _getStatusColor(meeting.status),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16.0),
+                      const SizedBox(height: 20.0),
 
-                // 会议类型
-                DropdownButtonFormField<MeetingType>(
-                  decoration: const InputDecoration(
-                    labelText: '会议类型',
-                    border: OutlineInputBorder(),
+                      // 会议标题
+                      TextField(
+                        controller: titleController,
+                        decoration: _getInputDecoration(
+                          label: '会议标题',
+                          hint: '输入会议标题',
+                          icon: Icons.title,
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+
+                      // 会议描述
+                      TextField(
+                        controller: descriptionController,
+                        decoration: _getInputDecoration(
+                          label: '会议描述',
+                          hint: '输入会议描述（可选）',
+                          icon: Icons.description,
+                        ),
+                        maxLines: 3,
+                      ),
+                      const SizedBox(height: 16.0),
+
+                      // 会议地点
+                      TextField(
+                        controller: locationController,
+                        decoration: _getInputDecoration(
+                          label: '会议地点',
+                          hint: '输入会议地点',
+                          icon: Icons.location_on,
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+
+                      // 会议时间板块
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.blue.withOpacity(0.1),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  color: Colors.blue.shade700,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '会议时间',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '时长: $durationText',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            // 开始时间选择
+                            GestureDetector(
+                              onTap:
+                                  () => _selectDateTime(
+                                    context,
+                                    startTime,
+                                    isStart: true,
+                                  ),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.play_circle_outline,
+                                          color: Colors.blue.shade700,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '开始时间',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Icon(
+                                          Icons.edit,
+                                          color: Colors.grey.shade600,
+                                          size: 14,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${startTime.value.year}-${startTime.value.month.toString().padLeft(2, '0')}-${startTime.value.day.toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${startTime.value.hour.toString().padLeft(2, '0')}:${startTime.value.minute.toString().padLeft(2, '0')}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            // 结束时间选择
+                            GestureDetector(
+                              onTap:
+                                  () => _selectDateTime(
+                                    context,
+                                    endTime,
+                                    isStart: false,
+                                  ),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.stop_circle_outlined,
+                                          color: Colors.red.shade400,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '结束时间',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red.shade400,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Icon(
+                                          Icons.edit,
+                                          color: Colors.grey.shade600,
+                                          size: 14,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${endTime.value.year}-${endTime.value.month.toString().padLeft(2, '0')}-${endTime.value.day.toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          '${endTime.value.hour.toString().padLeft(2, '0')}:${endTime.value.minute.toString().padLeft(2, '0')}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.red.shade400,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16.0),
+
+                      // 会议类型 - 改为手动输入
+                      TextField(
+                        controller: typeController,
+                        decoration: _getInputDecoration(
+                          label: '会议类型',
+                          hint: '例如：普通会议、培训会议、面试会议',
+                          icon: Icons.category,
+                        ),
+                      ),
+                    ],
                   ),
-                  value: meetingType.value,
-                  items:
-                      MeetingType.values.map((type) {
-                        return DropdownMenuItem<MeetingType>(
-                          value: type,
-                          child: Text(getMeetingTypeText(type)),
-                        );
-                      }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      meetingType.value = value;
-                    }
-                  },
                 ),
               ],
             ),
           ),
-        ),
 
-        // 会议参与设置卡片
-        Card(
-          margin: const EdgeInsets.only(bottom: 16.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '参与设置',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16.0),
-
-                // 权限设置
-                SwitchListTile(
-                  title: const Text('允许参与者发言'),
-                  subtitle: const Text('开启后，所有参与者可以直接发言'),
-                  value: true, // 从会议设置中获取实际值
-                  onChanged: (value) {
-                    // TODO: 实现权限变更功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('发言权限${value ? '已开启' : '已关闭'}')),
-                    );
-                  },
-                ),
-
-                SwitchListTile(
-                  title: const Text('允许参与者共享屏幕'),
-                  subtitle: const Text('开启后，所有参与者可以共享自己的屏幕'),
-                  value: false, // 从会议设置中获取实际值
-                  onChanged: (value) {
-                    // TODO: 实现权限变更功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('屏幕共享权限${value ? '已开启' : '已关闭'}')),
-                    );
-                  },
-                ),
-
-                SwitchListTile(
-                  title: const Text('允许参与者上传文件'),
-                  subtitle: const Text('开启后，所有参与者可以上传文件到会议'),
-                  value: true, // 从会议设置中获取实际值
-                  onChanged: (value) {
-                    // TODO: 实现权限变更功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('文件上传权限${value ? '已开启' : '已关闭'}')),
-                    );
-                  },
-                ),
-
-                SwitchListTile(
-                  title: const Text('允许参与者创建投票'),
-                  subtitle: const Text('开启后，所有参与者可以创建会议投票'),
-                  value: false, // 从会议设置中获取实际值
-                  onChanged: (value) {
-                    // TODO: 实现权限变更功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('投票创建权限${value ? '已开启' : '已关闭'}')),
-                    );
-                  },
+          // 保存按钮
+          Container(
+            margin: const EdgeInsets.only(bottom: 16.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [primaryColor, secondaryColor],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: primaryColor.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-          ),
-        ),
-
-        // 会议通知设置卡片
-        Card(
-          margin: const EdgeInsets.only(bottom: 16.0),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '通知设置',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+            child: ElevatedButton(
+              onPressed:
+                  () => _updateMeetingInfo(
+                    context,
+                    ref,
+                    titleController.text,
+                    descriptionController.text,
+                    locationController.text,
+                    startTime.value,
+                    endTime.value,
+                    _getTypeFromText(typeController.text),
                   ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                shadowColor: Colors.transparent,
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 16.0),
-
-                SwitchListTile(
-                  title: const Text('会议开始提醒'),
-                  subtitle: const Text('在会议开始前向所有参与者发送提醒'),
-                  value: true, // 从会议设置中获取实际值
-                  onChanged: (value) {
-                    // TODO: 实现提醒设置功能
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('会议提醒${value ? '已开启' : '已关闭'}')),
-                    );
-                  },
-                ),
-
-                ListTile(
-                  title: const Text('提醒时间'),
-                  subtitle: const Text('会议开始前 15 分钟'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    // TODO: 实现提醒时间设置弹窗
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('提醒时间设置功能开发中')),
-                    );
-                  },
-                ),
-              ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.save_rounded),
+                  SizedBox(width: 10),
+                  Text(
+                    '保存会议信息',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-
-        // 保存按钮
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: ElevatedButton(
-            onPressed:
-                () => _saveMeetingInfo(
-                  context,
-                  ref,
-                  titleController.text,
-                  descriptionController.text,
-                  locationController.text,
-                  startTime.value,
-                  endTime.value,
-                  meetingType.value,
-                ),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.all(16.0),
-              minimumSize: const Size(double.infinity, 50),
-            ),
-            child: const Text('保存会议设置'),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
+  }
+
+  // 获取输入框装饰
+  InputDecoration _getInputDecoration({
+    required String label,
+    required String hint,
+    required IconData icon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixIcon: Icon(icon),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade400, width: 1.5),
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    );
+  }
+
+  // 获取状态颜色
+  Color _getStatusColor(MeetingStatus status) {
+    switch (status) {
+      case MeetingStatus.upcoming:
+        return Colors.blue;
+      case MeetingStatus.ongoing:
+        return Colors.green;
+      case MeetingStatus.completed:
+        return Colors.grey;
+      case MeetingStatus.cancelled:
+        return Colors.red;
+    }
+  }
+
+  // 获取状态图标
+  IconData _getStatusIcon(MeetingStatus status) {
+    switch (status) {
+      case MeetingStatus.upcoming:
+        return Icons.schedule;
+      case MeetingStatus.ongoing:
+        return Icons.meeting_room;
+      case MeetingStatus.completed:
+        return Icons.event_available;
+      case MeetingStatus.cancelled:
+        return Icons.event_busy;
+    }
+  }
+
+  // 从文本获取会议类型枚举
+  MeetingType _getTypeFromText(String typeText) {
+    switch (typeText.trim()) {
+      case '培训会议':
+        return MeetingType.training;
+      case '面试会议':
+        return MeetingType.interview;
+      case '其他':
+        return MeetingType.other;
+      default:
+        return MeetingType.regular;
+    }
   }
 
   // 选择日期和时间
@@ -334,7 +552,7 @@ class MeetingInfoTab extends HookConsumerWidget {
   }
 
   // 保存会议信息
-  void _saveMeetingInfo(
+  void _updateMeetingInfo(
     BuildContext context,
     WidgetRef ref,
     String title,

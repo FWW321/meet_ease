@@ -8,12 +8,14 @@ class UserTile extends HookConsumerWidget {
   final String label;
   final bool canRemove;
   final VoidCallback? onRemove;
+  final Color? labelColor;
 
   const UserTile({
     required this.userId,
     required this.label,
     required this.canRemove,
     required this.onRemove,
+    this.labelColor,
     super.key,
   });
 
@@ -89,6 +91,11 @@ class UserTile extends HookConsumerWidget {
 
   // 根据标签获取颜色
   Color _getLabelColor(String label) {
+    // 如果提供了自定义颜色，优先使用自定义颜色
+    if (labelColor != null) {
+      return labelColor!;
+    }
+
     switch (label) {
       case '创建者':
         return Colors.orange;

@@ -26,64 +26,117 @@ class BlacklistTab extends HookConsumerWidget {
     // 获取管理员列表
     final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
 
-    return Column(
-      children: [
-        // 黑名单列表
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              if (meeting.blacklist.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Center(
-                    child: Text('黑名单为空', style: TextStyle(color: Colors.grey)),
-                  ),
-                )
-              else
-                ...meeting.blacklist.map(
-                  (userId) => UserTile(
-                    userId: userId,
-                    label: '已封禁',
-                    canRemove: meeting.canUserManage(currentUserId),
-                    onRemove: () {
-                      // 从黑名单移除
-                      _removeFromBlacklist(context, ref, userId);
-                    },
-                  ),
-                ),
-            ],
-          ),
-        ),
+    // 获取主题色
+    final primaryColor = Theme.of(context).primaryColor;
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
-        // 底部添加按钮
-        if (meeting.canUserManage(currentUserId))
-          participantsAsync.when(
-            data: (participants) {
-              // 获取管理员ID列表用于过滤
-              final adminIds =
-                  managersAsync.whenOrNull(
-                    data:
-                        (managers) =>
-                            managers.map((admin) => admin.id).toList(),
-                  ) ??
-                  [];
-
-              // 过滤掉已在黑名单中的用户和创建者以及管理员
-              final availableParticipants =
-                  participants
-                      .where(
-                        (user) =>
-                            !meeting.blacklist.contains(user.id) &&
-                            user.id != meeting.organizerId &&
-                            !adminIds.contains(user.id),
+    return Container(
+      color: backgroundColor.withOpacity(0.5),
+      child: Column(
+        children: [
+          // 黑名单列表
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child:
+                  meeting.blacklist.isEmpty
+                      ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 64,
+                              color: Colors.grey.shade400,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '黑名单为空',
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '所有用户都可以正常参与会议',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
                       )
-                      .toList();
+                      : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: meeting.blacklist.length,
+                        separatorBuilder:
+                            (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final userId = meeting.blacklist[index];
+                          return UserTile(
+                            userId: userId,
+                            label: '已封禁',
+                            labelColor: Colors.red.shade700,
+                            canRemove: meeting.canUserManage(currentUserId),
+                            onRemove: () {
+                              // 从黑名单移除
+                              _removeFromBlacklist(context, ref, userId);
+                            },
+                          );
+                        },
+                      ),
+            ),
+          ),
 
-              return Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: double.infinity,
+          // 底部添加按钮
+          if (meeting.canUserManage(currentUserId))
+            participantsAsync.when(
+              data: (participants) {
+                // 获取管理员ID列表用于过滤
+                final adminIds =
+                    managersAsync.whenOrNull(
+                      data:
+                          (managers) =>
+                              managers.map((admin) => admin.id).toList(),
+                    ) ??
+                    [];
+
+                // 过滤掉已在黑名单中的用户和创建者以及管理员
+                final availableParticipants =
+                    participants
+                        .where(
+                          (user) =>
+                              !meeting.blacklist.contains(user.id) &&
+                              user.id != meeting.organizerId &&
+                              !adminIds.contains(user.id),
+                        )
+                        .toList();
+
+                return Container(
+                  margin: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.shade300.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
                   child: ElevatedButton(
                     onPressed:
                         availableParticipants.isEmpty
@@ -94,25 +147,50 @@ class BlacklistTab extends HookConsumerWidget {
                               availableParticipants,
                             ),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(12.0),
+                      backgroundColor: Colors.red.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      minimumSize: const Size(double.infinity, 50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      disabledBackgroundColor: Colors.grey.shade300,
                     ),
-                    child: const Text('添加到黑名单'),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.person_off),
+                        const SizedBox(width: 10),
+                        Text(
+                          availableParticipants.isEmpty ? '没有可添加的用户' : '添加到黑名单',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-            loading:
-                () => const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-            error:
-                (error, stackTrace) => Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Center(child: Text('加载参与者失败: $error')),
-                ),
-          ),
-      ],
+                );
+              },
+              loading:
+                  () => const Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+              error:
+                  (error, stackTrace) => Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Center(
+                      child: Text(
+                        '加载参与者失败: $error',
+                        style: TextStyle(color: Colors.red.shade700),
+                      ),
+                    ),
+                  ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -125,12 +203,23 @@ class BlacklistTab extends HookConsumerWidget {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('添加到黑名单'),
+            title: Row(
+              children: [
+                Icon(Icons.person_off, color: Colors.red.shade700),
+                const SizedBox(width: 10),
+                const Text('添加到黑名单'),
+              ],
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             content: SizedBox(
               width: double.maxFinite,
-              child: ListView.builder(
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: availableParticipants.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final user = availableParticipants[index];
                   return ListTile(
@@ -144,8 +233,12 @@ class BlacklistTab extends HookConsumerWidget {
                               ? Text(user.name.substring(0, 1))
                               : null,
                     ),
-                    title: Text(user.name),
+                    title: Text(
+                      user.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text(user.email),
+                    trailing: const Icon(Icons.block, color: Colors.red),
                     onTap: () {
                       Navigator.of(context).pop();
                       _addToBlacklist(context, ref, user.id);
