@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../constants/app_constants.dart';
 
 /// 会议时间选择组件
 class MeetingTimeSelector extends StatelessWidget {
@@ -14,110 +15,148 @@ class MeetingTimeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // 计算预估会议时长
+    final duration = endDateNotifier.value.difference(startDateNotifier.value);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final durationText =
+        hours > 0
+            ? '$hours小时${minutes > 0 ? ' $minutes分钟' : ''}'
+            : '$minutes分钟';
+
+    // 判断会议时间是否合理
+    final bool isValidDuration = duration.inMinutes >= 15;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 开始时间选择
         InkWell(
           onTap: () => _selectDateTime(context, startDateNotifier, true),
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
           child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '开始时间',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.access_time),
+            decoration: InputDecoration(
+              labelText: '开始时间 *',
+              prefixIcon: Icon(Icons.event, color: theme.colorScheme.primary),
+              suffixIcon: Icon(
+                Icons.arrow_drop_down,
+                color: theme.colorScheme.primary,
+              ),
             ),
-            child: Text(
-              DateFormat('yyyy-MM-dd HH:mm').format(startDateNotifier.value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                DateFormat('yyyy-MM-dd HH:mm').format(startDateNotifier.value),
+                style: theme.textTheme.titleMedium,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppConstants.paddingM),
 
         // 结束时间选择
         InkWell(
           onTap: () => _selectDateTime(context, endDateNotifier, false),
+          borderRadius: BorderRadius.circular(AppConstants.radiusM),
           child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '结束时间',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.access_time),
+            decoration: InputDecoration(
+              labelText: '结束时间 *',
+              prefixIcon: Icon(
+                Icons.event_busy,
+                color: theme.colorScheme.primary,
+              ),
+              suffixIcon: Icon(
+                Icons.arrow_drop_down,
+                color: theme.colorScheme.primary,
+              ),
             ),
-            child: Text(
-              DateFormat('yyyy-MM-dd HH:mm').format(endDateNotifier.value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                DateFormat('yyyy-MM-dd HH:mm').format(endDateNotifier.value),
+                style: theme.textTheme.titleMedium,
+              ),
             ),
           ),
         ),
+        const SizedBox(height: AppConstants.paddingM),
 
-        // 时间验证错误提示
-        if (endDateNotifier.value.isBefore(startDateNotifier.value) ||
-            endDateNotifier.value.isAtSameMomentAs(startDateNotifier.value))
-          const Padding(
-            padding: EdgeInsets.only(top: 8.0, left: 16.0),
-            child: Text(
-              '结束时间必须晚于开始时间',
-              style: TextStyle(color: Colors.red, fontSize: 12),
+        // 会议时长显示
+        Container(
+          padding: const EdgeInsets.all(AppConstants.paddingS),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(AppConstants.radiusS),
+            border: Border.all(
+              color:
+                  isValidDuration
+                      ? theme.colorScheme.outline.withOpacity(0.1)
+                      : theme.colorScheme.error.withOpacity(0.5),
             ),
           ),
-
-        // 检查会议时长是否合理
-        if (endDateNotifier.value
-                .difference(startDateNotifier.value)
-                .inMinutes <
-            15)
-          const Padding(
-            padding: EdgeInsets.only(top: 8.0, left: 16.0),
-            child: Text(
-              '会议时长至少需要15分钟',
-              style: TextStyle(color: Colors.red, fontSize: 12),
-            ),
+          child: Row(
+            children: [
+              Icon(
+                isValidDuration ? Icons.timelapse : Icons.warning_amber_rounded,
+                size: 18,
+                color:
+                    isValidDuration
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.error,
+              ),
+              const SizedBox(width: AppConstants.paddingS),
+              Expanded(
+                child: Text(
+                  isValidDuration ? '预计会议时长: $durationText' : '会议时长太短，至少需要15分钟',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color:
+                        isValidDuration
+                            ? theme.colorScheme.onSurfaceVariant
+                            : theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
           ),
-
-        if (endDateNotifier.value.difference(startDateNotifier.value).inHours >
-            24)
-          const Padding(
-            padding: EdgeInsets.only(top: 8.0, left: 16.0),
-            child: Text(
-              '会议时长不建议超过24小时',
-              style: TextStyle(color: Colors.orange, fontSize: 12),
-            ),
-          ),
+        ),
       ],
     );
   }
 
-  // 选择日期和时间
+  /// 选择日期和时间
   Future<void> _selectDateTime(
     BuildContext context,
-    ValueNotifier<DateTime> dateTimeNotifier,
+    ValueNotifier<DateTime> dateNotifier,
     bool isStartTime,
   ) async {
-    final DateTime initialDate = dateTimeNotifier.value;
-
     // 选择日期
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: initialDate,
-      firstDate:
-          isStartTime
-              ? DateTime.now() // 开始时间不早于当前时间
-              : startDateNotifier.value, // 结束时间不早于开始时间
+      initialDate: dateNotifier.value,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
       lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: isStartTime ? '选择开始日期' : '选择结束日期',
+      cancelText: '取消',
+      confirmText: '确定',
     );
 
     if (pickedDate == null) return;
-    if (!context.mounted) return;
 
     // 选择时间
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(initialDate),
+      initialTime: TimeOfDay.fromDateTime(dateNotifier.value),
+      helpText: isStartTime ? '选择开始时间' : '选择结束时间',
+      cancelText: '取消',
+      confirmText: '确定',
     );
 
     if (pickedTime == null) return;
-    if (!context.mounted) return;
 
-    // 组合日期和时间
-    final newDateTime = DateTime(
+    // 更新日期时间
+    final DateTime newDateTime = DateTime(
       pickedDate.year,
       pickedDate.month,
       pickedDate.day,
@@ -125,20 +164,23 @@ class MeetingTimeSelector extends StatelessWidget {
       pickedTime.minute,
     );
 
-    // 对于结束时间，确保它不早于开始时间
+    // 如果是结束时间，确保不早于开始时间
     if (!isStartTime && newDateTime.isBefore(startDateNotifier.value)) {
-      // 如果用户选择的结束时间早于开始时间，则显示错误提示
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('结束时间不能早于开始时间'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // 设置结束时间为开始时间后1小时
+      dateNotifier.value = startDateNotifier.value.add(
+        const Duration(hours: 1),
+      );
       return;
     }
 
-    dateTimeNotifier.value = newDateTime;
+    // 如果是开始时间，确保不晚于结束时间
+    if (isStartTime && newDateTime.isAfter(endDateNotifier.value)) {
+      // 同时更新结束时间，保持至少1小时会议时长
+      dateNotifier.value = newDateTime;
+      endDateNotifier.value = newDateTime.add(const Duration(hours: 1));
+      return;
+    }
+
+    dateNotifier.value = newDateTime;
   }
 }

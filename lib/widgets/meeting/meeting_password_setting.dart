@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../constants/app_constants.dart';
 
 /// 会议密码设置组件
-class MeetingPasswordSetting extends StatelessWidget {
+class MeetingPasswordSetting extends StatefulWidget {
   final ValueNotifier<bool> enablePasswordNotifier;
   final TextEditingController passwordController;
   final Function(bool) onEnablePasswordChanged;
@@ -14,82 +15,147 @@ class MeetingPasswordSetting extends StatelessWidget {
   });
 
   @override
+  State<MeetingPasswordSetting> createState() => _MeetingPasswordSettingState();
+}
+
+class _MeetingPasswordSettingState extends State<MeetingPasswordSetting> {
+  // 是否显示密码
+  bool _obscurePassword = true;
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(AppConstants.radiusM),
+        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppConstants.paddingM),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 标题和开关
             Row(
               children: [
-                const Icon(Icons.lock, color: Colors.blue),
-                const SizedBox(width: 8),
-                const Expanded(
+                Icon(
+                  Icons.lock_outline,
+                  color:
+                      widget.enablePasswordNotifier.value
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                  size: 22,
+                ),
+                const SizedBox(width: AppConstants.paddingS),
+                Expanded(
                   child: Text(
-                    '会议密码',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    '会议密码保护',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color:
+                          widget.enablePasswordNotifier.value
+                              ? theme.colorScheme.primary
+                              : null,
+                    ),
                   ),
                 ),
                 Switch(
-                  value: enablePasswordNotifier.value,
+                  value: widget.enablePasswordNotifier.value,
+                  activeColor: theme.colorScheme.primary,
                   onChanged: (value) {
-                    onEnablePasswordChanged(value);
+                    widget.onEnablePasswordChanged(value);
                     if (!value) {
-                      passwordController.clear();
+                      widget.passwordController.clear();
                     }
+                    setState(() {});
                   },
                 ),
               ],
             ),
-            // 只有启用密码时才显示密码输入框
-            if (enablePasswordNotifier.value)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: passwordController,
-                    obscureText: true, // 隐藏密码
-                    decoration: const InputDecoration(
-                      labelText: '设置密码',
-                      hintText: '参会者需要输入此密码才能加入会议',
-                      border: OutlineInputBorder(),
+
+            // 密码输入框（仅当启用密码时显示）
+            if (widget.enablePasswordNotifier.value) ...[
+              const SizedBox(height: AppConstants.paddingM),
+              TextFormField(
+                controller: widget.passwordController,
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  labelText: '会议密码 *',
+                  hintText: '设置4-16位会议密码',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                      color: theme.colorScheme.primary,
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return '请输入会议密码';
-                      }
-                      if (value.length < 4) {
-                        return '密码长度至少为4位';
-                      }
-                      if (value.length > 16) {
-                        return '密码长度不能超过16位';
-                      }
-                      // 验证密码格式，可以根据需要增加字母、数字等要求
-                      if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
-                        return '密码只能包含字母和数字';
-                      }
-                      return null;
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
                     },
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '启用密码后，参会者需要输入正确的密码才能加入会议。',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              )
-            else
-              const Text(
-                '不启用密码，所有参会者可直接加入会议。',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return '请输入会议密码';
+                  }
+                  if (value.length < 4) {
+                    return '密码长度至少为4位';
+                  }
+                  if (value.length > 16) {
+                    return '密码长度不能超过16位';
+                  }
+                  // 验证密码格式
+                  if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+                    return '密码只能包含字母和数字';
+                  }
+                  return null;
+                },
               ),
+              const SizedBox(height: AppConstants.paddingS),
+
+              // 安全提示
+              Container(
+                padding: const EdgeInsets.all(AppConstants.paddingS),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(AppConstants.radiusS),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.security,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: AppConstants.paddingS),
+                    Expanded(
+                      child: Text(
+                        '启用密码后，参会者需要输入正确的密码才能加入会议',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // 关闭密码时的提示
+              const SizedBox(height: AppConstants.paddingS),
+              Padding(
+                padding: const EdgeInsets.only(left: 4.0),
+                child: Text(
+                  '不启用密码保护，任何人都可以直接加入会议',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
