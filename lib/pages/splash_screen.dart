@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/auth_checker.dart';
 
+// 为了跟踪AuthChecker的加载状态创建一个全局的Provider
+final authReadyProvider = StateProvider<bool>((ref) => false);
+
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -32,6 +35,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   // 粒子效果
   final List<Particle> _particles = [];
   final int _particleCount = 20;
+
+  // 监听页面准备状态
+  bool _authCheckerReady = false;
+  bool _minimumAnimationCompleted = false;
+
+  // 最少显示时间，防止动画过快结束
+  static const Duration _minimumDisplayDuration = Duration(milliseconds: 1500);
 
   @override
   void initState() {
@@ -92,94 +102,109 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _mainController.forward();
     _particleController.repeat();
 
-    // 为过渡到主页添加动画监听
-    _mainController.addStatusListener(_animationStatusListener);
+    // 预加载AuthChecker
+    _preloadAuthChecker();
+
+    // 确保动画至少显示一个最小时间
+    Future.delayed(_minimumDisplayDuration, () {
+      if (mounted) {
+        setState(() => _minimumAnimationCompleted = true);
+        _checkReadyToExit();
+      }
+    });
   }
 
-  // 动画状态监听器
-  void _animationStatusListener(AnimationStatus status) {
-    if (status == AnimationStatus.completed) {
-      // 主动画完成后开始准备退出
+  // 预加载AuthChecker
+  void _preloadAuthChecker() {
+    // 创建一个隐藏的AuthChecker实例，以便开始加载登录状态
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 开始加载AuthChecker
+      AuthChecker.preload().then((_) {
+        if (mounted) {
+          setState(() => _authCheckerReady = true);
+          _checkReadyToExit();
+        }
+      });
+    });
+  }
+
+  // 检查是否可以退出启动屏幕
+  void _checkReadyToExit() {
+    if (_authCheckerReady && _minimumAnimationCompleted && mounted) {
+      // 两个条件都满足时，可以退出启动屏幕
       _prepareExit();
     }
   }
 
   // 准备退出开屏界面
   void _prepareExit() {
-    // 在主动画完成后添加一些额外的缓冲时间再退出
-    Future.delayed(const Duration(milliseconds: 500), () {
+    if (!mounted) return;
+
+    // 如果已经在退出中，不要重复触发
+    if (_exitController != null) return;
+
+    // 创建淡出动画控制器
+    _exitController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    // 创建淡出动画
+    _exitAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _exitController!, curve: Curves.easeOut));
+
+    // 开始淡出整个开屏页面
+    setState(() {}); // 确保重建UI以应用退出动画
+
+    _exitController!.forward().then((_) {
       if (!mounted) return;
 
-      // 创建淡出动画控制器
-      _exitController = AnimationController(
-        duration: const Duration(milliseconds: 1000),
-        vsync: this,
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          pageBuilder:
+              (context, animation, secondaryAnimation) => const AuthChecker(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // 组合多种转场效果
+            final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
+              ),
+            );
+
+            final scaleAnimation = Tween<double>(begin: 0.98, end: 1.0).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
+              ),
+            );
+
+            final slideAnimation = Tween<Offset>(
+              begin: const Offset(0.0, 0.03),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
+              ),
+            );
+
+            return FadeTransition(
+              opacity: fadeAnimation,
+              child: SlideTransition(
+                position: slideAnimation,
+                child: Transform.scale(
+                  scale: scaleAnimation.value,
+                  child: child,
+                ),
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
       );
-
-      // 创建淡出动画
-      _exitAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-        CurvedAnimation(parent: _exitController!, curve: Curves.easeOut),
-      );
-
-      // 开始淡出整个开屏页面
-      setState(() {}); // 确保重建UI以应用退出动画
-
-      _exitController!.forward().then((_) {
-        if (!mounted) return;
-
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder:
-                (context, animation, secondaryAnimation) => const AuthChecker(),
-            transitionsBuilder: (
-              context,
-              animation,
-              secondaryAnimation,
-              child,
-            ) {
-              // 组合多种转场效果
-              final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-                ),
-              );
-
-              final scaleAnimation = Tween<double>(
-                begin: 0.98,
-                end: 1.0,
-              ).animate(
-                CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
-                ),
-              );
-
-              final slideAnimation = Tween<Offset>(
-                begin: const Offset(0.0, 0.03),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(
-                  parent: animation,
-                  curve: const Interval(0.0, 0.7, curve: Curves.easeOutCubic),
-                ),
-              );
-
-              return FadeTransition(
-                opacity: fadeAnimation,
-                child: SlideTransition(
-                  position: slideAnimation,
-                  child: Transform.scale(
-                    scale: scaleAnimation.value,
-                    child: child,
-                  ),
-                ),
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 800),
-          ),
-        );
-      });
     });
   }
 
@@ -216,8 +241,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   void dispose() {
-    // 移除监听器
-    _mainController.removeStatusListener(_animationStatusListener);
     _mainController.dispose();
     _pulseController.dispose();
     _particleController.dispose();
@@ -243,9 +266,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 Positioned.fill(
                   child: CustomPaint(
                     painter: GridPainter(
-                      lineColor: theme.colorScheme.primary.withValues(
-                        alpha: 0.1,
-                      ),
+                      lineColor: theme.colorScheme.primary.withOpacity(0.1),
                     ),
                   ),
                 ),
@@ -264,9 +285,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             shape: BoxShape.circle,
                             color: Colors.transparent,
                             border: Border.all(
-                              color: theme.colorScheme.primary.withValues(
-                                alpha: 0.2,
-                              ),
+                              color: theme.colorScheme.primary.withOpacity(0.2),
                               width: 2,
                             ),
                           ),
@@ -318,12 +337,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                         height: 30,
                                         decoration: BoxDecoration(
                                           color: theme.colorScheme.primary
-                                              .withValues(alpha: 0.7),
+                                              .withOpacity(0.7),
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
                                               color: theme.colorScheme.primary
-                                                  .withValues(alpha: 0.3),
+                                                  .withOpacity(0.3),
                                               blurRadius: 10,
                                               spreadRadius: 2,
                                             ),
@@ -364,9 +383,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: theme.colorScheme.primary.withValues(
-                                      alpha: 0.5,
-                                    ),
+                                    color: theme.colorScheme.primary
+                                        .withOpacity(0.5),
                                     blurRadius: 20,
                                     spreadRadius: 5,
                                   ),
@@ -406,10 +424,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
                 // 底部内容 - 应用名称和描述
                 Positioned(
-                  bottom: size.height * 0.15,
-                  left: 0,
-                  right: 0,
+                  bottom: size.height * 0.2,
+                  left: 16,
+                  right: 16,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // 应用名称
                       FadeTransition(
@@ -417,7 +437,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         child: Text(
                           'MeetEase',
                           style: TextStyle(
-                            fontSize: 36,
+                            fontSize: 32,
                             fontWeight: FontWeight.bold,
                             color: theme.colorScheme.primary,
                             letterSpacing: 2,
@@ -426,66 +446,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       ),
 
                       // 应用描述
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
                       FadeTransition(
                         opacity: _fadeAnimation,
-                        child: Text(
-                          '高效会议管理系统',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: theme.colorScheme.secondary,
-                            letterSpacing: 1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          constraints: BoxConstraints(
+                            maxWidth: size.width * 0.6,
+                          ),
+                          child: Text(
+                            '高效会议管理系统',
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: theme.colorScheme.secondary,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ),
 
-                      // 加载指示器
-                      const SizedBox(height: 50),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 50),
-                        child: AnimatedBuilder(
-                          animation: _mainController,
-                          builder: (context, child) {
-                            // 根据主动画完成状态决定进度条的可见性
-                            double opacity = 1.0;
-
-                            // 当主动画接近完成时，加载指示器开始淡出
-                            if (_mainController.value > 0.9) {
-                              opacity =
-                                  10.0 *
-                                  (1.0 - _mainController.value); // 0.9到1.0之间淡出
-                            }
-
-                            return Opacity(
-                              opacity: opacity,
-                              child: Column(
-                                children: [
-                                  LinearProgressIndicator(
-                                    value: _mainController.value,
-                                    minHeight: 6,
-                                    backgroundColor: theme.colorScheme.surface,
-                                    color: theme.colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-
-                                  // 显示当前加载进度百分比
-                                  if (_mainController.value < 0.99) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      '${(_mainController.value * 100).toInt()}%',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: theme.colorScheme.primary
-                                            .withValues(alpha: opacity),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                      // 不再显示加载指示器
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -652,7 +636,7 @@ class ParticlePainter extends CustomPainter {
     for (final particle in particles) {
       final paint =
           Paint()
-            ..color = color.withValues(alpha: 0.6)
+            ..color = color.withOpacity(0.6)
             ..style = PaintingStyle.fill;
 
       final position = center + particle.position;
@@ -661,7 +645,7 @@ class ParticlePainter extends CustomPainter {
       // 绘制粒子尾巴/轨迹
       final tailPaint =
           Paint()
-            ..color = color.withValues(alpha: 0.3)
+            ..color = color.withOpacity(0.3)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2;
 
@@ -711,7 +695,7 @@ class GridPainter extends CustomPainter {
     // 绘制会议室布局
     final roomPaint =
         Paint()
-          ..color = lineColor.withValues(alpha: 0.7)
+          ..color = lineColor.withOpacity(0.7)
           ..strokeWidth = 3.0
           ..style = PaintingStyle.stroke;
 
@@ -730,7 +714,7 @@ class GridPainter extends CustomPainter {
     // 会议桌
     final tablePaint =
         Paint()
-          ..color = lineColor.withValues(alpha: 0.5)
+          ..color = lineColor.withOpacity(0.5)
           ..strokeWidth = 2.0
           ..style = PaintingStyle.stroke;
 

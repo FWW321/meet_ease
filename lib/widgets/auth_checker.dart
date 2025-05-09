@@ -7,6 +7,20 @@ import '../services/user_service.dart';
 class AuthChecker extends StatefulWidget {
   const AuthChecker({super.key});
 
+  /// 提前加载认证状态，用于启动屏幕优化
+  static Future<void> preload() async {
+    // 这个方法会提前执行认证检查，以便在启动屏幕时预加载
+    final rememberLogin = await AuthService.getRememberLoginSetting();
+
+    // 仅当启用了记住登录状态时，才检查登录状态
+    if (rememberLogin) {
+      await AuthService.getLoginStatus();
+    } else {
+      // 未启用记住登录状态时，清除登录状态
+      await AuthService.clearLoginStatus();
+    }
+  }
+
   @override
   State<AuthChecker> createState() => _AuthCheckerState();
 }
