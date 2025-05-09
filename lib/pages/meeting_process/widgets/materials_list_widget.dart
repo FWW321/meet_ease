@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../../../widgets/materials_list_widget.dart' as original;
+import '../../../widgets/materials/materials_list_widget.dart'
+    as material_widgets;
 
-/// 会议资料列表组件
+/// 会议过程页面的资料列表组件
 class MaterialsListWidget extends ConsumerWidget {
   final String meetingId;
   final bool isReadOnly;
@@ -15,8 +16,8 @@ class MaterialsListWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 使用原始会议资料列表组件
-    return original.MaterialsListWidget(
+    // 使用重构后的会议资料列表组件
+    return material_widgets.MaterialsListWidget(
       meetingId: meetingId,
       isReadOnly: isReadOnly,
     );
