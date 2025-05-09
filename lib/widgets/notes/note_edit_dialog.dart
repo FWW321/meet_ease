@@ -13,9 +13,6 @@ class NoteEditDialog {
     String meetingId,
   ) {
     final contentController = TextEditingController(text: note.content);
-    final tagsController = TextEditingController(
-      text: note.tags != null ? note.tags!.join(', ') : '',
-    );
     final nameController = TextEditingController(text: note.noteName ?? '');
     bool isShared = note.isShared;
 
@@ -50,14 +47,6 @@ class NoteEditDialog {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
-                          controller: tagsController,
-                          decoration: const InputDecoration(
-                            labelText: '标签 (用逗号分隔)',
-                            hintText: '例如: 任务,讨论,决定',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         SwitchListTile(
                           title: const Text('与团队共享'),
                           subtitle: const Text('其他会议成员可以看到这个笔记'),
@@ -78,23 +67,12 @@ class NoteEditDialog {
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        // 解析标签
-                        List<String>? tags;
-                        if (tagsController.text.isNotEmpty) {
-                          tags =
-                              tagsController.text
-                                  .split(',')
-                                  .map((e) => e.trim())
-                                  .where((e) => e.isNotEmpty)
-                                  .toList();
-                        }
-
                         // 更新笔记
                         final updatedNote = note.copyWith(
                           content: contentController.text,
                           noteName: nameController.text,
                           isShared: isShared,
-                          tags: tags,
+                          tags: null, // 不使用标签
                           updatedAt: DateTime.now(),
                         );
 

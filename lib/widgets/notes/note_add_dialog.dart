@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import '../../models/meeting_note.dart';
@@ -13,7 +12,6 @@ class NoteAddDialog {
   /// 显示添加笔记对话框
   static void show(BuildContext context, WidgetRef ref, String meetingId) {
     final contentController = TextEditingController();
-    final tagsController = TextEditingController();
     final nameController = TextEditingController();
     bool isShared = false;
     File? selectedFile;
@@ -155,16 +153,6 @@ class NoteAddDialog {
                         ),
                         const SizedBox(height: 16),
 
-                        // 标签输入
-                        TextField(
-                          controller: tagsController,
-                          decoration: const InputDecoration(
-                            labelText: '标签 (用逗号分隔)',
-                            hintText: '例如: 任务,讨论,决定',
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
                         // 共享选项
                         SwitchListTile(
                           title: const Text('与团队共享'),
@@ -200,17 +188,6 @@ class NoteAddDialog {
                                   const SnackBar(content: Text('请输入笔记内容或选择文件')),
                                 );
                                 return;
-                              }
-
-                              // 解析标签
-                              List<String>? tags;
-                              if (tagsController.text.isNotEmpty) {
-                                tags =
-                                    tagsController.text
-                                        .split(',')
-                                        .map((e) => e.trim())
-                                        .where((e) => e.isNotEmpty)
-                                        .toList();
                               }
 
                               // 获取用户名
@@ -267,7 +244,7 @@ class NoteAddDialog {
                                           userName,
                                           selectedFile!,
                                           isShared,
-                                          tags,
+                                          null, // 不使用标签
                                           nameController.text,
                                         );
 
@@ -288,7 +265,7 @@ class NoteAddDialog {
                                     creatorName: userName,
                                     isShared: isShared,
                                     createdAt: DateTime.now(),
-                                    tags: tags,
+                                    tags: null, // 不使用标签
                                   );
 
                                   // 普通笔记添加

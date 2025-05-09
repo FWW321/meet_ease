@@ -59,26 +59,6 @@ class NoteCardWidget extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
-              // 标签
-              if (note.tags != null && note.tags!.isNotEmpty)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
-                  children:
-                      note.tags!.map((tag) {
-                        return Chip(
-                          label: Text(tag),
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          labelStyle: const TextStyle(fontSize: 12),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        );
-                      }).toList(),
-                ),
-
-              const SizedBox(height: 16),
-
               // 底部信息
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

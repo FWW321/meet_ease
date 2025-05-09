@@ -77,24 +77,6 @@ class NoteDetailDialog {
 
                           // 笔记内容
                           SelectableText(currentNote.content),
-
-                          if (currentNote.tags != null &&
-                              currentNote.tags!.isNotEmpty) ...[
-                            const SizedBox(height: 16),
-
-                            // 标签
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 4,
-                              children:
-                                  currentNote.tags!.map((tag) {
-                                    return Chip(
-                                      label: Text(tag),
-                                      labelStyle: const TextStyle(fontSize: 12),
-                                    );
-                                  }).toList(),
-                            ),
-                          ],
                         ],
                       ),
                     ),
