@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../models/meeting.dart';
 import '../../../providers/meeting_providers.dart';
 import '../../../services/service_providers.dart';
+import '../../../constants/app_constants.dart';
 
 /// 显示会议信息对话框
 void showMeetingInfo(BuildContext context, Meeting meeting) {
@@ -51,6 +52,8 @@ void showSignInDialog(
   VoidCallback onComplete,
 ) {
   final meeting = ref.read(meetingDetailProvider(meetingId)).value;
+  final theme = Theme.of(context);
+  final colorScheme = theme.colorScheme;
 
   // 检查是否为私有会议
   if (meeting != null && meeting.visibility != MeetingVisibility.private) {
@@ -67,93 +70,236 @@ void showSignInDialog(
 
   showDialog(
     context: context,
+    barrierColor: Colors.black54,
     builder:
-        (context) => AlertDialog(
-          title: const Text('会议签到'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('确认签到本次会议吗？'),
-              const SizedBox(height: 16),
-              Text(
-                meeting?.title ?? '当前会议',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              if (meeting != null)
-                Text(
-                  '开始时间：${meeting.startTime.toString().substring(0, 16)}',
-                  style: const TextStyle(color: Colors.grey),
+        (context) => Dialog(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppConstants.radiusL),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                onComplete();
-              },
-              child: const Text('取消'),
+              ],
             ),
-            Consumer(
-              builder: (context, ref, child) {
-                // 使用新的签到状态提供者
-                final signInStatusAsync = ref.watch(
-                  meetingSignInStatusProvider(meetingId),
-                );
-                final isLoading = signInStatusAsync is AsyncLoading;
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 顶部渐变装饰区域
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.primary.withOpacity(0.8),
+                        colorScheme.secondary.withOpacity(0.7),
+                      ],
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                  width: double.infinity,
+                  child: Column(
+                    children: [
+                      // 签到图标
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.how_to_reg_rounded,
+                          size: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // 标题
+                      const Text(
+                        '会议签到',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (meeting != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          meeting.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.access_time_rounded,
+                              size: 14,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              meeting.startTime.toString().substring(0, 16),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
 
-                return TextButton(
-                  onPressed:
-                      isLoading
-                          ? null
-                          : () async {
-                            try {
-                              // 使用新的签到操作提供者
-                              await ref
-                                  .read(
-                                    meetingSignInOperationProvider(meetingId),
-                                  )
-                                  .signIn();
+                // 内容区域
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    '确认签到本次会议吗？',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: colorScheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
 
-                              if (context.mounted) {
-                                // 显示签到成功提示
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('签到成功'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-
-                                Navigator.of(context).pop();
-                                onComplete();
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                // 显示错误提示
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('签到失败: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-
-                                Navigator.of(context).pop();
-                                onComplete();
-                              }
-                            }
+                // 按钮区域
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Row(
+                    children: [
+                      // 取消按钮
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            onComplete();
                           },
-                  child:
-                      isLoading
-                          ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : const Text('确认签到'),
-                );
-              },
+                          style: TextButton.styleFrom(
+                            foregroundColor: colorScheme.onSurface.withOpacity(
+                              0.7,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppConstants.radiusM,
+                              ),
+                            ),
+                          ),
+                          child: const Text('取消'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // 确认签到按钮
+                      Expanded(
+                        child: Consumer(
+                          builder: (context, ref, child) {
+                            // 使用新的签到状态提供者
+                            final signInStatusAsync = ref.watch(
+                              meetingSignInStatusProvider(meetingId),
+                            );
+                            final isLoading = signInStatusAsync is AsyncLoading;
+
+                            return ElevatedButton(
+                              onPressed:
+                                  isLoading
+                                      ? null
+                                      : () async {
+                                        try {
+                                          // 使用新的签到操作提供者
+                                          await ref
+                                              .read(
+                                                meetingSignInOperationProvider(
+                                                  meetingId,
+                                                ),
+                                              )
+                                              .signIn();
+
+                                          if (context.mounted) {
+                                            // 显示签到成功提示
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('签到成功'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+
+                                            Navigator.of(context).pop();
+                                            onComplete();
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            // 显示错误提示
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text('签到失败: $e'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+
+                                            Navigator.of(context).pop();
+                                            onComplete();
+                                          }
+                                        }
+                                      },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppConstants.radiusM,
+                                  ),
+                                ),
+                              ),
+                              child:
+                                  isLoading
+                                      ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
+                                      : const Text('确认签到'),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
   );
 }
