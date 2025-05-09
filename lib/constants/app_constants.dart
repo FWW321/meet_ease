@@ -41,7 +41,6 @@ class AppConstants {
   static const String meetingListRoute = '/meeting-list';
   static const String profileSettingsRoute = '/profile-settings';
   static const String accountSecurityRoute = '/account-security';
-  static const String notificationSettingsRoute = '/notification-settings';
   static const String helpCenterRoute = '/help-center';
   static const String aboutRoute = '/about';
   static const String privacyPolicyRoute = '/privacy-policy';

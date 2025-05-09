@@ -7,7 +7,6 @@ import 'pages/my_meetings_page.dart';
 import 'pages/meeting_list_page.dart';
 import 'pages/profile_settings_page.dart';
 import 'pages/account_security_page.dart';
-import 'pages/notification_settings_page.dart';
 import 'pages/help_center_page.dart';
 import 'pages/about_page.dart';
 import 'pages/privacy_policy_page.dart';
@@ -71,8 +70,6 @@ class MyApp extends ConsumerWidget {
             (context) => const ProfileSettingsPage(),
         AppConstants.accountSecurityRoute:
             (context) => const AccountSecurityPage(),
-        AppConstants.notificationSettingsRoute:
-            (context) => const NotificationSettingsPage(),
         AppConstants.helpCenterRoute: (context) => const HelpCenterPage(),
         AppConstants.aboutRoute: (context) => const AboutPage(),
         AppConstants.privacyPolicyRoute: (context) => const PrivacyPolicyPage(),

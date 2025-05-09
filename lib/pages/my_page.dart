@@ -189,19 +189,6 @@ class MyPage extends HookConsumerWidget {
           },
         ),
 
-        // 通知设置
-        ListTile(
-          leading: const Icon(Icons.notifications_none),
-          title: const Text('通知设置'),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () {
-            Navigator.pushNamed(
-              context,
-              AppConstants.notificationSettingsRoute,
-            );
-          },
-        ),
-
         // 帮助中心
         ListTile(
           leading: const Icon(Icons.help_outline),
