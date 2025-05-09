@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/meeting.dart';
+import '../providers/user_providers.dart';
 
-class MeetingListItem extends StatelessWidget {
+class MeetingListItem extends ConsumerWidget {
   final Meeting meeting;
   final VoidCallback onTap;
   final String? matchScore;
@@ -17,12 +19,15 @@ class MeetingListItem extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final dateFormat = DateFormat('MM-dd HH:mm');
     final statusColor = getMeetingStatusColor(meeting.status);
     final statusText = getMeetingStatusText(meeting.status);
     final typeText = getMeetingTypeText(meeting.type);
     final visibilityText = getMeetingVisibilityText(meeting.visibility);
+
+    // 获取组织者用户名
+    final userNameAsync = ref.watch(userNameProvider(meeting.organizerId));
 
     // 计算时间显示
     final now = DateTime.now();
@@ -133,60 +138,95 @@ class MeetingListItem extends StatelessWidget {
               const SizedBox(height: 8),
 
               // 会议类型、可见性和组织者
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    typeText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 新增：会议可见性
-                  Icon(visibilityIcon, size: 16, color: visibilityColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    visibilityText,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: visibilityColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.person, size: 16, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  Text(
-                    meeting.organizerName,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  if (meeting.isSignedIn) ...[
-                    const Spacer(),
-                    const Icon(
-                      Icons.check_circle,
-                      size: 16,
-                      color: Colors.green,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      '已签到',
-                      style: TextStyle(fontSize: 12, color: Colors.green),
-                    ),
-                  ],
-                  // 显示匹配度
-                  if (matchScore != null) ...[
-                    const Spacer(),
-                    const Icon(Icons.recommend, size: 16, color: Colors.blue),
-                    const SizedBox(width: 4),
-                    Text(
-                      '匹配度: $matchScore',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.blue,
-                        fontWeight: FontWeight.w500,
+                  Row(
+                    children: [
+                      Text(
+                        typeText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                      // 会议可见性
+                      Icon(visibilityIcon, size: 16, color: visibilityColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        visibilityText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: visibilityColor,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.person, size: 16, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      // 动态显示组织者姓名，使用Expanded防止溢出
+                      Expanded(
+                        child: userNameAsync.when(
+                          data:
+                              (name) => Text(
+                                name,
+                                style: const TextStyle(color: Colors.grey),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          loading:
+                              () => const SizedBox(
+                                width: 40,
+                                height: 12,
+                                child: LinearProgressIndicator(),
+                              ),
+                          error:
+                              (_, __) => Text(
+                                meeting.organizerName,
+                                style: const TextStyle(color: Colors.grey),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                        ),
+                      ),
+                      if (meeting.isSignedIn) ...[
+                        const SizedBox(width: 8),
+                        const Icon(
+                          Icons.check_circle,
+                          size: 16,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          '已签到',
+                          style: TextStyle(fontSize: 12, color: Colors.green),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  // 显示匹配度（移到单独一行）
+                  if (matchScore != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.recommend,
+                          size: 16,
+                          color: Colors.blue,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '匹配度: $matchScore',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
