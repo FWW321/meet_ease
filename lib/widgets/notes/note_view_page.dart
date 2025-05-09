@@ -4,6 +4,8 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
 import '../../models/meeting_note.dart';
 import '../../providers/meeting_process_providers.dart';
+import '../../providers/user_providers.dart';
+import 'note_edit_page.dart';
 
 /// 笔记查看页面 - 全屏查看笔记内容
 class NoteViewPage extends ConsumerStatefulWidget {
@@ -164,7 +166,35 @@ class _NoteViewPageState extends ConsumerState<NoteViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_currentNote?.noteName ?? '笔记详情')),
+      appBar: AppBar(
+        title: Text(_currentNote?.noteName ?? '笔记详情'),
+        actions: [
+          // 编辑按钮
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: '编辑笔记',
+            onPressed: () {
+              if (_currentNote != null) {
+                // 跳转到编辑页面，并等待返回结果
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder:
+                            (context) => NoteEditPage(
+                              note: _currentNote,
+                              meetingId: widget.meetingId,
+                            ),
+                      ),
+                    )
+                    .then((_) {
+                      // 编辑页面返回后，重新获取笔记详情
+                      _fetchNoteDetails();
+                    });
+              }
+            },
+          ),
+        ],
+      ),
       body:
           _isLoading
               ? const Center(child: CircularProgressIndicator())
