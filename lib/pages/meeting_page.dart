@@ -6,7 +6,7 @@ import '../models/meeting_recommendation.dart';
 import '../providers/meeting_providers.dart';
 import '../widgets/meeting_list_item.dart';
 import '../constants/app_constants.dart';
-import 'meeting_detail_page.dart';
+import 'meeting_detail/meeting_detail_page.dart';
 
 class MeetingPage extends HookConsumerWidget {
   const MeetingPage({super.key});

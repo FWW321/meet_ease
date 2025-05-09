@@ -12,7 +12,7 @@ import 'pages/help_center_page.dart';
 import 'pages/about_page.dart';
 import 'pages/privacy_policy_page.dart';
 import 'pages/create_meeting_page.dart';
-import 'pages/meeting_detail_page.dart';
+import 'pages/meeting_detail/meeting_detail_page.dart';
 import 'pages/splash_screen.dart';
 import 'pages/icon_generator_page.dart';
 import 'configs/app_theme.dart';

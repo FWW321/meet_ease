@@ -1324,7 +1324,7 @@ class _MeetingMaterialsNotifierProviderElement
 }
 
 String _$meetingNotesNotifierHash() =>
-    r'74f96995209f40cc2895a96f8ae2b82760cce24b';
+    r'239f83e26935e7dbd3b38abf23cd94561bdea055';
 
 abstract class _$MeetingNotesNotifier
     extends BuildlessAutoDisposeAsyncNotifier<List<MeetingNote>> {
