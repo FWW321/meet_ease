@@ -4,7 +4,7 @@ import '../../../widgets/chat/chat_widget.dart';
 import '../../../models/user.dart';
 import '../../../providers/user_providers.dart';
 import '../widgets/materials_list_widget.dart';
-import '../widgets/notes_list_widget.dart';
+import '../../../widgets/notes_list_widget.dart';
 import '../widgets/votes_list_widget.dart';
 import '../meeting_process_page.dart';
 
