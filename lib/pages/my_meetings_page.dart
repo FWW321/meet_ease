@@ -66,22 +66,6 @@ class MyMeetingsPage extends HookConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // 导航到创建会议页面
-          final result = await Navigator.pushNamed(
-            context,
-            AppConstants.createMeetingRoute,
-          );
-
-          // 如果创建成功，刷新会议列表
-          if (result == true) {
-            ref.invalidate(meetingListProvider);
-            ref.invalidate(myMeetingsProvider);
-          }
-        },
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
