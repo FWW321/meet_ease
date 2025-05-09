@@ -403,8 +403,18 @@ class ChatWidget extends HookConsumerWidget {
                 // 合并历史消息和WebSocket实时消息
                 final combinedMessages = [...messages, ...localMessages.value];
 
+                // 只过滤掉头像会显示为"?"的消息（头像为null且发送者名称为空）
+                final filteredMessages =
+                    combinedMessages
+                        .where(
+                          (message) =>
+                              !(message.senderAvatar == null &&
+                                  message.senderName.isEmpty),
+                        )
+                        .toList();
+
                 // 按时间排序
-                combinedMessages.sort(
+                filteredMessages.sort(
                   (a, b) => a.timestamp.compareTo(b.timestamp),
                 );
 
@@ -418,7 +428,7 @@ class ChatWidget extends HookConsumerWidget {
 
                 // 使用拆分出的消息列表组件
                 return ChatMessageList(
-                  messages: combinedMessages,
+                  messages: filteredMessages,
                   currentUserId: currentUserId.value ?? userId,
                   scrollController: scrollController,
                   showDateSeparator: showDateSeparator.value,
