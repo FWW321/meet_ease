@@ -105,6 +105,7 @@ class UserSearchResultList extends ConsumerWidget {
   final List<ApiUser> searchResults;
   final List<String> selectedUserIds;
   final void Function(String) onUserSelect;
+  final List<String>? userIdFilter; // 添加用户ID过滤参数
 
   const UserSearchResultList({
     super.key,
@@ -112,6 +113,7 @@ class UserSearchResultList extends ConsumerWidget {
     required this.searchResults,
     required this.selectedUserIds,
     required this.onUserSelect,
+    this.userIdFilter,
   });
 
   @override
@@ -122,12 +124,20 @@ class UserSearchResultList extends ConsumerWidget {
     return currentUserIdAsync.when(
       data: (currentUserId) {
         // 过滤掉当前用户和系统用户(userId为0)
-        final filteredResults =
+        var filteredResults =
             searchResults
                 .where(
                   (user) => user.userId != currentUserId && user.userId != '0',
                 )
                 .toList();
+
+        // 如果传入了userIdFilter参数，进一步过滤用户
+        if (userIdFilter != null && userIdFilter!.isNotEmpty) {
+          filteredResults =
+              filteredResults
+                  .where((user) => userIdFilter!.contains(user.userId))
+                  .toList();
+        }
 
         // 对搜索结果进行处理，将已选择的用户置顶
         final List<ApiUser> sortedResults = _getSortedResults(
@@ -222,14 +232,11 @@ class UserSearchResultList extends ConsumerWidget {
     List<ApiUser> results,
     List<String> selectedIds,
   ) {
-    if (selectedIds.isEmpty) {
-      return List.from(results);
-    }
+    // 创建已选择和未选择的用户列表
+    final selectedUsers = <ApiUser>[];
+    final unselectedUsers = <ApiUser>[];
 
-    // 将结果分为已选择和未选择两组
-    final List<ApiUser> selectedUsers = [];
-    final List<ApiUser> unselectedUsers = [];
-
+    // 将结果分为已选择和未选择的用户
     for (final user in results) {
       if (selectedIds.contains(user.userId)) {
         selectedUsers.add(user);
@@ -251,12 +258,14 @@ final _userSearchWidgetProvider = StateProvider<_UserSearchWidgetState?>(
 // 修改后的用户搜索组件，使用Riverpod管理用户选择状态
 class UserSearchWidget extends ConsumerStatefulWidget {
   final List<String> initialSelectedUserIds;
-  final ValueChanged<List<String>> onSelectedUsersChanged;
+  final ValueChanged<List<String>>? onSelectedUsersChanged;
+  final List<String>? userIdFilter; // 添加用户ID过滤参数
 
   const UserSearchWidget({
     super.key,
     required this.initialSelectedUserIds,
-    required this.onSelectedUsersChanged,
+    this.onSelectedUsersChanged,
+    this.userIdFilter, // 声明参数
   });
 
   @override
@@ -435,18 +444,19 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
   // 切换用户选择
   void _toggleUserSelection(String userId) {
     // 保存当前滚动位置
-    final currentPosition = _searchResultsScrollController.position.pixels;
+    final scrollPosition = _searchResultsScrollController.position.pixels;
 
-    // 使用Riverpod更新状态，这不会触发TextEditingController的重建
+    // 更新全局状态管理器
     ref.read(userSelectProvider.notifier).toggle(userId);
     // 通过回调将选中状态传递给父组件
-    widget.onSelectedUsersChanged(ref.read(userSelectProvider));
+    widget.onSelectedUsersChanged?.call(ref.read(userSelectProvider));
 
     // 使用Future.microtask确保在状态更新后恢复滚动位置
     Future.microtask(() {
       if (_searchResultsScrollController.hasClients &&
-          _searchResultsScrollController.position.pixels != currentPosition) {
-        _searchResultsScrollController.jumpTo(currentPosition);
+          mounted &&
+          scrollPosition > 0) {
+        _searchResultsScrollController.jumpTo(scrollPosition);
       }
     });
   }
@@ -567,6 +577,7 @@ class _UserSearchWidgetState extends ConsumerState<UserSearchWidget>
                                   searchResults: _stateHolder.searchResults,
                                   selectedUserIds: selectedUsers,
                                   onUserSelect: _toggleUserSelection,
+                                  userIdFilter: widget.userIdFilter,
                                 ),
                               ),
                     )

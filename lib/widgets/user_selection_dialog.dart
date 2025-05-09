@@ -9,6 +9,7 @@ import '../providers/user_providers.dart';
 Future<List<String>?> showUserSelectionDialog({
   required BuildContext context,
   required List<String> initialSelectedUserIds,
+  List<String>? userIdFilter,
 }) async {
   // 保存context引用，避免跨越异步间隙使用BuildContext
   final contextCaptured = context;
@@ -127,6 +128,7 @@ Future<List<String>?> showUserSelectionDialog({
                             padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
                             child: UserSearchWidget(
                               initialSelectedUserIds: tempSelectedUserIds,
+                              userIdFilter: userIdFilter,
                               onSelectedUsersChanged: (_) {
                                 // 选择变化直接反映在provider中，不需要额外处理
                                 // 强制刷新对话框状态以更新底部按钮

@@ -201,36 +201,99 @@ class AdminsTab extends HookConsumerWidget {
         [];
     final creatorId = meeting.organizerId;
 
-    // 使用UserSelectionDialog来选择管理员，从所有用户中选择
-    final selectedUserIds = await showUserSelectionDialog(
-      context: context,
-      initialSelectedUserIds: [], // 初始没有选择的管理员
-    );
+    // 根据会议类型决定从哪些用户中选择管理员
+    if (meeting.visibility == MeetingVisibility.private) {
+      // 私有会议：从参与者中选取管理员
+      // 获取参与者列表
+      final participantsAsync = ref.read(
+        meetingParticipantsProvider(meeting.id),
+      );
+      final participantIds =
+          await participantsAsync.whenOrNull(
+            data:
+                (participants) =>
+                    participants.map((participant) => participant.id).toList(),
+          ) ??
+          [];
 
-    // 如果用户取消了选择，则返回null
-    if (selectedUserIds == null || selectedUserIds.isEmpty) return;
-
-    // 过滤掉创建者ID和已有管理员ID
-    final validSelectedIds =
-        selectedUserIds
-            .where((id) => id != creatorId && !adminIds.contains(id))
-            .toList();
-
-    if (validSelectedIds.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('所选用户都已是管理员或创建者'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+      // 如果没有参与者，显示提示消息
+      if (participantIds.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('私有会议没有找到参与者，请先添加参与者'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    // 添加所有选中的用户为管理员
-    for (final userId in validSelectedIds) {
-      _addAdmin(context, ref, userId);
+      // 使用UserSelectionDialog来选择管理员，从参与者中选择
+      final selectedUserIds = await showUserSelectionDialog(
+        context: context,
+        initialSelectedUserIds: [], // 初始没有选择的管理员
+        userIdFilter: participantIds, // 只显示参与者
+      );
+
+      // 如果用户取消了选择，则返回null
+      if (selectedUserIds == null || selectedUserIds.isEmpty) return;
+
+      // 过滤掉创建者ID和已有管理员ID
+      final validSelectedIds =
+          selectedUserIds
+              .where((id) => id != creatorId && !adminIds.contains(id))
+              .toList();
+
+      if (validSelectedIds.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('所选用户都已是管理员或创建者'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 添加所有选中的用户为管理员
+      for (final userId in validSelectedIds) {
+        _addAdmin(context, ref, userId);
+      }
+    } else {
+      // 公开会议：从所有用户中选取管理员
+      // 使用UserSelectionDialog来选择管理员，从所有用户中选择
+      final selectedUserIds = await showUserSelectionDialog(
+        context: context,
+        initialSelectedUserIds: [], // 初始没有选择的管理员
+      );
+
+      // 如果用户取消了选择，则返回null
+      if (selectedUserIds == null || selectedUserIds.isEmpty) return;
+
+      // 过滤掉创建者ID和已有管理员ID
+      final validSelectedIds =
+          selectedUserIds
+              .where((id) => id != creatorId && !adminIds.contains(id))
+              .toList();
+
+      if (validSelectedIds.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('所选用户都已是管理员或创建者'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 添加所有选中的用户为管理员
+      for (final userId in validSelectedIds) {
+        _addAdmin(context, ref, userId);
+      }
     }
   }
 
