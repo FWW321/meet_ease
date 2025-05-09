@@ -25,26 +25,11 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
   List<VoteOption> options = [];
   bool isLoading = true;
   String? errorMessage;
-  bool hasVoted = false;
-  String? currentUserId;
 
   @override
   void initState() {
     super.initState();
     _loadVoteOptions();
-    _checkUserVoteStatus();
-  }
-
-  // 检查用户是否已投票
-  Future<void> _checkUserVoteStatus() async {
-    try {
-      // 获取当前用户ID
-      currentUserId = await ref.read(currentUserIdProvider.future);
-
-      // 加载投票结果时会检查用户是否已投票
-    } catch (e) {
-      print('检查用户投票状态出错: $e');
-    }
   }
 
   // 加载投票选项
@@ -52,22 +37,6 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
     try {
       final service = ref.read(meetingProcessServiceProvider);
       final results = await service.getVoteResults(widget.vote.id);
-
-      // 获取当前用户ID，如果尚未获取
-      if (currentUserId == null) {
-        currentUserId = await ref.read(currentUserIdProvider.future);
-      }
-
-      // 检查用户是否已经投票
-      if (currentUserId != null) {
-        for (var option in results) {
-          if (option.voterIds != null &&
-              option.voterIds!.contains(currentUserId)) {
-            hasVoted = true;
-            break;
-          }
-        }
-      }
 
       setState(() {
         options = results;
@@ -194,32 +163,6 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                     style: textTheme.bodySmall?.copyWith(
                       color: isVoteEnded ? Colors.red : Colors.green,
                       fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // 显示用户已参与投票的提示
-          if (hasVoted)
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.how_to_vote, size: 18, color: Colors.blue[700]),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '您已经参与过此投票',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ),
                 ],
@@ -410,7 +353,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                                           ? null
                                           : selectedOptions.first,
                                   onChanged:
-                                      isVoteEnded || hasVoted
+                                      isVoteEnded
                                           ? null
                                           : (value) {
                                             setState(() {
@@ -467,7 +410,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                                   title: optionTitle,
                                   value: isSelected,
                                   onChanged:
-                                      isVoteEnded || hasVoted
+                                      isVoteEnded
                                           ? null
                                           : (value) {
                                             setState(() {
@@ -545,7 +488,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
         ),
         ElevatedButton(
           onPressed:
-              isVoteEnded || selectedOptions.isEmpty || hasVoted
+              isVoteEnded || selectedOptions.isEmpty
                   ? null
                   : () => _submitVote(context),
           style: ElevatedButton.styleFrom(
@@ -554,10 +497,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child:
-              hasVoted
-                  ? const Text('已投票')
-                  : (isVoteEnded ? const Text('投票已结束') : const Text('提交')),
+          child: isVoteEnded ? const Text('投票已结束') : const Text('提交'),
         ),
       ],
     );
@@ -640,11 +580,6 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
 
         // 检查响应码
         if (responseData['code'] == 200) {
-          // 更新投票状态
-          setState(() {
-            hasVoted = true;
-          });
-
           // 投票成功
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(

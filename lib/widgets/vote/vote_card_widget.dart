@@ -2,85 +2,55 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../models/meeting_vote.dart';
 import '../../providers/meeting_process_providers.dart';
-import '../../providers/user_providers.dart';
 import '../../utils/time_utils.dart';
 import 'vote_dialog.dart';
 
 /// 投票卡片组件
-class VoteCardWidget extends ConsumerStatefulWidget {
+class VoteCardWidget extends ConsumerWidget {
   final MeetingVote vote;
   final String meetingId;
 
   const VoteCardWidget({required this.vote, required this.meetingId, Key? key})
     : super(key: key);
 
-  @override
-  ConsumerState<VoteCardWidget> createState() => _VoteCardWidgetState();
-}
-
-class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
-  bool hasVoted = false;
-  bool isCheckingVoteStatus = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkUserVoteStatus();
+  // 获取投票状态颜色
+  Color _getVoteStatusColor(VoteStatus status) {
+    switch (status) {
+      case VoteStatus.pending:
+        return Colors.orange;
+      case VoteStatus.active:
+        return Colors.blue;
+      case VoteStatus.closed:
+        return Colors.grey;
+    }
   }
 
-  // 检查用户是否已投票
-  Future<void> _checkUserVoteStatus() async {
-    try {
-      // 获取当前用户ID
-      final currentUserId = await ref.read(currentUserIdProvider.future);
-
-      // 获取投票结果
-      final service = ref.read(meetingProcessServiceProvider);
-      final options = await service.getVoteResults(widget.vote.id);
-
-      // 检查用户是否已经投票
-      bool voted = false;
-      for (var option in options) {
-        if (option.voterIds != null &&
-            option.voterIds!.contains(currentUserId)) {
-          voted = true;
-          break;
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          hasVoted = voted;
-          isCheckingVoteStatus = false;
-        });
-      }
-    } catch (e) {
-      print('检查用户投票状态出错: $e');
-      if (mounted) {
-        setState(() {
-          isCheckingVoteStatus = false;
-        });
-      }
+  // 获取投票状态文本
+  String _getVoteStatusText(VoteStatus status) {
+    switch (status) {
+      case VoteStatus.pending:
+        return '待开始';
+      case VoteStatus.active:
+        return '进行中';
+      case VoteStatus.closed:
+        return '已结束';
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    final statusColor = _getVoteStatusColor(widget.vote.status);
-    final statusText = _getVoteStatusText(widget.vote.status);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusColor = _getVoteStatusColor(vote.status);
+    final statusText = _getVoteStatusText(vote.status);
 
-    // 判断是否可以投票（进行中状态且未过截止时间且未投票）
+    // 判断是否可以投票（进行中状态且未过截止时间）
     final now = TimeUtils.nowInShanghaiTimeZone();
     final bool canVote =
-        widget.vote.status == VoteStatus.active &&
-        (widget.vote.endTime == null ||
-            now.isBefore(
-              TimeUtils.utcToShanghaiTimeZone(widget.vote.endTime!),
-            )) &&
-        !hasVoted;
+        vote.status == VoteStatus.active &&
+        (vote.endTime == null ||
+            now.isBefore(TimeUtils.utcToShanghaiTimeZone(vote.endTime!)));
 
     return InkWell(
-      onTap: canVote ? () => _showVoteDialog(context, widget.vote, ref) : null,
+      onTap: canVote ? () => _showVoteDialog(context, vote, ref) : null,
       child: Card(
         margin: const EdgeInsets.only(bottom: 16),
         child: Padding(
@@ -94,7 +64,7 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
                 children: [
                   Expanded(
                     child: Text(
-                      widget.vote.title,
+                      vote.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -121,12 +91,11 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
               ),
 
               // 描述
-              if (widget.vote.description != null &&
-                  widget.vote.description!.isNotEmpty)
+              if (vote.description != null && vote.description!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    widget.vote.description!,
+                    vote.description!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium,
@@ -139,7 +108,7 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
                 child: Row(
                   children: [
                     Icon(
-                      widget.vote.type == VoteType.singleChoice
+                      vote.type == VoteType.singleChoice
                           ? Icons.radio_button_checked
                           : Icons.check_box,
                       size: 16,
@@ -147,10 +116,10 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      widget.vote.type == VoteType.singleChoice ? '单选' : '多选',
+                      vote.type == VoteType.singleChoice ? '单选' : '多选',
                       style: TextStyle(color: Colors.grey[600], fontSize: 14),
                     ),
-                    if (widget.vote.isAnonymous) ...[
+                    if (vote.isAnonymous) ...[
                       const SizedBox(width: 16),
                       const Icon(
                         Icons.visibility_off,
@@ -168,31 +137,31 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
               ),
 
               // 保留开始和结束时间
-              if (widget.vote.startTime != null)
+              if (vote.startTime != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    '开始于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(widget.vote.startTime!), format: 'yyyy-MM-dd HH:mm')}',
+                    '开始于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(vote.startTime!), format: 'yyyy-MM-dd HH:mm')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
 
-              if (widget.vote.endTime != null)
+              if (vote.endTime != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    '截止于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(widget.vote.endTime!), format: 'yyyy-MM-dd HH:mm')}',
+                    '截止于: ${TimeUtils.formatDateTime(TimeUtils.utcToShanghaiTimeZone(vote.endTime!), format: 'yyyy-MM-dd HH:mm')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
 
               // 进度指示器（仅针对活动投票）
-              if (widget.vote.status == VoteStatus.active) ...[
+              if (vote.status == VoteStatus.active) ...[
                 const SizedBox(height: 16),
                 LinearProgressIndicator(
                   value:
-                      widget.vote.totalVotes > 0
-                          ? widget.vote.totalVotes / 10
+                      vote.totalVotes > 0
+                          ? vote.totalVotes / 10
                           : 0, // 假设10人参与会议
                   backgroundColor: Colors.grey[200],
                   color: Colors.blue,
@@ -200,11 +169,11 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
               ],
 
               // 操作按钮（仅保留开始投票按钮）
-              if (widget.vote.status == VoteStatus.pending)
+              if (vote.status == VoteStatus.pending)
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: ElevatedButton.icon(
-                    onPressed: () => _startVote(context, widget.vote.id, ref),
+                    onPressed: () => _startVote(context, vote.id, ref),
                     icon: const Icon(Icons.play_arrow),
                     label: const Text('开始投票'),
                     style: ElevatedButton.styleFrom(
@@ -214,42 +183,24 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
                   ),
                 ),
 
-              // 投票活动状态提示
-              if (widget.vote.status == VoteStatus.active)
+              // 如果是活动状态，添加提示文字
+              if (vote.status == VoteStatus.active)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child:
-                      isCheckingVoteStatus
-                          ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : Row(
-                            children: [
-                              Icon(
-                                hasVoted ? Icons.check_circle : Icons.touch_app,
-                                size: 14,
-                                color: hasVoted ? Colors.green : Colors.blue,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                hasVoted ? '您已经参与了此次投票' : '点击卡片参与投票',
-                                style: TextStyle(
-                                  color: hasVoted ? Colors.green : Colors.blue,
-                                  fontSize: 12,
-                                  fontStyle:
-                                      hasVoted
-                                          ? FontStyle.normal
-                                          : FontStyle.italic,
-                                  fontWeight:
-                                      hasVoted
-                                          ? FontWeight.w500
-                                          : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.touch_app, size: 14, color: Colors.blue),
+                      const SizedBox(width: 6),
+                      Text(
+                        '点击卡片参与投票',
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
             ],
           ),
@@ -273,52 +224,17 @@ class _VoteCardWidgetState extends ConsumerState<VoteCardWidget> {
       return;
     }
 
-    // 如果已经投票，提示用户
-    if (hasVoted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('您已参与过此投票'), backgroundColor: Colors.blue),
-      );
-      return;
-    }
-
     showDialog(
       context: context,
-      builder: (context) => VoteDialog(vote: vote, meetingId: widget.meetingId),
-    ).then((_) {
-      // 对话框关闭后刷新投票状态
-      _checkUserVoteStatus();
-    });
+      builder: (context) => VoteDialog(vote: vote, meetingId: meetingId),
+    );
   }
 
   // 开始投票
   void _startVote(BuildContext context, String voteId, WidgetRef ref) {
     final notifier = ref.read(
-      voteNotifierProvider(voteId, meetingId: widget.meetingId).notifier,
+      voteNotifierProvider(voteId, meetingId: meetingId).notifier,
     );
     notifier.startVote();
-  }
-
-  // 获取投票状态颜色
-  Color _getVoteStatusColor(VoteStatus status) {
-    switch (status) {
-      case VoteStatus.pending:
-        return Colors.orange;
-      case VoteStatus.active:
-        return Colors.blue;
-      case VoteStatus.closed:
-        return Colors.grey;
-    }
-  }
-
-  // 获取投票状态文本
-  String _getVoteStatusText(VoteStatus status) {
-    switch (status) {
-      case VoteStatus.pending:
-        return '待开始';
-      case VoteStatus.active:
-        return '进行中';
-      case VoteStatus.closed:
-        return '已结束';
-    }
   }
 }
