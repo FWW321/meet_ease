@@ -188,7 +188,8 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
                     decoration: InputDecoration(
                       hintText: '简要说明您的请假原因...',
                       filled: true,
-                      fillColor: colorScheme.surfaceVariant.withOpacity(0.5),
+                      fillColor: colorScheme.surfaceContainerHighest
+                          .withOpacity(0.5),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(
                           AppConstants.radiusM,
