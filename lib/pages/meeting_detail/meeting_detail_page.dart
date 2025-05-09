@@ -464,39 +464,6 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                         ),
                       ],
                     ),
-
-                    // 如果是公开会议，显示会议码
-                    if (meeting.visibility == MeetingVisibility.public) ...[
-                      const Divider(height: 32),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.qr_code,
-                            color: Colors.purple,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '会议码',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              SelectableText(
-                                meeting.id,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontFamily: 'monospace',
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
