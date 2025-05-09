@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_quill/flutter_quill.dart';
+import 'dart:convert';
 import '../../models/meeting_note.dart';
 import '../../providers/meeting_process_providers.dart';
 import '../../providers/user_providers.dart';
-import 'note_edit_dialog.dart';
+import 'note_edit_page.dart';
 
 /// 笔记详情对话框
 class NoteDetailDialog {
@@ -47,6 +49,47 @@ class NoteDetailDialog {
                   final currentNote = noteDetail ?? note;
                   final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
+                  // 初始化QuillController用于只读显示
+                  QuillController quillController;
+                  try {
+                    // 尝试解析JSON格式的富文本内容
+                    if (currentNote.content.isNotEmpty) {
+                      final dynamic jsonData = jsonDecode(currentNote.content);
+                      if (jsonData is List) {
+                        // 正确的Delta JSON格式
+                        quillController = QuillController(
+                          document: Document.fromJson(jsonData),
+                          selection: const TextSelection.collapsed(offset: 0),
+                        );
+                      } else {
+                        // JSON不是List格式，创建新文档并添加原始文本
+                        final document = Document();
+                        quillController = QuillController(
+                          document: document,
+                          selection: const TextSelection.collapsed(offset: 0),
+                        );
+                        quillController.document.insert(0, currentNote.content);
+                      }
+                    } else {
+                      // 内容为空，创建空文档
+                      quillController = QuillController(
+                        document: Document(),
+                        selection: const TextSelection.collapsed(offset: 0),
+                      );
+                    }
+                  } catch (e) {
+                    // JSON解析失败，创建新文档并添加原始文本
+                    final document = Document();
+                    quillController = QuillController(
+                      document: document,
+                      selection: const TextSelection.collapsed(offset: 0),
+                    );
+                    quillController.document.insert(0, currentNote.content);
+                  }
+
+                  // 设置为只读模式
+                  quillController.readOnly = true;
+
                   return AlertDialog(
                     title:
                         currentNote.noteName != null &&
@@ -75,8 +118,23 @@ class NoteDetailDialog {
 
                           const SizedBox(height: 16),
 
-                          // 笔记内容
-                          SelectableText(currentNote.content),
+                          // 使用QuillEditor以只读模式显示富文本内容
+                          Container(
+                            constraints: const BoxConstraints(
+                              maxHeight: 300,
+                              minHeight: 100,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: QuillEditor.basic(
+                              controller: quillController,
+                              config: const QuillEditorConfig(
+                                padding: EdgeInsets.all(8),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -141,7 +199,7 @@ class NoteDetailDialog {
                                   label: const Text('编辑'),
                                   onPressed: () {
                                     Navigator.of(context).pop();
-                                    NoteEditDialog.show(
+                                    NoteEditPage.navigate(
                                       context,
                                       currentNote,
                                       ref,

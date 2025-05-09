@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
 import 'pages/my_meetings_page.dart';
@@ -60,6 +62,17 @@ class MyApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
+      // 添加本地化委托，包括flutter_quill所需的
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'), // 中文
+        Locale('en', 'US'), // 英文
+      ],
       home: const SplashScreen(),
       routes: {
         AppConstants.loginRoute: (context) => const LoginPage(),

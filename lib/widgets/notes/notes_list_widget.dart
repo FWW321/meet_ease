@@ -3,7 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../providers/meeting_process_providers.dart';
 import '../../providers/user_providers.dart';
 import 'note_card_widget.dart';
-import 'note_add_dialog.dart';
+import 'note_edit_page.dart';
 import 'empty_notes_widget.dart';
 import 'notes_filter_widget.dart';
 
@@ -101,7 +101,11 @@ class _NotesListWidgetState extends ConsumerState<NotesListWidget> {
             bottom: 16,
             child: FloatingActionButton(
               onPressed:
-                  () => NoteAddDialog.show(context, ref, widget.meetingId),
+                  () => NoteEditPage.navigateToCreate(
+                    context,
+                    widget.meetingId,
+                    ref,
+                  ),
               tooltip: '添加笔记',
               elevation: 4,
               child: const Icon(Icons.add),

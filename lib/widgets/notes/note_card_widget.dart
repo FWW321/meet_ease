@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'package:flutter_quill/flutter_quill.dart';
 import '../../models/meeting_note.dart';
 import '../../providers/user_providers.dart';
 import 'note_detail_dialog.dart';
@@ -17,6 +19,26 @@ class NoteCardWidget extends ConsumerWidget {
     super.key,
   });
 
+  /// 从笔记内容中提取纯文本预览
+  String _getContentPreview(String content) {
+    try {
+      // 尝试解析JSON格式富文本
+      final dynamic jsonData = jsonDecode(content);
+
+      if (jsonData is List) {
+        // 创建临时Document对象提取纯文本
+        final document = Document.fromJson(jsonData);
+        return document.toPlainText().trim();
+      }
+
+      // 如果不是有效的Delta JSON，直接返回原始内容
+      return content;
+    } catch (e) {
+      // 解析失败，返回原始内容
+      return content;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
@@ -24,6 +46,9 @@ class NoteCardWidget extends ConsumerWidget {
         note.updatedAt != null
             ? dateFormat.format(note.updatedAt!)
             : dateFormat.format(note.createdAt);
+
+    // 提取笔记内容的纯文本预览
+    final contentPreview = _getContentPreview(note.content);
 
     // 检查笔记创建者是否为当前用户
     final currentUserIdAsync = ref.watch(currentUserIdProvider);
@@ -51,7 +76,7 @@ class NoteCardWidget extends ConsumerWidget {
 
               // 笔记内容预览
               Text(
-                note.content,
+                contentPreview,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium,

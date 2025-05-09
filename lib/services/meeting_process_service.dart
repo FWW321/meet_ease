@@ -1051,7 +1051,59 @@ class ApiMeetingProcessService implements MeetingProcessService {
 
   @override
   Future<MeetingNote> updateMeetingNote(MeetingNote note) async {
-    throw UnimplementedError('API服务尚未实现');
+    try {
+      // 创建HTTP客户端
+      final client = http.Client();
+
+      // 获取必要的参数
+      final noteId = note.id;
+      final content = note.content;
+      final noteName = note.noteName ?? '';
+      final isPublic = note.isShared ? '1' : '0';
+
+      // 构建API请求URL，添加查询参数
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/notes/$noteId',
+      ).replace(
+        queryParameters: {
+          'userId': note.creatorId,
+          'noteName': noteName,
+          'content': content,
+          'isPublic': isPublic,
+        },
+      );
+
+      // 添加调试信息
+      print('更新笔记请求URL: $uri');
+
+      // 发送PUT请求
+      final response = await client.put(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      // 处理响应
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 添加调试日志
+        print('更新笔记响应: $responseData');
+
+        // 检查响应码
+        if (responseData['code'] == 200) {
+          // 更新成功，返回更新后的笔记对象
+          return note.copyWith(updatedAt: DateTime.now());
+        } else {
+          final message = responseData['message'] ?? '更新笔记失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception('更新笔记请求失败: HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('更新笔记出错: $e');
+      throw Exception('更新笔记时出错: $e');
+    }
   }
 
   @override
