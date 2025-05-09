@@ -7,6 +7,7 @@ import '../../models/meeting_note.dart';
 import '../../providers/meeting_process_providers.dart';
 import '../../providers/user_providers.dart';
 import 'note_edit_page.dart';
+import 'note_view_page.dart';
 
 /// 笔记详情对话框
 class NoteDetailDialog {
@@ -164,6 +165,19 @@ class NoteDetailDialog {
                           return Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
+                              // 全屏查看按钮
+                              TextButton.icon(
+                                icon: const Icon(Icons.fullscreen),
+                                label: const Text('全屏查看'),
+                                onPressed: () {
+                                  Navigator.of(context).pop();
+                                  NoteViewPage.navigate(
+                                    context,
+                                    currentNote,
+                                    meetingId,
+                                  );
+                                },
+                              ),
                               if (isCreator) ...[
                                 // 分享按钮
                                 TextButton.icon(

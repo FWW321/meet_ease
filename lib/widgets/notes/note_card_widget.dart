@@ -7,6 +7,7 @@ import '../../models/meeting_note.dart';
 import '../../providers/user_providers.dart';
 import 'note_detail_dialog.dart';
 import 'note_actions.dart';
+import 'note_view_page.dart';
 
 /// 笔记卡片组件
 class NoteCardWidget extends ConsumerWidget {
@@ -56,7 +57,8 @@ class NoteCardWidget extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        onTap: () => NoteDetailDialog.show(context, note, ref, meetingId),
+        onTap: () => NoteViewPage.navigate(context, note, meetingId),
+        onLongPress: () => NoteDetailDialog.show(context, note, ref, meetingId),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
