@@ -10,7 +10,6 @@ import '../../services/service_providers.dart';
 import 'chat_message_list.dart';
 import 'chat_input_bar.dart';
 import 'chat_emoji_picker.dart';
-import 'recording_indicator.dart';
 
 /// 优化的聊天组件，作为会议中的主要内容
 class ChatWidget extends HookConsumerWidget {
@@ -122,15 +121,6 @@ class ChatWidget extends HookConsumerWidget {
     // 是否显示日期分隔
     final showDateSeparator = useState(true);
 
-    // 是否在录音
-    final isRecording = useState(false);
-
-    // 录音时长（模拟）
-    final recordDuration = useState(0);
-
-    // 计时器
-    final recordTimer = useState<Timer?>(null);
-
     // 文本控制器
     final textController = useTextEditingController();
 
@@ -216,7 +206,7 @@ class ChatWidget extends HookConsumerWidget {
 
     // 确保输入框在初始化后正确显示光标，移除不必要的延迟
     useEffect(() {
-      if (!isReadOnly && !isRecording.value && context.mounted) {
+      if (!isReadOnly && context.mounted) {
         // 使用microtask确保在UI渲染后执行，避免与其他操作冲突
         WidgetsBinding.instance.addPostFrameCallback((_) {
           focusNode.requestFocus();
@@ -280,72 +270,6 @@ class ChatWidget extends HookConsumerWidget {
       }
     }
 
-    // 停止录音并发送语音消息
-    Future<void> stopRecording() async {
-      if (!isRecording.value) return;
-
-      isRecording.value = false;
-      recordTimer.value?.cancel();
-      recordTimer.value = null;
-
-      // 如果录音时长过短，不发送
-      if (recordDuration.value < 1) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('录音时间过短')));
-        }
-        return;
-      }
-
-      try {
-        await ref.read(
-          sendVoiceMessageProvider({
-            'meetingId': meetingId,
-            'senderId': userId,
-            'senderName': userName,
-            'voiceUrl': 'https://example.com/voice/message_mock.mp3',
-            'voiceDuration': Duration(seconds: recordDuration.value),
-            'senderAvatar': userAvatar,
-          }).future,
-        );
-
-        // 滚动到底部
-        scrollToBottom();
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('发送语音消息失败: ${e.toString()}')));
-        }
-      }
-    }
-
-    // 开始录音（模拟）
-    void startRecording() {
-      isRecording.value = true;
-      recordDuration.value = 0;
-
-      // 开始计时
-      recordTimer.value = Timer.periodic(const Duration(seconds: 1), (_) {
-        recordDuration.value += 1;
-
-        // 最大录音时长限制（60秒）
-        if (recordDuration.value >= 60) {
-          stopRecording();
-        }
-      });
-    }
-
-    // 取消录音
-    void cancelRecording() {
-      if (!isRecording.value) return;
-
-      isRecording.value = false;
-      recordTimer.value?.cancel();
-      recordTimer.value = null;
-    }
-
     // 标记消息为已读
     void markMessageAsRead(String messageId) {
       ref.read(
@@ -384,15 +308,6 @@ class ChatWidget extends HookConsumerWidget {
       }
     }
 
-    // 录音按钮点击处理
-    void handleVoiceButtonClick() {
-      if (isRecording.value) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
-    }
-
     return Column(
       children: [
         // 消息列表
@@ -403,11 +318,12 @@ class ChatWidget extends HookConsumerWidget {
                 // 合并历史消息和WebSocket实时消息
                 final combinedMessages = [...messages, ...localMessages.value];
 
-                // 只过滤掉头像会显示为"?"的消息（头像为null且发送者名称为空）
+                // 过滤掉系统消息以及头像会显示为"?"的消息
                 final filteredMessages =
                     combinedMessages
                         .where(
                           (message) =>
+                              !message.isSystemMessage && // 过滤系统消息
                               !(message.senderAvatar == null &&
                                   message.senderName.isEmpty),
                         )
@@ -488,22 +404,12 @@ class ChatWidget extends HookConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 录音状态指示器 - 使用拆分出的组件
-              if (isRecording.value)
-                RecordingIndicator(
-                  recordDuration: recordDuration.value,
-                  onCancel: cancelRecording,
-                  onSend: stopRecording,
-                ),
-
               // 输入框 - 使用拆分出的组件
               if (!isReadOnly)
                 ChatInputBar(
                   textController: textController,
                   focusNode: focusNode,
-                  isRecording: isRecording.value,
                   onEmojiButtonClick: handleEmojiButtonClick,
-                  onVoiceButtonClick: handleVoiceButtonClick,
                   onSendMessage: sendTextMessage,
                   showEmojiPicker: showEmojiPicker.value,
                 ),

@@ -9,14 +9,8 @@ class ChatInputBar extends HookWidget {
   /// 聚焦节点
   final FocusNode focusNode;
 
-  /// 是否在录音
-  final bool isRecording;
-
   /// 表情按钮点击回调
   final VoidCallback onEmojiButtonClick;
-
-  /// 录音按钮点击回调
-  final VoidCallback onVoiceButtonClick;
 
   /// 发送消息回调
   final VoidCallback onSendMessage;
@@ -27,9 +21,7 @@ class ChatInputBar extends HookWidget {
   const ChatInputBar({
     required this.textController,
     required this.focusNode,
-    required this.isRecording,
     required this.onEmojiButtonClick,
-    required this.onVoiceButtonClick,
     required this.onSendMessage,
     required this.showEmojiPicker,
     super.key,
@@ -70,21 +62,12 @@ class ChatInputBar extends HookWidget {
                 ),
               ),
 
-              // 语音/文本输入切换按钮
-              IconButton(
-                icon: const Icon(Icons.mic),
-                onPressed: onVoiceButtonClick,
-                color: isRecording ? Colors.red : null,
-                tooltip: isRecording ? '停止录音' : '开始录音',
-              ),
-
               // 文本输入框 - 使用RepaintBoundary包装，防止输入时的重绘扩散
               Expanded(
                 child: RepaintBoundary(
                   child: TextField(
                     controller: textController,
                     focusNode: focusNode,
-                    enabled: !isRecording,
                     // 减少输入时重建开销
                     buildCounter:
                         (
@@ -95,7 +78,7 @@ class ChatInputBar extends HookWidget {
                         }) => null,
                     scrollPhysics: const ClampingScrollPhysics(),
                     decoration: InputDecoration(
-                      hintText: isRecording ? '正在录音...' : '输入消息...',
+                      hintText: '输入消息...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -121,7 +104,7 @@ class ChatInputBar extends HookWidget {
                               onEmojiButtonClick();
                             }
                             : null,
-                    onSubmitted: isRecording ? null : (_) => onSendMessage(),
+                    onSubmitted: (_) => onSendMessage(),
                     // 使用防抖动处理文本变化
                     onChanged: (_) {
                       // 空实现但确保不会触发额外的状态更新
@@ -135,7 +118,7 @@ class ChatInputBar extends HookWidget {
               IconButton(
                 icon: const Icon(Icons.send),
                 color: Colors.blue,
-                onPressed: isRecording ? null : onSendMessage,
+                onPressed: onSendMessage,
                 tooltip: '发送',
               ),
             ],

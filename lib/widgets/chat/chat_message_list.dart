@@ -3,7 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../models/chat_message.dart';
 import 'chat_message_bubble.dart';
 import 'chat_date_separator.dart';
-import 'chat_system_message.dart';
 
 /// 聊天消息列表组件
 class ChatMessageList extends ConsumerWidget {
@@ -84,20 +83,6 @@ class ChatMessageList extends ConsumerWidget {
 
               // 是否为当前用户发送的消息
               final isSentByMe = message.senderId == currentUserId;
-
-              // 系统消息特殊处理
-              if (message.isSystemMessage) {
-                return Column(
-                  children: [
-                    if (showDate)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0, bottom: 16.0),
-                        child: ChatDateSeparator(timestamp: message.timestamp),
-                      ),
-                    ChatSystemMessage(message: message),
-                  ],
-                );
-              }
 
               return Column(
                 children: [
