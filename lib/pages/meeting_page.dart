@@ -162,7 +162,7 @@ class MeetingPage extends HookConsumerWidget {
                     ),
                     _buildTabButton(
                       context: context,
-                      title: '我的',
+                      title: '私人',
                       isSelected: showMyPrivate,
                       onTap: () {
                         selectedTabIndex.value = 1;
