@@ -23,107 +23,120 @@ class NotesListWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notesAsync = ref.watch(meetingNotesNotifierProvider(meetingId));
 
-    return notesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error:
-          (error, stackTrace) => Center(
-            child: SelectableText.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(
-                    text: '获取会议笔记失败\n',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
+    return Stack(
+      children: [
+        notesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error:
+              (error, stackTrace) => Center(
+                child: SelectableText.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: '获取会议笔记失败\n',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                      TextSpan(text: error.toString()),
+                    ],
                   ),
-                  TextSpan(text: error.toString()),
-                ],
+                ),
               ),
-            ),
-          ),
-      data: (notes) {
-        if (notes.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          data: (notes) {
+            if (notes.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.note_alt_outlined,
+                      size: 64,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '暂无会议笔记',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
               children: [
-                const Text('暂无会议笔记'),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _showAddNoteDialog(context, ref),
-                  icon: const Icon(Icons.add),
-                  label: const Text('添加笔记'),
+                // 笔记过滤选项
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text('全部'),
+                        selected: true,
+                        onSelected: (selected) {
+                          // TODO: 实现过滤功能
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('我的笔记'),
+                        selected: false,
+                        onSelected: (selected) {
+                          // TODO: 实现过滤功能
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text('已共享'),
+                        selected: false,
+                        onSelected: (selected) {
+                          // TODO: 实现过滤功能
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 笔记列表
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return _buildNoteCard(context, note, ref);
+                    },
+                  ),
                 ),
               ],
-            ),
-          );
-        }
+            );
+          },
+        ),
 
-        return Column(
-          children: [
-            // 标题和按钮
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('会议笔记', style: Theme.of(context).textTheme.titleLarge),
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddNoteDialog(context, ref),
-                    icon: const Icon(Icons.add),
-                    label: const Text('添加笔记'),
-                  ),
-                ],
-              ),
+        // 右下角悬浮添加按钮
+        if (!isReadOnly)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              onPressed: () => _showAddNoteDialog(context, ref),
+              tooltip: '添加笔记',
+              elevation: 4,
+              child: const Icon(Icons.add),
             ),
-
-            // 笔记过滤选项
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  ChoiceChip(
-                    label: const Text('全部'),
-                    selected: true,
-                    onSelected: (selected) {
-                      // TODO: 实现过滤功能
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('我的笔记'),
-                    selected: false,
-                    onSelected: (selected) {
-                      // TODO: 实现过滤功能
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('已共享'),
-                    selected: false,
-                    onSelected: (selected) {
-                      // TODO: 实现过滤功能
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // 笔记列表
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: notes.length,
-                itemBuilder: (context, index) {
-                  final note = notes[index];
-                  return _buildNoteCard(context, note, ref);
-                },
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+      ],
     );
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import '../../models/meeting_material.dart';
 import '../../providers/meeting_process_providers.dart';
 import 'materials_list_item.dart';
 import 'add_material_dialog.dart';
@@ -22,80 +21,83 @@ class MaterialsListWidget extends ConsumerWidget {
       meetingMaterialsNotifierProvider(meetingId),
     );
 
-    return materialsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error:
-          (error, stackTrace) => Center(
-            child: SelectableText.rich(
-              TextSpan(
-                children: [
-                  const TextSpan(
-                    text: '获取会议资料失败\n',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
-                    ),
+    return Stack(
+      children: [
+        materialsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error:
+              (error, stackTrace) => Center(
+                child: SelectableText.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: '获取会议资料失败\n',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                      TextSpan(text: error.toString()),
+                    ],
                   ),
-                  TextSpan(text: error.toString()),
-                ],
+                ),
               ),
+          data: (materials) {
+            if (materials.items.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.folder_outlined,
+                      size: 64,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.4),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '暂无会议资料',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: materials.items.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final material = materials.items[index];
+                return MaterialsListItem(
+                  material: material,
+                  meetingId: meetingId,
+                  isReadOnly: isReadOnly,
+                );
+              },
+            );
+          },
+        ),
+
+        // 右下角悬浮添加按钮
+        if (!isReadOnly)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              onPressed: () => _showAddMaterialDialog(context, ref),
+              tooltip: '添加资料',
+              elevation: 4,
+              child: const Icon(Icons.add),
             ),
           ),
-      data: (materials) {
-        if (materials.items.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('暂无会议资料'),
-                const SizedBox(height: 16),
-                if (!isReadOnly)
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddMaterialDialog(context, ref),
-                    icon: const Icon(Icons.add),
-                    label: const Text('添加资料'),
-                  ),
-              ],
-            ),
-          );
-        }
-
-        return Column(
-          children: [
-            // 标题和按钮
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('会议资料', style: Theme.of(context).textTheme.titleLarge),
-                  if (!isReadOnly)
-                    ElevatedButton.icon(
-                      onPressed: () => _showAddMaterialDialog(context, ref),
-                      icon: const Icon(Icons.add),
-                      label: const Text('添加资料'),
-                    ),
-                ],
-              ),
-            ),
-
-            // 资料列表
-            Expanded(
-              child: ListView.builder(
-                itemCount: materials.items.length,
-                itemBuilder: (context, index) {
-                  final material = materials.items[index];
-                  return MaterialsListItem(
-                    material: material,
-                    meetingId: meetingId,
-                    isReadOnly: isReadOnly,
-                  );
-                },
-              ),
-            ),
-          ],
-        );
-      },
+      ],
     );
   }
 
