@@ -14,7 +14,8 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -23,11 +24,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   bool _isLoading = false;
   bool _isTestingConnection = false;
   bool _isEditingServer = false;
+  bool _obscurePassword = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _serverAddressController.text = AppConstants.apiDomain;
+
+    // 添加动画控制器
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _animationController.forward();
   }
 
   @override
@@ -35,6 +51,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     _usernameController.dispose();
     _passwordController.dispose();
     _serverAddressController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -158,143 +175,298 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     });
   }
 
+  void _togglePasswordVisibility() {
+    setState(() {
+      _obscurePassword = !_obscurePassword;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('登录')),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: '用户名',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return '请输入用户名';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: '密码',
-                      prefixIcon: Icon(Icons.lock),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return '请输入密码';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child:
-                        _isLoading
-                            ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                            : const Text('登录', style: TextStyle(fontSize: 16)),
-                  ),
+    final size = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
 
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const RegisterPage()),
-                      );
-                    },
-                    child: const Text('没有账号？点击注册'),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              theme.colorScheme.primary.withOpacity(0.8),
+              theme.colorScheme.secondary.withOpacity(0.7),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _isEditingServer
-                          ? SizedBox(
-                            width: 200,
-                            height: 40,
-                            child: TextField(
-                              controller: _serverAddressController,
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
+                      // Logo或应用名称
+                      const Icon(
+                        Icons.event_note_rounded,
+                        size: 70,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Meet Ease',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '便捷高效的会议管理系统',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      // 登录表单卡片
+                      Card(
+                        elevation: 8,
+                        shadowColor: Colors.black26,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  '欢迎登录',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                border: OutlineInputBorder(),
-                                isDense: true,
-                                hintText: '输入服务器地址',
-                              ),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          )
-                          : Text(
-                            '服务器地址: ${AppConstants.apiDomain}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                      const SizedBox(width: 8),
-                      _isTestingConnection
-                          ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : Row(
-                            children: [
-                              InkWell(
-                                onTap:
-                                    _isEditingServer
-                                        ? _testServerConnection
-                                        : _toggleEditServerMode,
-                                child: Icon(
-                                  _isEditingServer ? Icons.save : Icons.edit,
-                                  size: 14,
-                                  color: Colors.blue,
+                                const SizedBox(height: 24),
+                                // 用户名输入框
+                                TextFormField(
+                                  controller: _usernameController,
+                                  decoration: InputDecoration(
+                                    labelText: '用户名',
+                                    hintText: '请输入您的用户名',
+                                    prefixIcon: const Icon(
+                                      Icons.person_outline,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    floatingLabelBehavior:
+                                        FloatingLabelBehavior.auto,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty)
+                                      return '请输入用户名';
+                                    return null;
+                                  },
                                 ),
-                              ),
-                              if (!_isEditingServer) ...[
-                                const SizedBox(width: 8),
-                                InkWell(
-                                  onTap: _testServerConnection,
-                                  child: const Icon(
-                                    Icons.sync,
-                                    size: 14,
-                                    color: Colors.blue,
+                                const SizedBox(height: 20),
+                                // 密码输入框
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  decoration: InputDecoration(
+                                    labelText: '密码',
+                                    hintText: '请输入您的密码',
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                      ),
+                                      onPressed: _togglePasswordVisibility,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    floatingLabelBehavior:
+                                        FloatingLabelBehavior.auto,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 16,
+                                    ),
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty)
+                                      return '请输入密码';
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 32),
+                                // 登录按钮
+                                ElevatedButton(
+                                  onPressed: _isLoading ? null : _handleLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: theme.colorScheme.primary,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child:
+                                      _isLoading
+                                          ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                          : const Text(
+                                            '登录',
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                ),
+                                const SizedBox(height: 16),
+                                // 注册链接
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const RegisterPage(),
+                                      ),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: theme.colorScheme.primary,
+                                  ),
+                                  child: const Text(
+                                    '没有账号？点击注册',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ),
                               ],
-                            ],
+                            ),
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // 服务器设置
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isEditingServer = !_isEditingServer;
+                                });
+                              },
+                              child: const Icon(
+                                Icons.settings,
+                                size: 18,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            if (_isEditingServer) ...[
+                              const SizedBox(width: 8),
+                              _isEditingServer
+                                  ? SizedBox(
+                                    width: 180,
+                                    child: TextField(
+                                      controller: _serverAddressController,
+                                      decoration: const InputDecoration(
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
+                                        ),
+                                        border: InputBorder.none,
+                                        isDense: true,
+                                        hintText: '输入服务器地址',
+                                        hintStyle: TextStyle(
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                  : Text(
+                                    '服务器: ${AppConstants.apiDomain}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white.withOpacity(0.9),
+                                    ),
+                                  ),
+                              const SizedBox(width: 8),
+                              _isTestingConnection
+                                  ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                  : Row(
+                                    children: [
+                                      InkWell(
+                                        onTap: _testServerConnection,
+                                        child: const Icon(
+                                          Icons.save,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      InkWell(
+                                        onTap: _toggleEditServerMode,
+                                        child: const Icon(
+                                          Icons.cancel,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
