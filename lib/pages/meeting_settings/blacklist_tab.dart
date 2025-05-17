@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
 import '../../models/meeting.dart';
 import '../../providers/meeting_providers.dart';
+import '../../providers/user_providers.dart';
 import '../../widgets/user_selection_dialog.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/http_utils.dart';
+import '../../providers/chat_providers.dart';
+import '../../models/chat_message.dart';
+import '../../services/service_providers.dart';
 import 'user_tile.dart';
 
 /// 为当前页面创建黑名单列表提供者
@@ -326,10 +332,47 @@ class BlacklistTab extends HookConsumerWidget {
     WidgetRef ref,
     String userId,
   ) async {
-    // 添加到黑名单
-    final meetingService = ref.read(meetingServiceProvider);
+    // 获取用户信息
     try {
+      // 从用户信息API获取用户名称
+      final userName = await ref.read(userNameProvider(userId).future);
+
+      // 添加到黑名单
+      final meetingService = ref.read(meetingServiceProvider);
       await meetingService.addUserToBlacklist(meeting.id, userId);
+
+      // 发送系统消息
+      final systemMessage = "userId:$userId, username:$userName, action:禁止加入";
+      print('准备发送黑名单系统消息: $systemMessage');
+
+      // 使用API直接发送系统消息
+      try {
+        final requestBody = jsonEncode({
+          'meetingId': meeting.id,
+          'content': systemMessage,
+        });
+
+        final response = await http
+            .post(
+              Uri.parse('${AppConstants.apiBaseUrl}/system-message/send'),
+              headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json; charset=utf-8',
+              },
+              body: requestBody,
+            )
+            .timeout(Duration(milliseconds: 10000)); // 10秒超时
+
+        if (response.statusCode != 200) {
+          final responseBody = utf8.decode(response.bodyBytes);
+          print('发送黑名单系统消息失败: ${response.statusCode}, $responseBody');
+        } else {
+          print('黑名单系统消息发送成功');
+        }
+      } catch (e) {
+        print('发送黑名单系统消息异常: $e');
+        // 消息发送失败不阻止主流程
+      }
 
       // 刷新会议详情和黑名单列表
       ref.invalidate(meetingDetailProvider(meeting.id));
@@ -344,6 +387,7 @@ class BlacklistTab extends HookConsumerWidget {
         );
       }
     } catch (error) {
+      print('添加黑名单或发送系统消息失败: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

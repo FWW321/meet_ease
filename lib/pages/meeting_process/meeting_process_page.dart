@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../models/meeting.dart';
+import '../../models/chat_message.dart';
 import '../../providers/meeting_providers.dart';
 import '../../providers/user_providers.dart';
 import '../../providers/chat_providers.dart';
@@ -35,6 +36,98 @@ class MeetingProcessPage extends HookConsumerWidget {
 
     // 使用useState保存当前用户ID，避免重复请求
     final currentUserId = useState<String>('');
+
+    // 消息流订阅
+    final messageSubscription = useState<dynamic>(null);
+
+    // 处理系统消息
+    void handleSystemMessage(ChatMessage message) {
+      // 检查是否是系统消息
+      if (message.isSystemMessage) {
+        // 使用消息类型判断，而不是通过senderId和senderName
+        print('收到系统消息: ${message.content}');
+
+        // 检查是否是黑名单消息
+        if (message.content.contains("action:禁止加入")) {
+          // 解析消息内容
+          final msgContent = message.content;
+          String? msgUserId;
+
+          // 从消息中提取用户ID - 更新正则表达式，匹配任何字符而不仅是数字
+          final userIdMatch = RegExp(r'userId:([^,]+)').firstMatch(msgContent);
+          if (userIdMatch != null && userIdMatch.groupCount >= 1) {
+            msgUserId = userIdMatch.group(1);
+          }
+
+          print(
+            '收到黑名单系统消息，被禁止加入的用户ID：$msgUserId，当前用户ID：${currentUserId.value}',
+          );
+
+          // 如果当前用户是被拉黑的用户，强制退出
+          if (msgUserId != null &&
+              msgUserId == currentUserId.value &&
+              context.mounted) {
+            print('当前用户被加入黑名单，强制退出会议');
+            // 显示提示并退出
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('您已被管理员移出会议'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+
+            // 延迟一点时间后退出，以便用户能看到提示
+            Future.delayed(const Duration(seconds: 1), () {
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // 使用useEffect建立消息流监听
+    useEffect(() {
+      // 当用户ID可用时建立监听
+      currentUserIdAsync.whenData((userId) {
+        currentUserId.value = userId;
+
+        if (userId.isNotEmpty) {
+          // 获取聊天服务
+          final chatService = ref.read(chatServiceProvider);
+
+          // 订阅消息流
+          final subscription = chatService.getMessageStream(meetingId).listen((
+            message,
+          ) {
+            // 处理接收到的消息
+            handleSystemMessage(message);
+          });
+
+          // 保存订阅以便在组件卸载时取消
+          messageSubscription.value = subscription;
+        }
+      });
+
+      // 清理函数
+      return () {
+        // 取消消息流订阅
+        if (messageSubscription.value != null) {
+          messageSubscription.value.cancel();
+          messageSubscription.value = null;
+
+          // 关闭消息流
+          try {
+            final chatService = ref.read(chatServiceProvider);
+            chatService.closeMessageStream();
+          } catch (e) {
+            print('关闭消息流时出错: $e');
+          }
+        }
+      };
+    }, [currentUserIdAsync]);
 
     // 提前预加载聊天消息，避免点击聊天标签时出现加载延迟
     useEffect(() {
