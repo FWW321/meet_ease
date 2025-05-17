@@ -475,3 +475,75 @@ Future<List<Meeting>> myPrivateMeetings(MyPrivateMeetingsRef ref) async {
     return [];
   }
 }
+
+/// 获取会议黑名单列表
+@riverpod
+Future<List<dynamic>> blacklistMembers(Ref ref, String meetingId) async {
+  try {
+    final response = await http.get(
+      Uri.parse('${AppConstants.apiBaseUrl}/blacklist/list/$meetingId'),
+      headers: HttpUtils.createHeaders(),
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = HttpUtils.decodeResponse(response);
+
+      if (responseData['code'] == 200 && responseData['data'] != null) {
+        return responseData['data'] as List<dynamic>;
+      } else {
+        throw Exception(responseData['message'] ?? '获取黑名单列表失败');
+      }
+    } else {
+      throw Exception(
+        HttpUtils.extractErrorMessage(response, defaultMessage: '获取黑名单列表请求失败'),
+      );
+    }
+  } catch (e) {
+    throw Exception('获取黑名单列表时出错: $e');
+  }
+}
+
+/// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
+@riverpod
+Future<bool> isUserInBlacklist(
+  IsUserInBlacklistRef ref,
+  String meetingId,
+  String userId,
+) async {
+  // autoDispose注解会自动添加（由riverpod_generator生成）
+  // 确保每次使用都会重新请求
+
+  // 额外添加一个时间戳依赖，以确保每次都是新请求
+  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  ref.keepAlive(); // 主动保持这个provider直到请求完成
+
+  try {
+    final uri = Uri.parse('${AppConstants.apiBaseUrl}/blacklist/check').replace(
+      queryParameters: {
+        'meetingId': meetingId,
+        'userId': userId,
+        '_t': timestamp.toString(), // 添加时间戳防止缓存
+      },
+    );
+
+    final response = await http.get(uri, headers: HttpUtils.createHeaders());
+
+    if (response.statusCode == 200) {
+      final responseData = HttpUtils.decodeResponse(response);
+
+      if (responseData['code'] == 200) {
+        print('获取到最新黑名单状态[$timestamp]: ${responseData['data']}');
+        return responseData['data'] as bool;
+      } else {
+        throw Exception(responseData['message'] ?? '检查黑名单状态失败');
+      }
+    } else {
+      throw Exception(
+        HttpUtils.extractErrorMessage(response, defaultMessage: '检查黑名单状态请求失败'),
+      );
+    }
+  } catch (e) {
+    print('检查黑名单状态时出错: $e');
+    throw Exception('检查黑名单状态时出错: $e');
+  }
+}

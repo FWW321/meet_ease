@@ -11,6 +11,9 @@ import '../meeting_process/meeting_process_page.dart';
 import '../meeting_settings_page.dart';
 import 'meeting_detail_ui_components.dart';
 import 'meeting_detail_dialogs.dart';
+import 'package:http/http.dart' as http;
+import '../../constants/app_constants.dart';
+import '../../utils/http_utils.dart';
 
 class MeetingDetailPage extends ConsumerStatefulWidget {
   final String meetingId;
@@ -35,7 +38,25 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
     if (mounted) {
       setState(() {
         currentUserId = userId;
+
+        // 强制刷新黑名单状态
+        if (userId.isNotEmpty) {
+          // 使用invalidate强制重新获取黑名单状态
+          ref.invalidate(isUserInBlacklistProvider(widget.meetingId, userId));
+        }
       });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // 每次页面依赖变化时也刷新黑名单状态
+    if (currentUserId != null && currentUserId!.isNotEmpty) {
+      ref.invalidate(
+        isUserInBlacklistProvider(widget.meetingId, currentUserId!),
+      );
     }
   }
 
@@ -43,6 +64,12 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   Widget build(BuildContext context) {
     final meetingAsync = ref.watch(meetingDetailProvider(widget.meetingId));
     final theme = Theme.of(context);
+
+    // 当用户ID存在时，每次打开页面时都强制刷新黑名单状态
+    if (currentUserId != null) {
+      // 取消这里的预加载，以避免使用可能过时的缓存
+      // 我们已经在initState和didChangeDependencies中处理刷新
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -160,37 +187,92 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   Widget _buildMeetingDetailContent(BuildContext context, Meeting meeting) {
     final theme = Theme.of(context);
 
-    // 检查用户是否被拉黑
-    if (currentUserId != null && meeting.blacklist.contains(currentUserId)) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.block, size: 64, color: Colors.red),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              '您无法加入此会议',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '您没有权限访问此会议内容',
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
-            ),
-          ],
-        ),
-      );
+    // 检查当前用户是否登录
+    if (currentUserId == null) {
+      // 未登录用户直接显示会议详情
+      return _buildMeetingDetailUI(context, meeting, theme);
     }
 
+    // 监听黑名单状态，但避免重复刷新
+    return Consumer(
+      builder: (context, ref, child) {
+        // 添加一个刷新key，确保每次构建都重新请求
+        final refreshKey = DateTime.now().millisecondsSinceEpoch;
+
+        // 使用watch而不是read，以便Riverpod能够管理缓存和状态
+        final blacklistStatus = ref.watch(
+          isUserInBlacklistProvider(meeting.id, currentUserId!),
+        );
+
+        print('刷新黑名单状态检查[$refreshKey]');
+
+        return blacklistStatus.when(
+          data: (isInBlacklist) {
+            print('获取到黑名单检查结果[$refreshKey]: $isInBlacklist');
+            if (isInBlacklist) {
+              // 用户在黑名单中，显示被封禁消息
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.block,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      '您无法加入此会议',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '您没有权限访问此会议内容',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // 用户不在黑名单中，显示会议详情
+            return _buildMeetingDetailUI(context, meeting, theme);
+          },
+          loading:
+              () => const Center(
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+          error: (error, stack) {
+            // 发生错误时，继续显示会议详情
+            print('检查黑名单状态失败: $error');
+            return _buildMeetingDetailUI(context, meeting, theme);
+          },
+        );
+      },
+    );
+  }
+
+  // 构建会议详情UI
+  Widget _buildMeetingDetailUI(
+    BuildContext context,
+    Meeting meeting,
+    ThemeData theme,
+  ) {
     // 检查用户是否可以管理会议
     final canManageMeeting =
         currentUserId != null && meeting.canUserManage(currentUserId!);
@@ -657,6 +739,54 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
         ),
       );
       return;
+    }
+
+    // 检查用户是否在黑名单中（直接调用API，完全避免缓存）
+    if (currentUserId != null) {
+      try {
+        // 生成一个时间戳作为请求标识
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+        // 创建一个直接的HTTP请求而不使用provider缓存
+        final uri = Uri.parse(
+          '${AppConstants.apiBaseUrl}/blacklist/check',
+        ).replace(
+          queryParameters: {
+            'meetingId': meeting.id,
+            'userId': currentUserId!,
+            '_t': timestamp.toString(), // 添加时间戳防止缓存
+          },
+        );
+
+        final response = await http.get(
+          uri,
+          headers: HttpUtils.createHeaders(),
+        );
+
+        if (response.statusCode == 200) {
+          final responseData = HttpUtils.decodeResponse(response);
+
+          if (responseData['code'] == 200) {
+            final isInBlacklist = responseData['data'] as bool;
+            print('进入会议前直接检查黑名单状态[$timestamp]: $isInBlacklist');
+
+            if (isInBlacklist) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('您已被列入黑名单，无法进入此会议'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // 检查失败时记录错误，但允许用户继续
+        print('直接检查黑名单状态失败: $e');
+      }
     }
 
     print('准备进入会议 - ID: ${meeting.id}, 标题: ${meeting.title}');

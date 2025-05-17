@@ -1199,14 +1199,107 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<void> addUserToBlacklist(String meetingId, String userId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 获取当前用户ID作为操作者ID
+      String operatorId = '';
+      if (_ref != null) {
+        operatorId = await _ref.read(currentUserIdProvider.future);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = prefs.getString(AppConstants.userKey);
+        if (userJson != null) {
+          final userData = jsonDecode(userJson);
+          operatorId = userData['id']?.toString() ?? '';
+        }
+      }
+
+      if (operatorId.isEmpty) {
+        throw Exception('无法获取操作者ID');
+      }
+
+      // 构建请求体
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'userId': userId,
+        'duration': -1, // 固定值
+        'operatorId': operatorId,
+      });
+
+      // 发送POST请求
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/blacklist/add'),
+        headers: HttpUtils.createHeaders(),
+        body: requestBody,
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        if (responseData['code'] == 200) {
+          print('添加黑名单成功: ${responseData['data']}');
+        } else {
+          throw Exception(responseData['message'] ?? '添加黑名单失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '添加黑名单请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('添加黑名单时出错: $e');
+    }
   }
 
   @override
   Future<void> removeUserFromBlacklist(String meetingId, String userId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 获取当前用户ID作为操作者ID
+      String operatorId = '';
+      if (_ref != null) {
+        operatorId = await _ref.read(currentUserIdProvider.future);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = prefs.getString(AppConstants.userKey);
+        if (userJson != null) {
+          final userData = jsonDecode(userJson);
+          operatorId = userData['id']?.toString() ?? '';
+        }
+      }
+
+      if (operatorId.isEmpty) {
+        throw Exception('无法获取操作者ID');
+      }
+
+      // 构建请求体
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'userId': userId,
+        'operatorId': operatorId,
+      });
+
+      // 发送POST请求
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/blacklist/remove'),
+        headers: HttpUtils.createHeaders(),
+        body: requestBody,
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        if (responseData['code'] == 200) {
+          print('移除黑名单成功: ${responseData['data']}');
+        } else {
+          throw Exception(responseData['message'] ?? '移除黑名单失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '移除黑名单请求失败'),
+        );
+      }
+    } catch (e) {
+      throw Exception('移除黑名单时出错: $e');
+    }
   }
 
   @override

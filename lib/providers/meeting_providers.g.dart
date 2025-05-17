@@ -911,6 +911,286 @@ final myPrivateMeetingsProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MyPrivateMeetingsRef = AutoDisposeFutureProviderRef<List<Meeting>>;
+String _$blacklistMembersHash() => r'b618d5f6789e96d9089601916fde9e36c8593545';
+
+/// 获取会议黑名单列表
+///
+/// Copied from [blacklistMembers].
+@ProviderFor(blacklistMembers)
+const blacklistMembersProvider = BlacklistMembersFamily();
+
+/// 获取会议黑名单列表
+///
+/// Copied from [blacklistMembers].
+class BlacklistMembersFamily extends Family<AsyncValue<List<dynamic>>> {
+  /// 获取会议黑名单列表
+  ///
+  /// Copied from [blacklistMembers].
+  const BlacklistMembersFamily();
+
+  /// 获取会议黑名单列表
+  ///
+  /// Copied from [blacklistMembers].
+  BlacklistMembersProvider call(String meetingId) {
+    return BlacklistMembersProvider(meetingId);
+  }
+
+  @override
+  BlacklistMembersProvider getProviderOverride(
+    covariant BlacklistMembersProvider provider,
+  ) {
+    return call(provider.meetingId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'blacklistMembersProvider';
+}
+
+/// 获取会议黑名单列表
+///
+/// Copied from [blacklistMembers].
+class BlacklistMembersProvider
+    extends AutoDisposeFutureProvider<List<dynamic>> {
+  /// 获取会议黑名单列表
+  ///
+  /// Copied from [blacklistMembers].
+  BlacklistMembersProvider(String meetingId)
+    : this._internal(
+        (ref) => blacklistMembers(ref as BlacklistMembersRef, meetingId),
+        from: blacklistMembersProvider,
+        name: r'blacklistMembersProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$blacklistMembersHash,
+        dependencies: BlacklistMembersFamily._dependencies,
+        allTransitiveDependencies:
+            BlacklistMembersFamily._allTransitiveDependencies,
+        meetingId: meetingId,
+      );
+
+  BlacklistMembersProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.meetingId,
+  }) : super.internal();
+
+  final String meetingId;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<dynamic>> Function(BlacklistMembersRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: BlacklistMembersProvider._internal(
+        (ref) => create(ref as BlacklistMembersRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        meetingId: meetingId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<dynamic>> createElement() {
+    return _BlacklistMembersProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is BlacklistMembersProvider && other.meetingId == meetingId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, meetingId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin BlacklistMembersRef on AutoDisposeFutureProviderRef<List<dynamic>> {
+  /// The parameter `meetingId` of this provider.
+  String get meetingId;
+}
+
+class _BlacklistMembersProviderElement
+    extends AutoDisposeFutureProviderElement<List<dynamic>>
+    with BlacklistMembersRef {
+  _BlacklistMembersProviderElement(super.provider);
+
+  @override
+  String get meetingId => (origin as BlacklistMembersProvider).meetingId;
+}
+
+String _$isUserInBlacklistHash() => r'1a75c0657d511652d1199220c41a14fc41821d13';
+
+/// 检查用户是否在黑名单中
+///
+/// Copied from [isUserInBlacklist].
+@ProviderFor(isUserInBlacklist)
+const isUserInBlacklistProvider = IsUserInBlacklistFamily();
+
+/// 检查用户是否在黑名单中
+///
+/// Copied from [isUserInBlacklist].
+class IsUserInBlacklistFamily extends Family<AsyncValue<bool>> {
+  /// 检查用户是否在黑名单中
+  ///
+  /// Copied from [isUserInBlacklist].
+  const IsUserInBlacklistFamily();
+
+  /// 检查用户是否在黑名单中
+  ///
+  /// Copied from [isUserInBlacklist].
+  IsUserInBlacklistProvider call(String meetingId, String userId) {
+    return IsUserInBlacklistProvider(meetingId, userId);
+  }
+
+  @override
+  IsUserInBlacklistProvider getProviderOverride(
+    covariant IsUserInBlacklistProvider provider,
+  ) {
+    return call(provider.meetingId, provider.userId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'isUserInBlacklistProvider';
+}
+
+/// 检查用户是否在黑名单中
+///
+/// Copied from [isUserInBlacklist].
+class IsUserInBlacklistProvider extends AutoDisposeFutureProvider<bool> {
+  /// 检查用户是否在黑名单中
+  ///
+  /// Copied from [isUserInBlacklist].
+  IsUserInBlacklistProvider(String meetingId, String userId)
+    : this._internal(
+        (ref) =>
+            isUserInBlacklist(ref as IsUserInBlacklistRef, meetingId, userId),
+        from: isUserInBlacklistProvider,
+        name: r'isUserInBlacklistProvider',
+        debugGetCreateSourceHash:
+            const bool.fromEnvironment('dart.vm.product')
+                ? null
+                : _$isUserInBlacklistHash,
+        dependencies: IsUserInBlacklistFamily._dependencies,
+        allTransitiveDependencies:
+            IsUserInBlacklistFamily._allTransitiveDependencies,
+        meetingId: meetingId,
+        userId: userId,
+      );
+
+  IsUserInBlacklistProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.meetingId,
+    required this.userId,
+  }) : super.internal();
+
+  final String meetingId;
+  final String userId;
+
+  @override
+  Override overrideWith(
+    FutureOr<bool> Function(IsUserInBlacklistRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: IsUserInBlacklistProvider._internal(
+        (ref) => create(ref as IsUserInBlacklistRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        meetingId: meetingId,
+        userId: userId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<bool> createElement() {
+    return _IsUserInBlacklistProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is IsUserInBlacklistProvider &&
+        other.meetingId == meetingId &&
+        other.userId == userId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, meetingId.hashCode);
+    hash = _SystemHash.combine(hash, userId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin IsUserInBlacklistRef on AutoDisposeFutureProviderRef<bool> {
+  /// The parameter `meetingId` of this provider.
+  String get meetingId;
+
+  /// The parameter `userId` of this provider.
+  String get userId;
+}
+
+class _IsUserInBlacklistProviderElement
+    extends AutoDisposeFutureProviderElement<bool>
+    with IsUserInBlacklistRef {
+  _IsUserInBlacklistProviderElement(super.provider);
+
+  @override
+  String get meetingId => (origin as IsUserInBlacklistProvider).meetingId;
+  @override
+  String get userId => (origin as IsUserInBlacklistProvider).userId;
+}
+
 String _$createMeetingHash() => r'ad7ce223cd00374078eca4dbfa608e7cf52b7c69';
 
 /// 创建会议提供者
