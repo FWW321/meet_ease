@@ -1,5 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
 import '../models/chat_message.dart';
+import '../constants/app_constants.dart';
 
 /// 聊天服务接口
 abstract class ChatService {
@@ -24,6 +28,9 @@ abstract class ChatService {
     Duration voiceDuration, {
     String? senderAvatar,
   });
+
+  /// 发送系统消息
+  Future<void> sendSystemMessage(String meetingId, String content);
 
   /// 标记消息为已读
   Future<void> markMessageAsRead(String messageId, String userId);
@@ -163,6 +170,40 @@ class MockChatService implements ChatService {
     _messages.add(message);
     _messageController.add(message);
     return message;
+  }
+
+  @override
+  Future<void> sendSystemMessage(String meetingId, String content) async {
+    try {
+      debugPrint('发送系统消息: $content');
+
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'content': content,
+      });
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.apiBaseUrl}/system-message/send'),
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            body: requestBody,
+          )
+          .timeout(Duration(milliseconds: AppConstants.apiTimeout));
+
+      if (response.statusCode != 200) {
+        final responseBody = utf8.decode(response.bodyBytes);
+        debugPrint('发送系统消息失败: ${response.statusCode}, $responseBody');
+        throw Exception('发送系统消息失败: ${response.statusCode}');
+      } else {
+        debugPrint('系统消息发送成功');
+      }
+    } catch (e) {
+      debugPrint('发送系统消息异常: $e');
+      throw Exception('发送系统消息异常: $e');
+    }
   }
 
   @override

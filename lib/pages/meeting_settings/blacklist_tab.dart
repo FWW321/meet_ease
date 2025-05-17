@@ -345,30 +345,11 @@ class BlacklistTab extends HookConsumerWidget {
       final systemMessage = "userId:$userId, username:$userName, action:禁止加入";
       print('准备发送黑名单系统消息: $systemMessage');
 
-      // 使用API直接发送系统消息
+      // 使用ChatService发送系统消息
       try {
-        final requestBody = jsonEncode({
-          'meetingId': meeting.id,
-          'content': systemMessage,
-        });
-
-        final response = await http
-            .post(
-              Uri.parse('${AppConstants.apiBaseUrl}/system-message/send'),
-              headers: {
-                'Content-Type': 'application/json; charset=utf-8',
-                'Accept': 'application/json; charset=utf-8',
-              },
-              body: requestBody,
-            )
-            .timeout(Duration(milliseconds: 10000)); // 10秒超时
-
-        if (response.statusCode != 200) {
-          final responseBody = utf8.decode(response.bodyBytes);
-          print('发送黑名单系统消息失败: ${response.statusCode}, $responseBody');
-        } else {
-          print('黑名单系统消息发送成功');
-        }
+        final chatService = ref.read(chatServiceProvider);
+        await chatService.sendSystemMessage(meeting.id, systemMessage);
+        print('黑名单系统消息发送成功');
       } catch (e) {
         print('发送黑名单系统消息异常: $e');
         // 消息发送失败不阻止主流程

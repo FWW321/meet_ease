@@ -596,29 +596,11 @@ class MockWebRTCService implements WebRTCService {
       final action = enabled ? '开启麦克风' : '关闭麦克风';
       final content = 'userId:$userId, username:$userName, action:$action';
 
-      final requestBody = jsonEncode({
-        'meetingId': _currentMeetingId,
-        'content': content,
-      });
-
-      debugPrint('发送麦克风状态系统消息: $content');
-
-      final response = await http
-          .post(
-            Uri.parse('${AppConstants.apiBaseUrl}/system-message/send'),
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json; charset=utf-8',
-            },
-            body: requestBody,
-          )
-          .timeout(Duration(milliseconds: AppConstants.apiTimeout));
-
-      if (response.statusCode != 200) {
-        final responseBody = utf8.decode(response.bodyBytes);
-        debugPrint('发送麦克风状态系统消息失败: ${response.statusCode}, $responseBody');
+      // 使用ChatService发送系统消息
+      if (_chatService != null) {
+        await _chatService!.sendSystemMessage(_currentMeetingId!, content);
       } else {
-        debugPrint('麦克风状态系统消息发送成功');
+        debugPrint('ChatService为空，无法发送麦克风状态系统消息');
       }
     } catch (e) {
       debugPrint('发送麦克风状态系统消息异常: $e');

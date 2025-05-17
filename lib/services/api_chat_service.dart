@@ -6,8 +6,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../constants/app_constants.dart';
 import '../models/chat_message.dart';
-import '../providers/chat_providers.dart';
 import '../services/service_providers.dart';
+import '../utils/http_utils.dart';
 import 'chat_service.dart';
 
 /// 实际的API聊天服务实现
@@ -69,6 +69,46 @@ class ApiChatService implements ChatService {
     );
 
     print('已设置使用外部WebSocket连接');
+  }
+
+  @override
+  Future<void> sendSystemMessage(String meetingId, String content) async {
+    try {
+      print('发送系统消息: $content');
+
+      final requestBody = jsonEncode({
+        'meetingId': meetingId,
+        'content': content,
+      });
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.apiBaseUrl}/system-message/send'),
+            headers: HttpUtils.createHeaders(),
+            body: requestBody,
+          )
+          .timeout(Duration(milliseconds: AppConstants.apiTimeout));
+
+      if (response.statusCode == 200) {
+        final jsonResponse = HttpUtils.decodeResponse(response);
+        if (jsonResponse['code'] == 200) {
+          print('系统消息发送成功');
+        } else {
+          print('系统消息发送失败: ${jsonResponse['message']}');
+          throw Exception('发送系统消息失败: ${jsonResponse['message']}');
+        }
+      } else {
+        final errorMessage = HttpUtils.extractErrorMessage(
+          response,
+          defaultMessage: '发送系统消息失败',
+        );
+        print(errorMessage);
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      print('发送系统消息异常: $e');
+      throw Exception('发送系统消息异常: $e');
+    }
   }
 
   @override
