@@ -8,6 +8,45 @@ import 'chat_service.dart';
 import '../models/chat_message.dart';
 import '../providers/user_providers.dart';
 
+/// WebRTC连接信息类，用于跟踪连接状态
+class ConnectionInfo {
+  final String peerId; // 对方ID
+  final String peerName; // 对方名称
+  bool isConnected; // 是否已连接
+  bool isInitiator; // 是否是发起方(offer)
+  DateTime lastUpdated; // 最后更新时间
+  int reconnectAttempts; // 重连尝试次数
+
+  ConnectionInfo({
+    required this.peerId,
+    required this.peerName,
+    this.isConnected = false,
+    this.isInitiator = false,
+    DateTime? lastUpdated,
+    this.reconnectAttempts = 0,
+  }) : lastUpdated = lastUpdated ?? DateTime.now();
+
+  // 更新连接状态
+  void updateStatus(bool connected) {
+    isConnected = connected;
+    lastUpdated = DateTime.now();
+    if (connected) {
+      reconnectAttempts = 0; // 重置重连计数
+    }
+  }
+
+  // 增加重连计数
+  void incrementReconnectAttempt() {
+    reconnectAttempts++;
+    lastUpdated = DateTime.now();
+  }
+
+  @override
+  String toString() {
+    return 'ConnectionInfo(peerId: $peerId, name: $peerName, connected: $isConnected, initiator: $isInitiator, attempts: $reconnectAttempts)';
+  }
+}
+
 /// WebRTC语音服务接口
 abstract class WebRTCService {
   /// 初始化WebRTC
@@ -96,8 +135,15 @@ class MockWebRTCService implements WebRTCService {
 
   // WebRTC相关变量
   final Map<String, RTCPeerConnection> _peerConnections = {};
+  // 连接信息映射，记录每个连接的状态和类型
+  final Map<String, ConnectionInfo> _connectionInfos = {};
   MediaStream? _localStream;
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+
+  // 重连定时器
+  Timer? _reconnectionTimer;
+  // 最大重连次数
+  final int _maxReconnectAttempts = 3;
 
   // TURN服务器配置
   final Map<String, dynamic> _iceServers = {
@@ -175,6 +221,25 @@ class MockWebRTCService implements WebRTCService {
     }
   }
 
+  // 发送ICE候选
+  Future<void> _sendIceCandidate(
+    String peerId,
+    RTCIceCandidate candidate,
+  ) async {
+    try {
+      await _sendWebRTCSignal(peerId, {
+        'type': 'candidate',
+        'candidate': candidate.candidate,
+        'sdpMid': candidate.sdpMid,
+        'sdpMLineIndex': candidate.sdpMLineIndex,
+        'fromId': _currentUserId,
+        'toId': peerId,
+      });
+    } catch (e) {
+      debugPrint('发送ICE候选失败: $e');
+    }
+  }
+
   // 设置聊天服务
   void setChatService(ChatService chatService) {
     debugPrint('WebRTCService-设置聊天服务');
@@ -240,6 +305,9 @@ class MockWebRTCService implements WebRTCService {
 
       // 初始化本地媒体流
       await _initLocalStream();
+
+      // 启动连接状态监控
+      _startConnectionMonitoring();
     } catch (e) {
       debugPrint('WebRTC初始化失败: $e');
       // 不要立即抛出异常，允许应用继续运行
@@ -274,6 +342,26 @@ class MockWebRTCService implements WebRTCService {
     });
   }
 
+  /// 修改音频约束，使用最强回音消除
+  Map<String, dynamic> get _strongAudioConstraints => {
+    'audio': {
+      'echoCancellation': true, // 启用回音消除
+      'noiseSuppression': true, // 启用噪声抑制
+      'autoGainControl': true, // 自动增益控制
+      'disableLocalEcho': true, // 禁用本地回音
+      'googEchoCancellation': true, // Chrome特定回音消除
+      'googAutoGainControl': true, // Chrome特定自动增益
+      'googNoiseSuppression': true, // Chrome特定噪声抑制
+      'googHighpassFilter': true, // 高通滤波器
+      'googTypingNoiseDetection': true, // 打字声检测
+      'googAudioMirroring': false, // 禁用音频镜像
+      'googExperimentalEchoCancellation': true, // 实验性回音消除
+      'sampleRate': 44100, // 采样率
+      'channelCount': 1, // 单声道
+    },
+    'video': false, // 仅音频会议
+  };
+
   // 初始化本地媒体流
   Future<void> _initLocalStream() async {
     try {
@@ -288,16 +376,8 @@ class MockWebRTCService implements WebRTCService {
         }
       }
 
-      // 添加回音消除和降噪配置
-      final Map<String, dynamic> constraints = {
-        'audio': {
-          'echoCancellation': true, // 启用回音消除
-          'noiseSuppression': true, // 启用噪声抑制
-          'autoGainControl': true, // 自动增益控制
-          'disableLocalEcho': true, // 禁用本地回音
-        },
-        'video': false, // 仅音频会议
-      };
+      // 使用增强的音频约束
+      final constraints = _strongAudioConstraints;
 
       // 使用try-catch包装媒体流获取
       try {
@@ -358,6 +438,9 @@ class MockWebRTCService implements WebRTCService {
       });
     }
 
+    // 清理之前可能存在的连接
+    await _cleanupExistingConnections();
+
     // 发布初始参会人员列表
     _participantsController.add(_participants);
 
@@ -415,8 +498,9 @@ class MockWebRTCService implements WebRTCService {
           _updateParticipantsFromMessages(messages);
           debugPrint('成功从历史消息初始化参会人员列表');
 
-          // 作为新加入者，向所有现有参会者发送offer
-          _sendOffersToExistingParticipants();
+          // 作为新加入者，发送加入会议的系统消息，以便其他参与者知道新用户加入
+          // 注：实际加入会议的系统消息可能已由聊天服务发送，这里确保发送WebRTC相关的通知
+          await _sendJoinNotification();
         }
       } catch (e) {
         debugPrint('获取会议消息失败: $e');
@@ -424,23 +508,150 @@ class MockWebRTCService implements WebRTCService {
     }
   }
 
-  // 向所有现有参会者发送offer
-  Future<void> _sendOffersToExistingParticipants() async {
-    // 排除自己
-    final existingParticipants = _participants.where((p) => !p.isMe).toList();
-
-    debugPrint('向${existingParticipants.length}位现有参会者发送offer...');
-
-    for (final participant in existingParticipants) {
-      try {
-        await _createPeerConnectionAndSendOffer(
-          participant.id,
-          participant.name,
-        );
-      } catch (e) {
-        debugPrint('向${participant.name}发送offer失败: $e');
-      }
+  // 发送加入通知，让其他用户知道新用户加入
+  Future<void> _sendJoinNotification() async {
+    if (_chatService == null ||
+        _currentMeetingId == null ||
+        _currentUserId == null ||
+        _currentUserName == null) {
+      debugPrint('无法发送加入通知: 缺少必要信息');
+      return;
     }
+
+    try {
+      // 发送特殊的WebRTC加入通知
+      final notification = {
+        'type': 'webrtc_join',
+        'fromId': _currentUserId,
+        'fromName': _currentUserName,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      final notificationStr = jsonEncode(notification);
+      final content = 'webrtc_signal:$notificationStr';
+
+      await _chatService!.sendSystemMessage(_currentMeetingId!, content);
+      debugPrint('已发送WebRTC加入通知');
+    } catch (e) {
+      debugPrint('发送加入通知失败: $e');
+    }
+  }
+
+  // 清理现有连接
+  Future<void> _cleanupExistingConnections() async {
+    if (_peerConnections.isNotEmpty) {
+      debugPrint('清理${_peerConnections.length}个现有连接...');
+
+      // 创建一个连接列表副本，避免在迭代时修改
+      final connections = Map<String, RTCPeerConnection>.from(_peerConnections);
+
+      for (final entry in connections.entries) {
+        final peerId = entry.key;
+        final connection = entry.value;
+
+        try {
+          debugPrint('关闭与$peerId的连接');
+          await connection.close();
+        } catch (e) {
+          debugPrint('关闭连接失败: $e');
+        }
+      }
+
+      // 清空连接映射
+      _peerConnections.clear();
+      debugPrint('所有现有连接已清理');
+    }
+  }
+
+  // 监控连接状态，定期检查并清理失败连接
+  void _startConnectionMonitoring() {
+    // 每30秒检查一次连接状态
+    Timer.periodic(const Duration(seconds: 30), (timer) async {
+      if (!_isConnected) {
+        timer.cancel();
+        return;
+      }
+
+      debugPrint('定期检查WebRTC连接状态...');
+      int activeCount = 0;
+      int failedCount = 0;
+      List<String> toRemove = [];
+
+      // 检查每个连接的状态
+      for (final entry in _peerConnections.entries) {
+        final peerId = entry.key;
+        final connection = entry.value;
+
+        try {
+          final state = await connection.getConnectionState();
+          debugPrint('与$peerId的连接状态: $state');
+
+          // 检查用户是否仍在会议中
+          bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+
+          if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+            activeCount++;
+          } else if (state ==
+                  RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+              state ==
+                  RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+              state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+            if (!peerStillInMeeting) {
+              // 用户不在会议中，标记为需要移除
+              failedCount++;
+              toRemove.add(peerId);
+            } else if (_connectionInfos.containsKey(peerId) &&
+                _connectionInfos[peerId]!.isInitiator &&
+                _connectionInfos[peerId]!.reconnectAttempts <
+                    _maxReconnectAttempts) {
+              // 用户在会议中，尝试重连
+              debugPrint('检测到失败连接，将尝试重连: $peerId');
+              _connectionInfos[peerId]!.updateStatus(false);
+              _connectionInfos[peerId]!.incrementReconnectAttempt();
+              _scheduleReconnection();
+            }
+          }
+        } catch (e) {
+          debugPrint('检查连接状态失败: $e');
+          // 如果无法获取状态，检查用户是否仍在会议中
+          bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+          if (!peerStillInMeeting) {
+            toRemove.add(peerId);
+          }
+        }
+      }
+
+      // 清理失败的连接
+      for (final peerId in toRemove) {
+        try {
+          debugPrint('清理失败的连接: $peerId');
+          await _peerConnections[peerId]?.close();
+          _peerConnections.remove(peerId);
+          _connectionInfos.remove(peerId);
+        } catch (e) {
+          debugPrint('清理连接失败: $e');
+        }
+      }
+
+      // 清理ConnectionInfos中不存在对应Peer连接的项
+      final connectionInfosToRemove = <String>[];
+      for (final peerId in _connectionInfos.keys) {
+        if (!_peerConnections.containsKey(peerId)) {
+          // 检查用户是否仍在会议中
+          bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+          if (!peerStillInMeeting) {
+            connectionInfosToRemove.add(peerId);
+          }
+        }
+      }
+
+      for (final peerId in connectionInfosToRemove) {
+        _connectionInfos.remove(peerId);
+        debugPrint('已清理无对应连接的信息: $peerId');
+      }
+
+      debugPrint('连接状态检查完成: $activeCount 个活动连接, $failedCount 个失败连接已清理');
+    });
   }
 
   // 创建点对点连接并发送offer
@@ -448,9 +659,27 @@ class MockWebRTCService implements WebRTCService {
     String peerId,
     String peerName,
   ) async {
-    // 如果已存在连接，先关闭
+    // 如果已存在连接，检查连接状态
     if (_peerConnections.containsKey(peerId)) {
-      await _peerConnections[peerId]!.close();
+      final existingConnection = _peerConnections[peerId]!;
+      final connectionState = await existingConnection.getConnectionState();
+
+      if (connectionState ==
+              RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+          connectionState ==
+              RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
+        debugPrint('已存在与$peerName的活动连接，不重新建立');
+
+        // 更新连接信息
+        _connectionInfos[peerId]?.updateStatus(true);
+        // 确保在参会人员列表中显示该用户
+        _updateParticipantsWithConnectionStatus();
+        return;
+      }
+
+      // 关闭状态不佳的连接
+      debugPrint('与$peerName的连接状态不佳: $connectionState，将重新建立');
+      await existingConnection.close();
       _peerConnections.remove(peerId);
     }
 
@@ -487,6 +716,15 @@ class MockWebRTCService implements WebRTCService {
       final pc = await createPeerConnection(config, constraints);
       _peerConnections[peerId] = pc;
 
+      // 创建或更新连接信息
+      _connectionInfos[peerId] = ConnectionInfo(
+        peerId: peerId,
+        peerName: peerName,
+        isConnected: false,
+        isInitiator: true, // 作为offer方，我们是发起者
+      );
+      debugPrint('已创建连接信息: ${_connectionInfos[peerId]}');
+
       // 添加本地媒体轨道 - 确保音频轨道正确添加
       if (_localStream != null) {
         try {
@@ -497,8 +735,14 @@ class MockWebRTCService implements WebRTCService {
             final track = audioTracks.first;
             pc.addTrack(track, _localStream!);
             debugPrint('已添加单个音频轨道: ${track.id} 到与$peerName的连接');
-            // 确保音频轨道状态与当前麦克风状态一致
+
+            // 根据麦克风状态设置音频轨道是否启用
             track.enabled = !_isMuted;
+            debugPrint('设置与$peerName连接的音频轨道状态: ${!_isMuted ? "已启用" : "已静音"}');
+
+            // 记录最后更新时间，便于调试
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            debugPrint('轨道状态更新时间戳: $timestamp');
           } else {
             debugPrint('警告：本地流中没有可用的音频轨道');
           }
@@ -518,12 +762,77 @@ class MockWebRTCService implements WebRTCService {
         // 当连接建立时，记录成功
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           debugPrint('🎉 与$peerName的WebRTC连接已成功建立!');
+
+          // 更新连接信息
+          if (_connectionInfos.containsKey(peerId)) {
+            _connectionInfos[peerId]!.updateStatus(true);
+            debugPrint('更新连接状态为已连接: ${_connectionInfos[peerId]}');
+          }
+
+          // 更新参会人员列表
+          _updateParticipantsWithConnectionStatus();
+        }
+
+        // 如果连接失败或关闭，清理资源
+        if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+            state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+          debugPrint('与$peerName的连接已失败或关闭');
+
+          // 更新连接状态
+          if (_connectionInfos.containsKey(peerId)) {
+            _connectionInfos[peerId]!.updateStatus(false);
+            debugPrint('更新连接状态为断开: ${_connectionInfos[peerId]}');
+
+            // 检查用户是否仍在会议中
+            bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+
+            // 如果是发起方且用户仍在会议中，尝试重连
+            if (_connectionInfos[peerId]!.isInitiator &&
+                peerStillInMeeting &&
+                _connectionInfos[peerId]!.reconnectAttempts <
+                    _maxReconnectAttempts) {
+              debugPrint('作为发起方，将尝试重新连接');
+              // 标记为需要重连，实际重连在定时器中处理
+              _connectionInfos[peerId]!.incrementReconnectAttempt();
+              _scheduleReconnection();
+            } else if (!peerStillInMeeting) {
+              // 如果用户不在会议中，清理连接资源
+              debugPrint('用户已不在会议中，清理连接资源');
+              _peerConnections.remove(peerId);
+              _connectionInfos.remove(peerId);
+            }
+          }
+
+          // 更新参会人员列表
+          _updateParticipantsWithConnectionStatus();
         }
       };
 
       // 监听ICE连接状态
       pc.onIceConnectionState = (RTCIceConnectionState state) {
         debugPrint('与$peerName的ICE连接状态: $state');
+
+        // 如果ICE连接失败，尝试重新建立连接
+        if (state == RTCIceConnectionState.RTCIceConnectionStateFailed) {
+          debugPrint('与$peerName的ICE连接失败，将在稍后尝试重新连接');
+          // 更新连接状态
+          if (_connectionInfos.containsKey(peerId)) {
+            _connectionInfos[peerId]!.updateStatus(false);
+
+            // 检查用户是否仍在会议中
+            bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+
+            // 如果是发起方且用户仍在会议中，尝试重连
+            if (_connectionInfos[peerId]!.isInitiator &&
+                peerStillInMeeting &&
+                _connectionInfos[peerId]!.reconnectAttempts <
+                    _maxReconnectAttempts) {
+              debugPrint('ICE连接失败，作为发起方，将尝试重新连接');
+              _connectionInfos[peerId]!.incrementReconnectAttempt();
+              _scheduleReconnection();
+            }
+          }
+        }
       };
 
       // 监听远程媒体流
@@ -550,6 +859,15 @@ class MockWebRTCService implements WebRTCService {
 
             // 更新UI，显示该用户正在通话中
             _updateParticipantConnectionStatus(peerId, true);
+
+            // 更新连接信息
+            if (_connectionInfos.containsKey(peerId)) {
+              _connectionInfos[peerId]!.updateStatus(true);
+              debugPrint('接收到音频轨道，更新连接状态为已连接: ${_connectionInfos[peerId]}');
+            }
+
+            // 更新参会人员列表
+            _updateParticipantsWithConnectionStatus();
           }
         }
       };
@@ -562,22 +880,33 @@ class MockWebRTCService implements WebRTCService {
           'offerToReceiveVideo': false,
           'voiceActivityDetection': true,
         });
-        await pc.setLocalDescription(offer);
+
+        // 修改SDP以增强音频质量和消除回音
+        String modifiedSdp = _enhanceAudioSdp(offer.sdp ?? '');
+        final enhancedOffer = RTCSessionDescription(modifiedSdp, 'offer');
+
+        await pc.setLocalDescription(enhancedOffer);
 
         debugPrint('已创建offer，准备发送...');
-        debugPrint('Offer SDP内容预览: ${offer.sdp?.substring(0, 100)}...');
+        debugPrint('Offer SDP内容预览: ${modifiedSdp.substring(0, 100)}...');
+
+        // 发送offer前增加短暂延迟，确保本地描述已完全设置
+        await Future.delayed(const Duration(milliseconds: 50));
 
         // 将offer通过系统消息发送给目标用户
         await _sendWebRTCSignal(peerId, {
           'type': 'offer',
-          'sdp': offer.sdp,
+          'sdp': modifiedSdp,
           'fromId': _currentUserId,
           'toId': peerId,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
 
         debugPrint('已向$peerName发送offer');
       } catch (e) {
         debugPrint('创建或发送offer失败: $e');
+        _peerConnections.remove(peerId);
+        await pc.close();
       }
     } catch (e) {
       debugPrint('创建与$peerName的连接失败: $e');
@@ -594,7 +923,65 @@ class MockWebRTCService implements WebRTCService {
 
       final String type = signal['type'];
       final String fromId = signal['fromId'];
-      final String toId = signal['toId'];
+
+      // 日志所有连接 - 用于诊断
+      debugPrint('📊 当前WebRTC连接数: ${_peerConnections.length}');
+      if (_peerConnections.isNotEmpty) {
+        debugPrint('📊 连接列表: ${_peerConnections.keys.join(', ')}');
+      }
+
+      // 处理加入通知 - 这种消息没有toId，发给所有人
+      if (type == 'webrtc_join') {
+        final String fromName = signal['fromName'] ?? 'Unknown';
+        debugPrint('收到用户加入通知: $fromName ($fromId)');
+
+        // 如果是自己发出的通知，忽略
+        if (fromId == _currentUserId) {
+          debugPrint('忽略自己的加入通知');
+          return;
+        }
+
+        // 检查是否已存在与该用户的连接
+        if (_peerConnections.containsKey(fromId)) {
+          // 检查连接状态
+          final connectionState =
+              await _peerConnections[fromId]!.getConnectionState();
+          if (connectionState ==
+                  RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+              connectionState ==
+                  RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
+            debugPrint('已存在与$fromName的活动连接，不重新建立');
+            return;
+          }
+
+          // 如果连接状态不佳，关闭并重新建立
+          debugPrint('与$fromName的连接状态不佳: $connectionState，将重新建立');
+          await _peerConnections[fromId]!.close();
+          _peerConnections.remove(fromId);
+        }
+
+        // 检查这个新用户是否是本会议中的第一个其他用户
+        // 如果是，则作为房间中最老的用户，主动发起连接
+        // 如果不是，则等待新用户自己发送加入会议的系统消息，让所有人发送offer
+        final otherParticipants = _participants.where((p) => !p.isMe).length;
+
+        if (otherParticipants <= 1) {
+          // 如果当前用户是第一个或唯一的其他用户，作为房间中最早的用户主动发起连接
+          debugPrint('作为房间中现有用户，向新加入的用户$fromName发送offer');
+          await _createPeerConnectionAndSendOffer(fromId, fromName);
+        } else {
+          // 如果房间中已有多人，新用户会收到多个系统消息，每个人都会向其发送offer
+          // 这里可以添加一个随机延迟，避免所有用户同时发送offer导致的冲突
+          final delay = 200 + (DateTime.now().millisecondsSinceEpoch % 800);
+          debugPrint('房间中已有多人，延迟${delay}ms后发送offer，避免冲突');
+          await Future.delayed(Duration(milliseconds: delay));
+          await _createPeerConnectionAndSendOffer(fromId, fromName);
+        }
+        return;
+      }
+
+      // 对于普通信令消息，需要检查toId
+      final String toId = signal['toId'] ?? '';
 
       // 检查信令是否发给当前用户
       if (toId != _currentUserId) {
@@ -603,6 +990,35 @@ class MockWebRTCService implements WebRTCService {
       }
 
       debugPrint('处理来自$fromId的WebRTC信令: $type');
+
+      // 当收到offer时检查重复连接 - 如果已经有连接且状态良好，可能会造成回声
+      if (type == 'offer' && _peerConnections.containsKey(fromId)) {
+        // 检查现有连接状态
+        final existingConnection = _peerConnections[fromId]!;
+        final connectionState = await existingConnection.getConnectionState();
+
+        if (connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+            connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
+          debugPrint('⚠️ 检测到可能的重复连接! 已存在与$fromId的活动连接，忽略新offer');
+
+          // 发送连接已存在的信号
+          await _sendWebRTCSignal(fromId, {
+            'type': 'connection_exists',
+            'fromId': _currentUserId,
+            'toId': fromId,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+
+          return; // 不处理这个offer
+        } else {
+          debugPrint('现有连接状态: $connectionState, 将重新建立连接');
+          // 关闭并移除现有连接，避免内存泄漏
+          await existingConnection.close();
+          _peerConnections.remove(fromId);
+        }
+      }
 
       switch (type) {
         case 'offer':
@@ -613,6 +1029,10 @@ class MockWebRTCService implements WebRTCService {
           break;
         case 'candidate':
           await _handleIceCandidate(fromId, signal);
+          break;
+        case 'connection_exists':
+          // 对方已经有与我们的连接，不需要再创建连接
+          debugPrint('对方报告已存在连接，停止当前连接尝试');
           break;
       }
     } catch (e) {
@@ -625,9 +1045,35 @@ class MockWebRTCService implements WebRTCService {
     try {
       final String sdp = signal['sdp'];
 
-      // 如果已存在连接，先关闭
+      // 如果已存在连接，先检查状态
       if (_peerConnections.containsKey(fromId)) {
-        await _peerConnections[fromId]!.close();
+        final existingConnection = _peerConnections[fromId]!;
+        final connectionState = await existingConnection.getConnectionState();
+
+        if (connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+            connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
+          debugPrint('已存在与$fromId的活动连接，发送连接已存在信号');
+          await _sendWebRTCSignal(fromId, {
+            'type': 'connection_exists',
+            'fromId': _currentUserId,
+            'toId': fromId,
+            'timestamp': DateTime.now().millisecondsSinceEpoch,
+          });
+
+          // 更新连接信息
+          if (_connectionInfos.containsKey(fromId)) {
+            _connectionInfos[fromId]!.updateStatus(true);
+            debugPrint('更新已存在连接的状态为连接: ${_connectionInfos[fromId]}');
+          }
+
+          return;
+        }
+
+        // 关闭状态不佳的连接
+        debugPrint('关闭旧连接，状态: $connectionState');
+        await existingConnection.close();
         _peerConnections.remove(fromId);
       }
 
@@ -652,6 +1098,23 @@ class MockWebRTCService implements WebRTCService {
       final pc = await createPeerConnection(config, constraints);
       _peerConnections[fromId] = pc;
 
+      // 获取对方名字
+      String peerName = '未知用户';
+      final participant = _participants.firstWhere(
+        (p) => p.id == fromId,
+        orElse: () => MeetingParticipant(id: fromId, name: peerName),
+      );
+      peerName = participant.name;
+
+      // 创建或更新连接信息
+      _connectionInfos[fromId] = ConnectionInfo(
+        peerId: fromId,
+        peerName: peerName,
+        isConnected: false,
+        isInitiator: false, // 作为answer方，我们不是发起者
+      );
+      debugPrint('已创建连接信息(answer): ${_connectionInfos[fromId]}');
+
       // 添加本地媒体轨道
       if (_localStream != null) {
         try {
@@ -662,8 +1125,14 @@ class MockWebRTCService implements WebRTCService {
             final track = audioTracks.first;
             pc.addTrack(track, _localStream!);
             debugPrint('已添加单个音频轨道: ${track.id} 到与$fromId的应答连接');
-            // 确保音频轨道状态与当前麦克风状态一致
+
+            // 根据麦克风状态设置音频轨道启用状态
             track.enabled = !_isMuted;
+            debugPrint('设置应答连接的音频轨道状态: ${!_isMuted ? "已启用" : "已静音"}');
+
+            // 记录最后更新时间，便于调试
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            debugPrint('answer轨道状态更新时间戳: $timestamp');
           } else {
             debugPrint('警告：本地流中没有可用的音频轨道用于应答');
           }
@@ -684,12 +1153,40 @@ class MockWebRTCService implements WebRTCService {
         // 当连接建立时，记录成功
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
           debugPrint('🎉 与$fromId的WebRTC应答连接已成功建立!');
+
+          // 更新连接信息
+          if (_connectionInfos.containsKey(fromId)) {
+            _connectionInfos[fromId]!.updateStatus(true);
+            debugPrint('更新连接状态为已连接(answer): ${_connectionInfos[fromId]}');
+          }
+
+          // 更新参会人员列表
+          _updateParticipantsWithConnectionStatus();
         }
 
         // 如果连接失败或关闭，清理资源
         if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
-          _peerConnections.remove(fromId);
+          debugPrint('与$fromId的应答连接已失败或关闭');
+
+          // 更新连接状态
+          if (_connectionInfos.containsKey(fromId)) {
+            _connectionInfos[fromId]!.updateStatus(false);
+            debugPrint('更新连接状态为断开(answer): ${_connectionInfos[fromId]}');
+
+            // 检查用户是否仍在会议中
+            bool peerStillInMeeting = _participants.any((p) => p.id == fromId);
+
+            // 如果用户不在会议中，清理连接资源
+            if (!peerStillInMeeting) {
+              debugPrint('用户已不在会议中，清理连接资源');
+              _peerConnections.remove(fromId);
+              _connectionInfos.remove(fromId);
+            }
+          }
+
+          // 更新参会人员列表
+          _updateParticipantsWithConnectionStatus();
         }
       };
 
@@ -722,6 +1219,14 @@ class MockWebRTCService implements WebRTCService {
 
             // 更新UI，显示该用户正在通话中
             _updateParticipantConnectionStatus(fromId, true);
+
+            // 更新连接信息
+            if (_connectionInfos.containsKey(fromId)) {
+              _connectionInfos[fromId]!.updateStatus(true);
+            }
+
+            // 更新参会人员列表
+            _updateParticipantsWithConnectionStatus();
           }
         }
       };
@@ -743,16 +1248,24 @@ class MockWebRTCService implements WebRTCService {
           'voiceActivityDetection': true,
         });
 
+        // 修改SDP以增强回音消除
+        String modifiedSdp = _enhanceAudioSdp(answer.sdp ?? '');
+        final enhancedAnswer = RTCSessionDescription(modifiedSdp, 'answer');
+
         // 设置本地描述
-        await pc.setLocalDescription(answer);
-        debugPrint('Answer SDP内容预览: ${answer.sdp?.substring(0, 100)}...');
+        await pc.setLocalDescription(enhancedAnswer);
+        debugPrint('Answer SDP内容预览: ${modifiedSdp.substring(0, 100)}...');
+
+        // 发送answer前增加短暂延迟，避免信令拥塞
+        await Future.delayed(const Duration(milliseconds: 50));
 
         // 发送answer
         await _sendWebRTCSignal(fromId, {
           'type': 'answer',
-          'sdp': answer.sdp,
+          'sdp': modifiedSdp,
           'fromId': _currentUserId,
           'toId': fromId,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
         });
 
         debugPrint('已向$fromId发送answer');
@@ -778,14 +1291,45 @@ class MockWebRTCService implements WebRTCService {
         return;
       }
 
-      // 设置远程描述
-      final RTCSessionDescription remoteDesc = RTCSessionDescription(
-        sdp,
-        'answer',
-      );
-      await pc.setRemoteDescription(remoteDesc);
+      try {
+        // 获取当前连接状态
+        final connectionState = await pc.getConnectionState();
+        debugPrint('设置answer前连接状态: $connectionState');
 
-      debugPrint('已设置来自$fromId的answer');
+        // 如果连接已经关闭或失败，跳过处理
+        if (connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateClosed ||
+            connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+          debugPrint('连接已关闭或失败，不处理answer');
+          return;
+        }
+
+        // 设置远程描述
+        final RTCSessionDescription remoteDesc = RTCSessionDescription(
+          sdp,
+          'answer',
+        );
+        await pc.setRemoteDescription(remoteDesc);
+
+        debugPrint('已设置来自$fromId的answer');
+
+        // 检查ICE收集状态，确保连接建立
+        final iceGatheringState = await pc.getIceGatheringState();
+        debugPrint('设置answer后ICE收集状态: $iceGatheringState');
+
+        // 为确保连接能够建立，对部分特殊情况做处理
+        final iceConnectionState = await pc.getIceConnectionState();
+        if (iceConnectionState ==
+            RTCIceConnectionState.RTCIceConnectionStateChecking) {
+          debugPrint('ICE连接处于checking状态，等待连接建立...');
+        }
+      } catch (e) {
+        debugPrint('设置远程描述失败: $e');
+        // 如果设置远程描述失败，关闭并重新创建连接
+        _peerConnections.remove(fromId);
+        await pc.close();
+      }
     } catch (e) {
       debugPrint('处理answer失败: $e');
     }
@@ -814,25 +1358,6 @@ class MockWebRTCService implements WebRTCService {
       debugPrint('已添加来自$fromId的ICE候选');
     } catch (e) {
       debugPrint('处理ICE候选失败: $e');
-    }
-  }
-
-  // 发送ICE候选
-  Future<void> _sendIceCandidate(
-    String peerId,
-    RTCIceCandidate candidate,
-  ) async {
-    try {
-      await _sendWebRTCSignal(peerId, {
-        'type': 'candidate',
-        'candidate': candidate.candidate,
-        'sdpMid': candidate.sdpMid,
-        'sdpMLineIndex': candidate.sdpMLineIndex,
-        'fromId': _currentUserId,
-        'toId': peerId,
-      });
-    } catch (e) {
-      debugPrint('发送ICE候选失败: $e');
     }
   }
 
@@ -1007,8 +1532,26 @@ class MockWebRTCService implements WebRTCService {
         );
       }
 
-      // 发布更新后的参会人员列表
-      _participantsController.add(List.from(_participants));
+      // 当用户加入时，检查是否是当前用户
+      if (userId != _currentUserId) {
+        // 修改: 如果是其他用户加入，当前用户作为已存在的用户应该主动向新用户发送offer
+        debugPrint('其他用户加入，向其发送WebRTC offer');
+        // 检查与该用户的连接是否已存在
+        if (!_peerConnections.containsKey(userId)) {
+          _createPeerConnectionAndSendOffer(userId, username);
+        } else {
+          debugPrint('已经存在与该用户的连接，不重新建立');
+        }
+      } else {
+        // 如果是当前用户加入消息，则发送WebRTC加入通知
+        // 这是一个补充措施，以防joinMeeting中的通知失败
+        _sendJoinNotification().catchError((e) {
+          debugPrint('发送WebRTC加入通知失败: $e');
+        });
+      }
+
+      // 更新参会人员列表 - 基于连接状态过滤
+      _updateParticipantsWithConnectionStatus();
     } else if (action == '离开会议') {
       debugPrint('用户离开会议: $username (ID: $userId)');
       // 不移除当前用户自己
@@ -1019,12 +1562,31 @@ class MockWebRTCService implements WebRTCService {
 
         if (beforeCount != afterCount) {
           debugPrint('已从参会人员列表中移除用户');
+
+          // 清理与该用户的WebRTC连接
+          if (_peerConnections.containsKey(userId)) {
+            debugPrint('清理与离开用户的WebRTC连接');
+            _peerConnections[userId]
+                ?.close()
+                .then((_) {
+                  _peerConnections.remove(userId);
+                  debugPrint('已清理与$username的WebRTC连接');
+                })
+                .catchError((e) {
+                  debugPrint('清理连接失败: $e');
+                  _peerConnections.remove(userId);
+                });
+          }
+
+          // 清理连接信息
+          _connectionInfos.remove(userId);
+          debugPrint('已清理与$username的连接信息');
         } else {
           debugPrint('未找到要移除的用户');
         }
 
-        // 发布更新后的参会人员列表
-        _participantsController.add(List.from(_participants));
+        // 更新参会人员列表 - 基于连接状态过滤
+        _updateParticipantsWithConnectionStatus();
       } else {
         debugPrint('忽略当前用户自己的离开消息');
       }
@@ -1035,8 +1597,8 @@ class MockWebRTCService implements WebRTCService {
       // 更新用户麦克风状态
       _updateUserMicrophoneStatus(userId, isMuted);
 
-      // 发布更新后的参会人员列表
-      _participantsController.add(List.from(_participants));
+      // 更新参会人员列表 - 基于连接状态过滤
+      _updateParticipantsWithConnectionStatus();
     }
   }
 
@@ -1199,15 +1761,23 @@ class MockWebRTCService implements WebRTCService {
     // 停止音频活动检测
     _stopVoiceActivityDetection();
 
-    // 关闭所有点对点连接
+    // 停止重连定时器
+    _reconnectionTimer?.cancel();
+    _reconnectionTimer = null;
+
+    // 关闭所有点对点连接并清理资源
     for (final peerId in _peerConnections.keys) {
       try {
         await _peerConnections[peerId]?.close();
+        debugPrint('已关闭与$peerId的连接');
       } catch (e) {
         debugPrint('关闭与$peerId的连接失败: $e');
       }
     }
     _peerConnections.clear();
+
+    // 清空连接信息映射
+    _connectionInfos.clear();
 
     // 禁用所有音频轨道
     _localStream?.getAudioTracks().forEach((track) {
@@ -1241,29 +1811,83 @@ class MockWebRTCService implements WebRTCService {
   Future<void> toggleMicrophone(bool enabled) async {
     final previousState = _isMuted;
     _isMuted = !enabled;
+    debugPrint(
+      '切换麦克风状态: ${enabled ? "开启" : "关闭"}，当前连接数: ${_peerConnections.length}',
+    );
 
     // 更新本地媒体流轨道状态
     if (_localStream != null) {
       _localStream!.getAudioTracks().forEach((track) {
         track.enabled = enabled;
-        debugPrint('已${enabled ? "启用" : "禁用"}本地音频轨道');
+        debugPrint('已${enabled ? "启用" : "禁用"}本地音频轨道: ${track.id}');
       });
     }
 
     // 同步更新所有对等连接中的发送轨道状态
-    for (final pc in _peerConnections.values) {
-      pc
-          .getSenders()
-          .then((senders) {
-            for (final sender in senders) {
-              if (sender.track?.kind == 'audio') {
-                sender.track!.enabled = enabled;
-              }
-            }
-          })
-          .catchError((e) {
-            debugPrint('更新发送轨道状态失败: $e');
-          });
+    final updateFutures = <Future>[];
+
+    for (final entry in _peerConnections.entries) {
+      final peerId = entry.key;
+      final pc = entry.value;
+
+      try {
+        // 获取连接状态
+        final connectionState = await pc.getConnectionState();
+        if (connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnected ||
+            connectionState ==
+                RTCPeerConnectionState.RTCPeerConnectionStateConnecting) {
+          debugPrint('更新连接状态良好的 $peerId 音频轨道');
+
+          // 使用getSenders()获取所有发送器
+          final updateFuture = pc
+              .getSenders()
+              .then((senders) {
+                int audioTrackCount = 0;
+
+                for (final sender in senders) {
+                  if (sender.track?.kind == 'audio') {
+                    audioTrackCount++;
+                    sender.track!.enabled = enabled;
+                    debugPrint(
+                      '已${enabled ? "启用" : "禁用"}发送到$peerId的音频轨道: ${sender.track!.id}',
+                    );
+                  }
+                }
+
+                if (audioTrackCount == 0 && _localStream != null) {
+                  debugPrint('警告: 未找到发往$peerId的音频轨道，尝试重新添加');
+                  // 考虑重新添加轨道，但需要注意不要造成重复添加
+                }
+
+                return audioTrackCount;
+              })
+              .catchError((e) {
+                debugPrint('更新发送到$peerId的轨道状态失败: $e');
+                return 0;
+              });
+
+          updateFutures.add(updateFuture);
+        } else {
+          debugPrint('跳过连接状态不佳的 $peerId (状态: $connectionState)');
+        }
+      } catch (e) {
+        debugPrint('检查与$peerId的连接状态失败: $e');
+      }
+    }
+
+    // 等待所有更新完成
+    if (updateFutures.isNotEmpty) {
+      try {
+        final results = await Future.wait(updateFutures);
+        final totalUpdated = results.fold<int>(
+          0,
+          (sum, count) => sum + (count as int),
+        );
+        debugPrint('已更新 $totalUpdated 个音频轨道的状态');
+      } catch (e) {
+        debugPrint('更新音频轨道状态时发生错误: $e');
+      }
     }
 
     // 更新当前用户的静音状态
@@ -1295,12 +1919,13 @@ class MockWebRTCService implements WebRTCService {
       _stopVoiceActivityDetection();
     }
 
-    await Future.delayed(const Duration(milliseconds: 100));
+    debugPrint('麦克风状态切换完成: ${enabled ? "已开启" : "已关闭"}');
   }
 
   // 音频活动检测相关变量
   Timer? _voiceDetectionTimer;
   final double _voiceThreshold = 0.01; // 音量阈值
+  bool _isSpeaking = false; // 当前是否在说话
 
   // 启动语音活动检测
   void _startVoiceActivityDetection() {
@@ -1326,13 +1951,19 @@ class MockWebRTCService implements WebRTCService {
     _voiceDetectionTimer = null;
 
     // 确保说话状态被重置
-    _updateCurrentUserSpeakingStatus(false);
+    if (_isSpeaking) {
+      _isSpeaking = false;
+      _updateCurrentUserSpeakingStatus(false);
+    }
   }
 
   // 检测语音活动
   void _detectVoiceActivity() async {
     if (_localStream == null || _isMuted) {
-      _updateCurrentUserSpeakingStatus(false);
+      if (_isSpeaking) {
+        _isSpeaking = false;
+        _updateCurrentUserSpeakingStatus(false);
+      }
       return;
     }
 
@@ -1341,26 +1972,60 @@ class MockWebRTCService implements WebRTCService {
       final audioTracks = _localStream!.getAudioTracks();
       if (audioTracks.isEmpty) return;
 
+      // 确保所有连接的音频轨道都处于启用状态
+      _ensureAllConnectionsAudioEnabled();
+
       // 简化的语音活动检测方法
       // 仅检查音频轨道是否启用，而不是实际检测音量
       // 未来可以考虑使用更准确的音频级别检测
       final isEnabled = audioTracks.first.enabled && !_isMuted;
 
-      // 随机模拟说话状态以实现可视化效果
-      // 注意：这只是演示用，实际应用中应该使用真实的音频级别
-      final bool isSpeaking =
+      // 模拟说话状态以实现可视化效果
+      // 注意：这只是演示用，实际应用中应使用真实的音频级别
+      bool newIsSpeaking =
           isEnabled && (DateTime.now().millisecondsSinceEpoch % 3000 < 1000);
 
-      _updateCurrentUserSpeakingStatus(isSpeaking);
+      // 只有当状态发生变化时才更新UI
+      if (newIsSpeaking != _isSpeaking) {
+        _isSpeaking = newIsSpeaking;
+        _updateCurrentUserSpeakingStatus(_isSpeaking);
 
-      // 记录状态变化
-      if (isSpeaking) {
-        debugPrint('检测到语音活动');
+        if (_isSpeaking) {
+          debugPrint('检测到语音活动，更新所有连接');
+        }
       }
     } catch (e) {
       debugPrint('语音活动检测失败: $e');
       // 确保说话状态被重置
-      _updateCurrentUserSpeakingStatus(false);
+      if (_isSpeaking) {
+        _isSpeaking = false;
+        _updateCurrentUserSpeakingStatus(false);
+      }
+    }
+  }
+
+  // 确保所有连接的音频轨道都处于启用状态
+  void _ensureAllConnectionsAudioEnabled() {
+    // 如果麦克风静音，则不做任何事
+    if (_isMuted) return;
+
+    // 检查所有连接的发送轨道状态
+    for (final entry in _peerConnections.entries) {
+      final peerId = entry.key;
+      final pc = entry.value;
+
+      try {
+        pc.getSenders().then((senders) {
+          for (final sender in senders) {
+            if (sender.track?.kind == 'audio' && !sender.track!.enabled) {
+              sender.track!.enabled = true;
+              debugPrint('重新启用发送到$peerId的音频轨道: ${sender.track!.id}');
+            }
+          }
+        });
+      } catch (e) {
+        debugPrint('检查$peerId连接的音频轨道状态失败: $e');
+      }
     }
   }
 
@@ -1428,6 +2093,10 @@ class MockWebRTCService implements WebRTCService {
     // 停止音频活动检测
     _stopVoiceActivityDetection();
 
+    // 停止重连定时器
+    _reconnectionTimer?.cancel();
+    _reconnectionTimer = null;
+
     // 释放WebRTC资源
     _localRenderer.dispose();
 
@@ -1436,6 +2105,9 @@ class MockWebRTCService implements WebRTCService {
       pc.close();
     }
     _peerConnections.clear();
+
+    // 清空连接信息映射
+    _connectionInfos.clear();
 
     // 停止并释放媒体流
     _localStream?.getTracks().forEach((track) => track.stop());
@@ -1478,5 +2150,183 @@ class MockWebRTCService implements WebRTCService {
       debugPrint('手动处理系统消息: ${message.content}');
       _updateParticipantsFromSystemMessage(message);
     }
+  }
+
+  // 修改SDP以增强音频质量和消除回音
+  String _enhanceAudioSdp(String sdp) {
+    if (sdp.isEmpty) return sdp;
+
+    List<String> lines = sdp.split('\r\n');
+    List<String> newLines = [];
+    bool inAudioSection = false;
+
+    for (String line in lines) {
+      // 检测是否进入音频部分
+      if (line.startsWith('m=audio')) {
+        inAudioSection = true;
+        newLines.add(line);
+        continue;
+      } else if (line.startsWith('m=') && !line.startsWith('m=audio')) {
+        inAudioSection = false;
+      }
+
+      // 在音频部分添加或修改参数
+      if (inAudioSection) {
+        // 设置最大包间隔，减少延迟
+        if (line.startsWith('a=maxptime')) {
+          newLines.add('a=maxptime:60'); // 60毫秒最大包间隔
+          continue;
+        }
+
+        // 设置首选编解码器参数
+        if (line.contains('opus/48000/2')) {
+          newLines.add(line);
+          // 添加Opus相关参数，增强回音消除
+          newLines.add(
+            'a=fmtp:111 minptime=10;useinbandfec=1;stereo=0;sprop-stereo=0;cbr=1;maxaveragebitrate=24000;maxplaybackrate=24000;usedtx=0;maxptime=60',
+          );
+          // 添加强制单声道，避免回音
+          newLines.add('a=ptime:20');
+          continue;
+        }
+
+        // 禁用立体声传输，减少带宽并可能减少回音
+        if (line.startsWith('a=fmtp:') && line.contains('stereo=1')) {
+          line = line.replaceAll('stereo=1', 'stereo=0');
+          line = line.replaceAll('sprop-stereo=1', 'sprop-stereo=0');
+        }
+      }
+
+      // 全局级别修改
+      if (line.startsWith('o=')) {
+        // 增加会话版本号，确保更新
+        var parts = line.split(' ');
+        if (parts.length > 2) {
+          try {
+            int version = int.parse(parts[2]) + 1;
+            parts[2] = version.toString();
+            line = parts.join(' ');
+          } catch (e) {
+            // 如果无法解析版本号，使用原始行
+          }
+        }
+      }
+
+      newLines.add(line);
+    }
+
+    // 返回修改后的SDP
+    return newLines.join('\r\n');
+  }
+
+  // 安排重连任务
+  void _scheduleReconnection() {
+    // 如果已有定时器在运行，不重复创建
+    if (_reconnectionTimer != null && _reconnectionTimer!.isActive) {
+      return;
+    }
+
+    // 创建定时器，每10秒检查一次需要重连的连接
+    _reconnectionTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _attemptReconnections();
+    });
+
+    debugPrint('已安排重连检查任务');
+  }
+
+  // 尝试重新连接断开的连接
+  void _attemptReconnections() async {
+    if (_connectionInfos.isEmpty) {
+      _reconnectionTimer?.cancel();
+      _reconnectionTimer = null;
+      return;
+    }
+
+    bool hasReconnectionTask = false;
+
+    // 遍历所有连接信息
+    for (final entry in _connectionInfos.entries.toList()) {
+      final peerId = entry.key;
+      final info = entry.value;
+
+      // 检查此连接是否仍需要维持（检查用户是否仍在会议中）
+      bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
+      if (!peerStillInMeeting) {
+        debugPrint('用户 ${info.peerName} 已不在会议中，不尝试重连');
+        continue;
+      }
+
+      // 如果连接已断开，是发起方，且重连次数未超过限制
+      if (!info.isConnected &&
+          info.isInitiator &&
+          info.reconnectAttempts < _maxReconnectAttempts) {
+        hasReconnectionTask = true;
+
+        debugPrint(
+          '尝试重新连接: ${info.peerName} (${info.peerId})，第${info.reconnectAttempts}次尝试',
+        );
+
+        // 等待一段时间后尝试重连
+        await Future.delayed(
+          Duration(milliseconds: 500 * info.reconnectAttempts),
+        );
+
+        // 再次检查连接状态和用户是否仍在会议中
+        if (_connectionInfos.containsKey(peerId) &&
+            !_connectionInfos[peerId]!.isConnected &&
+            _connectionInfos[peerId]!.isInitiator &&
+            _participants.any((p) => p.id == peerId)) {
+          await _createPeerConnectionAndSendOffer(info.peerId, info.peerName);
+        } else {
+          debugPrint('条件已变化，取消与 ${info.peerName} 的重连');
+        }
+      }
+    }
+
+    // 如果没有需要重连的任务，取消定时器
+    if (!hasReconnectionTask) {
+      _reconnectionTimer?.cancel();
+      _reconnectionTimer = null;
+      debugPrint('没有需要重连的连接，停止重连任务');
+    }
+  }
+
+  // 基于连接状态更新参会人员列表
+  void _updateParticipantsWithConnectionStatus() {
+    // 当这是测试环境或者连接数量为0时，不过滤参会人员列表
+    if (_peerConnections.isEmpty && _connectionInfos.isEmpty) {
+      debugPrint('无活跃连接，不过滤参会人员列表');
+      _participantsController.add(_participants);
+      return;
+    }
+
+    // 创建筛选后的参会人员列表
+    List<MeetingParticipant> filteredParticipants = [];
+
+    // 首先添加自己
+    final myParticipant = _participants.firstWhere(
+      (p) => p.isMe,
+      orElse:
+          () => MeetingParticipant(
+            id: _currentUserId ?? '',
+            name: _currentUserName ?? '',
+            isMe: true,
+          ),
+    );
+    filteredParticipants.add(myParticipant);
+
+    // 添加所有在会议中的参会人员，无论连接状态如何
+    for (final participant in _participants) {
+      // 跳过自己
+      if (participant.isMe) continue;
+
+      // 将所有参会者添加到列表中，无论连接状态如何
+      filteredParticipants.add(participant);
+    }
+
+    debugPrint(
+      '已更新参会人员列表: 总数=${_participants.length}, 显示=${filteredParticipants.length}',
+    );
+    _participantsController.add(filteredParticipants);
   }
 }
