@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'chat_service.dart';
 import '../models/chat_message.dart';
 import '../providers/user_providers.dart';
+import 'dart:math' as Math;
 
 /// WebRTC连接信息类，用于跟踪连接状态
 class ConnectionInfo {
@@ -142,8 +143,8 @@ class MockWebRTCService implements WebRTCService {
 
   // 重连定时器
   Timer? _reconnectionTimer;
-  // 最大重连次数
-  final int _maxReconnectAttempts = 3;
+  // 最大重连次数 - 修改为较大的值以支持持续重连
+  final int _maxReconnectAttempts = 100; // 改为一个较大的值，实现"直到连接成功"的需求
 
   // TURN服务器配置
   final Map<String, dynamic> _iceServers = {
@@ -501,6 +502,9 @@ class MockWebRTCService implements WebRTCService {
           // 作为新加入者，发送加入会议的系统消息，以便其他参与者知道新用户加入
           // 注：实际加入会议的系统消息可能已由聊天服务发送，这里确保发送WebRTC相关的通知
           await _sendJoinNotification();
+
+          // 确保立即更新参会人员列表，只显示活跃连接的用户
+          _updateParticipantsWithConnectionStatus();
         }
       } catch (e) {
         debugPrint('获取会议消息失败: $e');
@@ -565,8 +569,8 @@ class MockWebRTCService implements WebRTCService {
 
   // 监控连接状态，定期检查并清理失败连接
   void _startConnectionMonitoring() {
-    // 每30秒检查一次连接状态
-    Timer.periodic(const Duration(seconds: 30), (timer) async {
+    // 缩短检查间隔为10秒，更快地检测连接状态变化
+    Timer.periodic(const Duration(seconds: 10), (timer) async {
       if (!_isConnected) {
         timer.cancel();
         return;
@@ -591,6 +595,11 @@ class MockWebRTCService implements WebRTCService {
 
           if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
             activeCount++;
+
+            // 确保连接信息状态正确
+            if (_connectionInfos.containsKey(peerId)) {
+              _connectionInfos[peerId]!.updateStatus(true);
+            }
           } else if (state ==
                   RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
               state ==
@@ -600,15 +609,16 @@ class MockWebRTCService implements WebRTCService {
               // 用户不在会议中，标记为需要移除
               failedCount++;
               toRemove.add(peerId);
-            } else if (_connectionInfos.containsKey(peerId) &&
-                _connectionInfos[peerId]!.isInitiator &&
-                _connectionInfos[peerId]!.reconnectAttempts <
-                    _maxReconnectAttempts) {
-              // 用户在会议中，尝试重连
+            } else if (_connectionInfos.containsKey(peerId)) {
+              // 用户在会议中，标记为断开连接
               debugPrint('检测到失败连接，将尝试重连: $peerId');
               _connectionInfos[peerId]!.updateStatus(false);
-              _connectionInfos[peerId]!.incrementReconnectAttempt();
-              _scheduleReconnection();
+
+              // 如果是发起方，尝试重连
+              if (_connectionInfos[peerId]!.isInitiator) {
+                _connectionInfos[peerId]!.incrementReconnectAttempt();
+                _scheduleReconnection();
+              }
             }
           }
         } catch (e) {
@@ -617,6 +627,12 @@ class MockWebRTCService implements WebRTCService {
           bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
           if (!peerStillInMeeting) {
             toRemove.add(peerId);
+          } else if (_connectionInfos.containsKey(peerId) &&
+              _connectionInfos[peerId]!.isInitiator) {
+            // 将连接标记为断开并尝试重连
+            _connectionInfos[peerId]!.updateStatus(false);
+            _connectionInfos[peerId]!.incrementReconnectAttempt();
+            _scheduleReconnection();
           }
         }
       }
@@ -633,22 +649,8 @@ class MockWebRTCService implements WebRTCService {
         }
       }
 
-      // 清理ConnectionInfos中不存在对应Peer连接的项
-      final connectionInfosToRemove = <String>[];
-      for (final peerId in _connectionInfos.keys) {
-        if (!_peerConnections.containsKey(peerId)) {
-          // 检查用户是否仍在会议中
-          bool peerStillInMeeting = _participants.any((p) => p.id == peerId);
-          if (!peerStillInMeeting) {
-            connectionInfosToRemove.add(peerId);
-          }
-        }
-      }
-
-      for (final peerId in connectionInfosToRemove) {
-        _connectionInfos.remove(peerId);
-        debugPrint('已清理无对应连接的信息: $peerId');
-      }
+      // 更新参与者列表，确保只显示活跃连接的用户
+      _updateParticipantsWithConnectionStatus();
 
       debugPrint('连接状态检查完成: $activeCount 个活动连接, $failedCount 个失败连接已清理');
     });
@@ -2236,7 +2238,7 @@ class MockWebRTCService implements WebRTCService {
 
   // 尝试重新连接断开的连接
   void _attemptReconnections() async {
-    if (_connectionInfos.isEmpty) {
+    if (_connectionInfos.isEmpty || !_isConnected) {
       _reconnectionTimer?.cancel();
       _reconnectionTimer = null;
       return;
@@ -2256,20 +2258,18 @@ class MockWebRTCService implements WebRTCService {
         continue;
       }
 
-      // 如果连接已断开，是发起方，且重连次数未超过限制
-      if (!info.isConnected &&
-          info.isInitiator &&
-          info.reconnectAttempts < _maxReconnectAttempts) {
+      // 如果连接已断开且是发起方，尝试重连
+      // 移除重连次数限制，持续尝试直到成功
+      if (!info.isConnected && info.isInitiator) {
         hasReconnectionTask = true;
 
         debugPrint(
           '尝试重新连接: ${info.peerName} (${info.peerId})，第${info.reconnectAttempts}次尝试',
         );
 
-        // 等待一段时间后尝试重连
-        await Future.delayed(
-          Duration(milliseconds: 500 * info.reconnectAttempts),
-        );
+        // 根据尝试次数增加延迟，避免频繁重连导致的资源消耗
+        final delay = Math.min(info.reconnectAttempts * 500, 10000); // 最大10秒延迟
+        await Future.delayed(Duration(milliseconds: delay));
 
         // 再次检查连接状态和用户是否仍在会议中
         if (_connectionInfos.containsKey(peerId) &&
@@ -2293,13 +2293,6 @@ class MockWebRTCService implements WebRTCService {
 
   // 基于连接状态更新参会人员列表
   void _updateParticipantsWithConnectionStatus() {
-    // 当这是测试环境或者连接数量为0时，不过滤参会人员列表
-    if (_peerConnections.isEmpty && _connectionInfos.isEmpty) {
-      debugPrint('无活跃连接，不过滤参会人员列表');
-      _participantsController.add(_participants);
-      return;
-    }
-
     // 创建筛选后的参会人员列表
     List<MeetingParticipant> filteredParticipants = [];
 
@@ -2315,17 +2308,33 @@ class MockWebRTCService implements WebRTCService {
     );
     filteredParticipants.add(myParticipant);
 
-    // 添加所有在会议中的参会人员，无论连接状态如何
-    for (final participant in _participants) {
-      // 跳过自己
-      if (participant.isMe) continue;
+    // 添加已成功建立RTC连接的参会人员
+    for (final participant in _participants.where((p) => !p.isMe)) {
+      // 检查与该参会人员的连接状态
+      if (_connectionInfos.containsKey(participant.id) &&
+          _connectionInfos[participant.id]!.isConnected) {
+        // 只有已成功建立连接的参会人员才添加到列表中
+        filteredParticipants.add(participant);
+        debugPrint('添加已连接的参会人员: ${participant.name} (${participant.id})');
+      } else {
+        debugPrint('跳过未连接的参会人员: ${participant.name} (${participant.id})');
 
-      // 将所有参会者添加到列表中，无论连接状态如何
-      filteredParticipants.add(participant);
+        // 如果是发起方，尝试重新建立连接
+        if (_connectionInfos.containsKey(participant.id) &&
+            _connectionInfos[participant.id]!.isInitiator) {
+          debugPrint('检测到未连接的参会人员，作为发起方将重新尝试连接');
+
+          // 增加重连计数
+          _connectionInfos[participant.id]!.incrementReconnectAttempt();
+
+          // 调度重连任务
+          _scheduleReconnection();
+        }
+      }
     }
 
     debugPrint(
-      '已更新参会人员列表: 总数=${_participants.length}, 显示=${filteredParticipants.length}',
+      '已更新参会人员列表: 总数=${_participants.length}, 已连接显示=${filteredParticipants.length}',
     );
     _participantsController.add(filteredParticipants);
   }

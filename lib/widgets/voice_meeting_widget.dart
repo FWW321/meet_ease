@@ -508,7 +508,16 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           ],
         ),
 
-        const SizedBox(height: 16),
+        // 添加一个提示，说明只显示活跃连接的用户
+        // Container(
+        //   padding: const EdgeInsets.symmetric(vertical: 4),
+        //   child: const Text(
+        //     '注意：只有活跃连接的用户才会显示在下方列表中',
+        //     style: TextStyle(fontSize: 12, color: Colors.grey),
+        //   ),
+        // ),
+
+        const SizedBox(height: 8),
 
         // 参会人员列表
         Expanded(
@@ -563,6 +572,11 @@ class VoiceMeetingWidget extends HookConsumerWidget {
             Icon(Icons.people_outline, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('暂无其他参会人员', style: TextStyle(color: Colors.grey)),
+            SizedBox(height: 8),
+            Text(
+              '只有活跃连接的用户才会显示在列表中',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ],
         ),
       );
