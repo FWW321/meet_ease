@@ -533,6 +533,9 @@ class MockWebRTCService implements WebRTCService {
 
       await _chatService!.sendSystemMessage(_currentMeetingId!, content);
       debugPrint('已发送WebRTC加入通知');
+
+      // 新加入的用户不主动发起连接，只等待已在会议的用户发起连接
+      debugPrint('作为新加入用户，仅等待已在会议的用户发起连接');
     } catch (e) {
       debugPrint('发送加入通知失败: $e');
     }
@@ -884,23 +887,16 @@ class MockWebRTCService implements WebRTCService {
           _peerConnections.remove(fromId);
         }
 
-        // 检查这个新用户是否是本会议中的第一个其他用户
-        // 如果是，则作为房间中最老的用户，主动发起连接
-        // 如果不是，则等待新用户自己发送加入会议的系统消息，让所有人发送offer
-        final otherParticipants = _participants.where((p) => !p.isMe).length;
+        // 优化：作为已存在的用户，主动向新加入用户发起连接
+        // 不再考虑是否为房间中第一个或唯一的其他用户
+        debugPrint('作为已在会议的用户，向新加入的用户$fromName发送offer');
 
-        if (otherParticipants <= 1) {
-          // 如果当前用户是第一个或唯一的其他用户，作为房间中最早的用户主动发起连接
-          debugPrint('作为房间中现有用户，向新加入的用户$fromName发送offer');
-          await _createPeerConnectionAndSendOffer(fromId, fromName);
-        } else {
-          // 如果房间中已有多人，新用户会收到多个系统消息，每个人都会向其发送offer
-          // 这里可以添加一个随机延迟，避免所有用户同时发送offer导致的冲突
-          final delay = 200 + (DateTime.now().millisecondsSinceEpoch % 800);
-          debugPrint('房间中已有多人，延迟${delay}ms后发送offer，避免冲突');
-          await Future.delayed(Duration(milliseconds: delay));
-          await _createPeerConnectionAndSendOffer(fromId, fromName);
-        }
+        // 添加短暂随机延迟，避免多个用户同时发送offer导致的冲突
+        final delay = 200 + (DateTime.now().millisecondsSinceEpoch % 500);
+        debugPrint('延迟${delay}ms后发送offer，避免冲突');
+        await Future.delayed(Duration(milliseconds: delay));
+        await _createPeerConnectionAndSendOffer(fromId, fromName);
+
         return;
       }
 
@@ -1483,11 +1479,16 @@ class MockWebRTCService implements WebRTCService {
 
       // 当用户加入时，检查是否是当前用户
       if (userId != _currentUserId) {
-        // 修改: 如果是其他用户加入，当前用户作为已存在的用户应该主动向新用户发送offer
-        debugPrint('其他用户加入，向其发送WebRTC offer');
+        // 优化: 如果是其他用户加入，当前用户作为已存在的用户应该主动向新用户发送offer
+        debugPrint('用户$username加入会议，当前用户将主动发送offer');
+
         // 检查与该用户的连接是否已存在
         if (!_peerConnections.containsKey(userId)) {
-          _createPeerConnectionAndSendOffer(userId, username);
+          // 添加短暂随机延迟，避免多个用户同时发送offer导致的冲突
+          final delay = 200 + (DateTime.now().millisecondsSinceEpoch % 500);
+          Future.delayed(Duration(milliseconds: delay), () {
+            _createPeerConnectionAndSendOffer(userId, username);
+          });
         } else {
           debugPrint('已经存在与该用户的连接，不重新建立');
         }
