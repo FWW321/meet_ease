@@ -24,9 +24,6 @@ class ChatMessageList extends ConsumerWidget {
   /// 下拉刷新回调
   final Future<void> Function() onRefresh;
 
-  /// 消息已读标记回调
-  final void Function(String) onMessageRead;
-
   const ChatMessageList({
     required this.messages,
     required this.currentUserId,
@@ -34,7 +31,6 @@ class ChatMessageList extends ConsumerWidget {
     required this.showDateSeparator,
     required this.isLoadingHistory,
     required this.onRefresh,
-    required this.onMessageRead,
     super.key,
   });
 
@@ -51,13 +47,6 @@ class ChatMessageList extends ConsumerWidget {
           ],
         ),
       );
-    }
-
-    // 标记所有消息为已读
-    for (final message in messages) {
-      if (!message.readByUserIds.contains(currentUserId)) {
-        onMessageRead(message.id);
-      }
     }
 
     return RefreshIndicator(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../../models/meeting.dart';
 import '../../../providers/meeting_providers.dart';
-import '../../../services/service_providers.dart';
 import '../../../constants/app_constants.dart';
 
 /// 显示会议信息对话框
@@ -82,7 +81,7 @@ void showSignInDialog(
               borderRadius: BorderRadius.circular(AppConstants.radiusL),
               boxShadow: [
                 BoxShadow(
-                  color: colorScheme.shadow.withOpacity(0.2),
+                  color: colorScheme.shadow.withValues(alpha: 0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -99,8 +98,8 @@ void showSignInDialog(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        colorScheme.primary.withOpacity(0.8),
-                        colorScheme.secondary.withOpacity(0.7),
+                        colorScheme.primary.withValues(alpha: 0.8),
+                        colorScheme.secondary.withValues(alpha: 0.7),
                       ],
                     ),
                   ),
@@ -113,7 +112,7 @@ void showSignInDialog(
                         width: 56,
                         height: 56,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -193,8 +192,8 @@ void showSignInDialog(
                             onComplete();
                           },
                           style: TextButton.styleFrom(
-                            foregroundColor: colorScheme.onSurface.withOpacity(
-                              0.7,
+                            foregroundColor: colorScheme.onSurface.withValues(
+                              alpha: 0.7,
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
@@ -355,8 +354,8 @@ void showEndMeetingConfirmDialog(
                       ),
                     );
 
-                    // 返回会议列表
-                    Navigator.of(context).pop();
+                    // 返回会议列表并强制刷新
+                    Navigator.of(context).pop(true); // 传递true表示需要刷新
                   }
                 } catch (e) {
                   if (context.mounted) {

@@ -30,7 +30,7 @@ class _MeetingPasswordSettingState extends State<MeetingPasswordSetting> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
-        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1)),
+        side: BorderSide(color: theme.colorScheme.outline.withAlpha(26)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingM),
@@ -121,7 +121,9 @@ class _MeetingPasswordSettingState extends State<MeetingPasswordSetting> {
               Container(
                 padding: const EdgeInsets.all(AppConstants.paddingS),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                    77,
+                  ),
                   borderRadius: BorderRadius.circular(AppConstants.radiusS),
                 ),
                 child: Row(

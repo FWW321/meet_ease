@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../pages/login_page.dart';
 import '../pages/home_page.dart';
-import '../services/user_service.dart';
 
 class AuthChecker extends StatefulWidget {
   const AuthChecker({super.key});

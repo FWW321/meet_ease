@@ -398,58 +398,6 @@ class MaterialActions {
     return false;
   }
 
-  /// 打开文件所在位置
-  static Future<void> _openFileLocation(String filePath) async {
-    try {
-      final file = File(filePath);
-      if (!await file.exists()) {
-        debugPrint('文件不存在: $filePath');
-        return;
-      }
-
-      if (Platform.isAndroid) {
-        // 在Android上直接使用系统文件浏览器打开文件夹
-        final directory = file.parent.path;
-
-        // 尝试构建一个文件夹的content URI
-        final contentUri = Uri.parse(
-          'content://com.android.externalstorage.documents/document/primary:${directory.replaceFirst('/storage/emulated/0/', '')}',
-        );
-
-        // 使用ACTION_VIEW打开文件夹
-        if (await canLaunchUrl(contentUri)) {
-          await launchUrl(contentUri, mode: LaunchMode.externalApplication);
-        } else {
-          // 如果无法打开content URI，尝试直接打开文件URI
-          final fileUri = Uri.parse('file://$directory');
-          if (await canLaunchUrl(fileUri)) {
-            await launchUrl(fileUri, mode: LaunchMode.externalApplication);
-          } else {
-            debugPrint('无法打开文件夹: $directory');
-          }
-        }
-      } else if (Platform.isWindows) {
-        // Windows: 使用explorer打开文件所在文件夹并选中文件
-        await Process.run('explorer.exe', ['/select,', filePath]);
-      } else if (Platform.isMacOS) {
-        // macOS: 使用open -R命令打开文件所在文件夹并选中文件
-        await Process.run('open', ['-R', filePath]);
-      } else if (Platform.isLinux) {
-        // Linux: 尝试使用xdg-open打开文件所在文件夹
-        final directory = file.parent.path;
-        await Process.run('xdg-open', [directory]);
-      } else {
-        // 其他平台: 尝试直接打开文件
-        final uri = Uri.file(filePath);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        }
-      }
-    } catch (e) {
-      debugPrint('打开文件位置失败: $e');
-    }
-  }
-
   /// 直接打开文件
   static Future<void> _openFile(String filePath) async {
     try {

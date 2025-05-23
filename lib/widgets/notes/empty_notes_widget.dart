@@ -13,13 +13,13 @@ class EmptyNotesWidget extends StatelessWidget {
           Icon(
             Icons.note_alt_outlined,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(102),
           ),
           const SizedBox(height: 16),
           Text(
             '暂无会议笔记',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
             ),
           ),
         ],

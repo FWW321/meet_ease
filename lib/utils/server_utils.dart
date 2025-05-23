@@ -37,7 +37,7 @@ class ServerUtils {
       final socket = await Socket.connect(
         host,
         port,
-        timeout: const Duration(seconds: 5),
+        timeout: const Duration(seconds: 10),
       );
 
       // 成功建立连接

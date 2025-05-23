@@ -3,23 +3,26 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../providers/webrtc_providers.dart';
 import '../providers/user_providers.dart';
-import '../providers/chat_providers.dart';
 import '../services/webrtc_service.dart';
-import '../models/chat_message.dart';
 import '../services/service_providers.dart';
-import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:async';
+import '../providers/chat_providers.dart';
+import '../providers/meeting_process_providers.dart' as meeting_providers;
+import '../providers/meeting_providers.dart';
 
 /// 语音会议组件
 class VoiceMeetingWidget extends HookConsumerWidget {
   final String meetingId;
   final String userName;
   final bool isReadOnly;
+  final bool isAdminOrCreator; // 添加是否是管理员或创建者的属性
 
   const VoiceMeetingWidget({
     required this.meetingId,
     required this.userName,
     this.isReadOnly = false,
+    this.isAdminOrCreator = false, // 默认值为false
     super.key,
   });
 
@@ -35,6 +38,7 @@ class VoiceMeetingWidget extends HookConsumerWidget {
 
     // 如果权限已被永久拒绝，引导用户前往设置页面
     if (micStatus.isPermanentlyDenied) {
+      if (!context.mounted) return false;
       return await _showPermissionSettingsDialog(context, '麦克风');
     }
 
@@ -89,65 +93,14 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     // 是否已加入会议
     final isJoined = useState(false);
 
+    // 获取聊天服务
+    final chatService = ref.watch(chatServiceProvider);
+
+    // 监听WebSocket连接状态
+    final isWebSocketConnected = useState(false);
+
     // 参会人员列表
     final participantsAsync = ref.watch(webRTCParticipantsProvider);
-
-    // 聊天消息流 - 用于将系统消息传递给WebRTC服务
-    final chatMessagesAsync = ref.watch(webSocketMessagesProvider);
-
-    // 处理新的聊天消息
-    useEffect(() {
-      // 创建一个标志，表示组件是否已被销毁
-      bool isDisposed = false;
-
-      if (chatMessagesAsync.hasValue && chatMessagesAsync.value != null) {
-        try {
-          final message = chatMessagesAsync.value!;
-          // 检查是否为系统消息
-          if (message['messageType'] == 'SYSTEM') {
-            debugPrint('VoiceMeetingWidget收到系统消息: ${message['content']}');
-
-            // 记录会议ID，确保消息是当前会议的
-            final msgMeetingId = message['meetingId']?.toString() ?? '';
-            if (msgMeetingId == meetingId) {
-              debugPrint('系统消息属于当前会议，WebRTC服务应自动处理');
-
-              // 如果需要手动处理，可以获取WebRTC服务并调用handleSystemMessage
-              if (message['content'].toString().contains('加入会议') ||
-                  message['content'].toString().contains('离开会议') ||
-                  message['content'].toString().contains('开启麦克风') ||
-                  message['content'].toString().contains('关闭麦克风')) {
-                debugPrint('收到会议相关系统消息，确保WebRTC服务处理: ${message['content']}');
-
-                // 创建一个ChatMessage对象并手动传递给WebRTC服务
-                try {
-                  if (!isDisposed) {
-                    final chatMessage = ChatMessage.fromJson(message);
-                    final webRTCService = ref.read(webRTCServiceProvider);
-                    if (webRTCService is MockWebRTCService) {
-                      webRTCService.handleSystemMessage(chatMessage);
-                      debugPrint('已手动传递系统消息给WebRTC服务');
-                    }
-                  }
-                } catch (e) {
-                  debugPrint('创建ChatMessage或传递给WebRTC服务失败: $e');
-                }
-              }
-            } else {
-              debugPrint('系统消息不属于当前会议，忽略');
-            }
-          }
-        } catch (e) {
-          debugPrint('处理系统消息出错: $e');
-        }
-      }
-
-      // 返回清理函数，在组件销毁时将标志设置为true
-      return () {
-        isDisposed = true;
-        debugPrint('VoiceMeetingWidget系统消息处理器已清理');
-      };
-    }, [chatMessagesAsync]);
 
     // 麦克风状态 - 从参会人员列表中获取当前用户的麦克风状态
     final isMicEnabled = participantsAsync.when(
@@ -335,10 +288,33 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           });
 
       // 离开会议时清理资源
-      return () {
-        ref.read(leaveMeetingProvider.future);
+      return () async {
+        // 使用 webSocketDisconnectProvider 断开连接
+        await ref.read(webSocketDisconnectProvider)();
+
+        // 离开 WebRTC 会议
+        await ref.read(leaveMeetingProvider.future);
       };
-    }, [userId]); // 添加userId作为依赖，确保用户ID变化时重新执行
+    }, [userId, chatService]); // 添加 chatService 作为依赖
+
+    // 监听WebSocket连接状态
+    useEffect(() {
+      // 监听连接状态流
+      final subscription = chatService.connectionStateStream.listen((
+        connected,
+      ) {
+        isWebSocketConnected.value = connected;
+        if (connected) {
+          debugPrint('更新UI: WebSocket已连接，显示"会议已连接"');
+        } else {
+          debugPrint('更新UI: WebSocket已断开，显示"正在连接会议..."');
+        }
+      });
+
+      return () {
+        subscription.cancel();
+      };
+    }, [chatService, meetingId, userIdAsync.value]);
 
     // 获取当前用户信息
     final currentUserAsync = participantsAsync.when(
@@ -368,6 +344,12 @@ class VoiceMeetingWidget extends HookConsumerWidget {
       return null;
     }, [participantsAsync]);
 
+    // 检查当前用户是否为管理员或创建者
+    final isAdmin =
+        isAdminOrCreator ||
+        currentUserAsync.isAdmin ||
+        currentUserAsync.isCreator;
+
     // 进行中会议的界面
     return Column(
       children: [
@@ -375,30 +357,31 @@ class VoiceMeetingWidget extends HookConsumerWidget {
         Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
           decoration: BoxDecoration(
-            color: theme.primaryColor.withOpacity(0.1),
+            color: theme.primaryColor.withAlpha(26),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
               // 会议状态图标
               Icon(
-                isJoined.value ? Icons.mic : Icons.mic_off,
-                color: isJoined.value ? Colors.green : Colors.grey,
+                isWebSocketConnected.value ? Icons.mic : Icons.mic_off,
+                color: isWebSocketConnected.value ? Colors.green : Colors.grey,
               ),
               const SizedBox(width: 12),
 
               // 会议状态文本
               Expanded(
                 child: Text(
-                  isJoined.value ? '会议已连接' : '正在连接会议...',
+                  isWebSocketConnected.value ? '会议已连接' : '正在连接会议...',
                   style: TextStyle(
                     fontWeight: FontWeight.w500,
-                    color: isJoined.value ? Colors.green : Colors.grey,
+                    color:
+                        isWebSocketConnected.value ? Colors.green : Colors.grey,
                   ),
                 ),
               ),
 
-              // 麦克风控制按钮
+              // 麦克风控制按钮 - 放在后面
               IconButton(
                 icon: Icon(
                   isMicEnabled ? Icons.mic : Icons.mic_off,
@@ -416,9 +399,9 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           margin: const EdgeInsets.symmetric(vertical: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withAlpha(26),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            border: Border.all(color: Colors.blue.withAlpha(77)),
           ),
           child: Row(
             children: [
@@ -508,15 +491,6 @@ class VoiceMeetingWidget extends HookConsumerWidget {
           ],
         ),
 
-        // 添加一个提示，说明只显示活跃连接的用户
-        // Container(
-        //   padding: const EdgeInsets.symmetric(vertical: 4),
-        //   child: const Text(
-        //     '注意：只有活跃连接的用户才会显示在下方列表中',
-        //     style: TextStyle(fontSize: 12, color: Colors.grey),
-        //   ),
-        // ),
-
         const SizedBox(height: 8),
 
         // 参会人员列表
@@ -572,11 +546,6 @@ class VoiceMeetingWidget extends HookConsumerWidget {
             Icon(Icons.people_outline, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text('暂无其他参会人员', style: TextStyle(color: Colors.grey)),
-            SizedBox(height: 8),
-            Text(
-              '只有活跃连接的用户才会显示在列表中',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
           ],
         ),
       );
@@ -597,64 +566,60 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     );
   }
 
-  // 构建参会人员项
+  // 修改参会者项的构建方法，根据连接状态显示不同的图标
   Widget _buildParticipantItem(
     MeetingParticipant participant,
     BuildContext context, {
     bool showSpeakingStatus = true,
     bool showMicStatus = true,
   }) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.grey.shade300,
-        child: Text(
-          participant.name.isNotEmpty ? participant.name[0].toUpperCase() : '?',
-          style: const TextStyle(color: Colors.black),
-        ),
-      ),
-      title: Text(participant.name),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 角色标签
-          if (participant.isCreator) _buildRoleTag('创建者', Colors.orange),
-          if (participant.isAdmin && !participant.isCreator)
-            _buildRoleTag('管理员', Colors.blue),
-          const SizedBox(width: 4),
+    return Consumer(
+      builder: (context, ref, _) {
+        // 在Consumer内部获取WebRTC服务实例
+        final webrtcService = ref.read(webRTCServiceProvider);
+        // 检查与此参会者的连接状态
+        final isPeerConnected = webrtcService.isPeerConnected(participant.id);
 
-          // 发言指示器
-          if (showSpeakingStatus && participant.isSpeaking)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.record_voice_over, size: 16, color: Colors.green),
-                  SizedBox(width: 4),
-                  Text(
-                    '发言中',
-                    style: TextStyle(color: Colors.green, fontSize: 12),
-                  ),
-                ],
-              ),
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Colors.grey.shade300,
+            child: Text(
+              participant.name.isNotEmpty
+                  ? participant.name[0].toUpperCase()
+                  : '?',
+              style: const TextStyle(color: Colors.black),
             ),
+          ),
+          title: Text(participant.name),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 角色标签
+              if (participant.isCreator) _buildRoleTag('创建者', Colors.orange),
+              if (participant.isAdmin && !participant.isCreator)
+                _buildRoleTag('管理员', Colors.blue),
+              const SizedBox(width: 4),
 
-          if (showSpeakingStatus && participant.isSpeaking)
-            const SizedBox(width: 8),
-
-          // 麦克风状态图标
-          if (showMicStatus)
-            Icon(
-              participant.isMuted ? Icons.mic_off : Icons.mic,
-              color: participant.isMuted ? Colors.red : Colors.green,
-              size: 20,
-            ),
-        ],
-      ),
+              // 麦克风状态图标 - 根据连接状态显示不同图标
+              if (showMicStatus)
+                isPeerConnected
+                    ? Icon(
+                      participant.isMuted ? Icons.mic_off : Icons.mic,
+                      color: participant.isMuted ? Colors.red : Colors.green,
+                      size: 20,
+                    )
+                    : SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
+                      ),
+                    ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -663,9 +628,9 @@ class VoiceMeetingWidget extends HookConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
+        border: Border.all(color: color.withAlpha(128)),
       ),
       child: Text(
         label,

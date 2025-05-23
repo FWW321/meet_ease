@@ -34,7 +34,7 @@ class AdminsTab extends HookConsumerWidget {
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: backgroundColor.withOpacity(0.5),
+      color: backgroundColor.withValues(alpha: 0.5),
       child: Column(
         children: [
           // 管理员列表
@@ -46,7 +46,7 @@ class AdminsTab extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -140,7 +140,7 @@ class AdminsTab extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.3),
+                    color: primaryColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -209,7 +209,7 @@ class AdminsTab extends HookConsumerWidget {
         meetingParticipantsProvider(meeting.id),
       );
       final participantIds =
-          await participantsAsync.whenOrNull(
+          participantsAsync.whenOrNull(
             data:
                 (participants) =>
                     participants.map((participant) => participant.id).toList(),
@@ -259,6 +259,7 @@ class AdminsTab extends HookConsumerWidget {
 
       // 添加所有选中的用户为管理员
       for (final userId in validSelectedIds) {
+        if (!context.mounted) return;
         _addAdmin(context, ref, userId);
       }
     } else {
@@ -292,6 +293,7 @@ class AdminsTab extends HookConsumerWidget {
 
       // 添加所有选中的用户为管理员
       for (final userId in validSelectedIds) {
+        if (!context.mounted) return;
         _addAdmin(context, ref, userId);
       }
     }

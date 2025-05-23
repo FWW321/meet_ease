@@ -124,7 +124,7 @@ class NoteCardWidget extends ConsumerWidget {
                               fontSize: 12,
                               color: Colors.blue,
                             ),
-                            backgroundColor: Colors.blue.withOpacity(0.1),
+                            backgroundColor: Colors.blue.withAlpha(26),
                             visualDensity: VisualDensity.compact,
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,

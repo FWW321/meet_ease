@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +20,9 @@ class ChatWidget extends HookConsumerWidget {
   final String? userAvatar;
   final bool isReadOnly;
 
+  // 添加未读消息计数状态
+  static final unreadCountProvider = StateProvider<int>((ref) => 0);
+
   const ChatWidget({
     required this.meetingId,
     required this.userId,
@@ -27,6 +31,16 @@ class ChatWidget extends HookConsumerWidget {
     this.isReadOnly = false,
     super.key,
   });
+
+  // 添加更新未读消息计数的方法
+  static void updateUnreadCount(WidgetRef ref, int count) {
+    ref.read(unreadCountProvider.notifier).state = count;
+  }
+
+  // 添加重置未读消息计数的方法
+  static void resetUnreadCount(WidgetRef ref) {
+    ref.read(unreadCountProvider.notifier).state = 0;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,9 +58,6 @@ class ChatWidget extends HookConsumerWidget {
       });
       return null;
     }, const []);
-
-    // WebSocket消息流
-    final webSocketMessages = ref.watch(webSocketMessagesProvider);
 
     // 本地消息列表（用于保存接收到的WebSocket消息）
     final localMessages = useState<List<ChatMessage>>([]);
@@ -89,31 +100,35 @@ class ChatWidget extends HookConsumerWidget {
 
     // 处理接收到的WebSocket消息
     useEffect(() {
-      webSocketMessages.whenData((message) {
-        try {
-          print('接收到WebSocket消息: $message');
+      // 获取WebSocket消息流
+      final chatService = ref.read(chatServiceProvider);
+      final messageStream = chatService.getMessageStream(meetingId);
 
-          // 从消息中获取所需的字段
-          final messageType =
-              message['messageType']?.toString().toUpperCase() ?? '';
+      // 订阅消息流
+      final subscription = messageStream.listen(
+        (message) {
+          try {
+            debugPrint('ChatWidget接收到WebSocket消息: $message');
 
-          // 创建ChatMessage对象
-          final chatMessage = ChatMessage.fromJson(message);
+            // 将消息添加到本地消息列表
+            localMessages.value = [...localMessages.value, message];
 
-          // 将消息添加到本地消息列表
-          localMessages.value = [...localMessages.value, chatMessage];
+            // 滚动到底部显示新消息
+            scrollToBottom();
+          } catch (e) {
+            debugPrint('ChatWidget处理WebSocket消息失败: $e');
+          }
+        },
+        onError: (error) {
+          debugPrint('ChatWidget WebSocket消息流错误: $error');
+        },
+      );
 
-          // 滚动到底部显示新消息
-          scrollToBottom();
-
-          print('消息类型: $messageType, 内容: ${chatMessage.content}');
-        } catch (e) {
-          print('处理WebSocket消息失败: $e');
-        }
-      });
-
-      return null;
-    }, [webSocketMessages]);
+      // 清理订阅
+      return () {
+        subscription.cancel();
+      };
+    }, [meetingId]);
 
     // 消息列表
     final messagesAsync = ref.watch(meetingMessagesProvider(meetingId));
@@ -252,6 +267,12 @@ class ChatWidget extends HookConsumerWidget {
       if (text.isEmpty) return;
 
       try {
+        // 确保有用户ID
+        final userId = currentUserId.value;
+        if (userId == null || userId.isEmpty) {
+          throw Exception('用户ID不能为空');
+        }
+
         // 使用WebSocket发送消息
         final sendMessage = ref.read(webSocketSendMessageProvider);
         await sendMessage(text);
@@ -268,13 +289,6 @@ class ChatWidget extends HookConsumerWidget {
           ).showSnackBar(SnackBar(content: Text('发送消息失败: ${e.toString()}')));
         }
       }
-    }
-
-    // 标记消息为已读
-    void markMessageAsRead(String messageId) {
-      ref.read(
-        markMessageAsReadProvider({'messageId': messageId, 'userId': userId}),
-      );
     }
 
     // 添加表情到输入框
@@ -318,16 +332,32 @@ class ChatWidget extends HookConsumerWidget {
                 // 合并历史消息和WebSocket实时消息
                 final combinedMessages = [...messages, ...localMessages.value];
 
-                // 过滤掉系统消息以及头像会显示为"?"的消息
+                // 过滤掉系统消息、WebRTC信令消息以及头像会显示为"?"的消息
                 final filteredMessages =
-                    combinedMessages
-                        .where(
-                          (message) =>
-                              !message.isSystemMessage && // 过滤系统消息
-                              !(message.senderAvatar == null &&
-                                  message.senderName.isEmpty),
-                        )
-                        .toList();
+                    combinedMessages.where((message) {
+                      // 如果是系统消息，检查是否包含WebRTC信令
+                      if (message.isSystemMessage) {
+                        return false;
+                      }
+
+                      // 检查是否是WebRTC信令消息（通过消息内容判断）
+                      try {
+                        final content = message.content;
+                        if (content.startsWith('{') && content.endsWith('}')) {
+                          final jsonData = jsonDecode(content);
+                          // 如果消息类型是WEBRTC_SIGNAL，则过滤掉
+                          if (jsonData['messageType'] == 'WEBRTC_SIGNAL') {
+                            return false;
+                          }
+                        }
+                      } catch (_) {
+                        // 解析失败说明不是JSON格式，不是WebRTC信令
+                      }
+
+                      // 过滤掉头像为空且名称为空的消息
+                      return !(message.senderAvatar == null &&
+                          message.senderName.isEmpty);
+                    }).toList();
 
                 // 按时间排序
                 filteredMessages.sort(
@@ -350,7 +380,6 @@ class ChatWidget extends HookConsumerWidget {
                   showDateSeparator: showDateSeparator.value,
                   isLoadingHistory: isLoadingHistory.value,
                   onRefresh: handleRefresh,
-                  onMessageRead: markMessageAsRead,
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),

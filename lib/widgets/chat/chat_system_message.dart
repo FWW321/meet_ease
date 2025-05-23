@@ -59,10 +59,8 @@ class ChatSystemMessage extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (messageIcon != null) ...[
-            Icon(messageIcon, size: 14, color: iconColor),
-            const SizedBox(width: 6),
-          ],
+          Icon(messageIcon, size: 14, color: iconColor),
+          const SizedBox(width: 6),
           Flexible(
             child: Text(
               displayMessage,

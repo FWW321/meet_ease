@@ -3,9 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../../models/meeting.dart';
 import '../../providers/meeting_providers.dart';
 import '../../providers/user_providers.dart';
-import '../../providers/chat_providers.dart';
-import '../../services/api_chat_service.dart';
-import '../../services/service_providers.dart';
 import '../../widgets/meeting_password_dialog.dart';
 import '../meeting_process/meeting_process_page.dart';
 import '../meeting_settings_page.dart';
@@ -38,12 +35,6 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
     if (mounted) {
       setState(() {
         currentUserId = userId;
-
-        // 强制刷新黑名单状态
-        if (userId.isNotEmpty) {
-          // 使用invalidate强制重新获取黑名单状态
-          ref.invalidate(isUserInBlacklistProvider(widget.meetingId, userId));
-        }
       });
     }
   }
@@ -52,7 +43,11 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // 每次页面依赖变化时也刷新黑名单状态
+    // 每次页面依赖变化时刷新数据
+    // 1. 刷新会议详情数据
+    ref.invalidate(meetingDetailProvider(widget.meetingId));
+
+    // 2. 刷新黑名单状态(如果用户ID不为空)
     if (currentUserId != null && currentUserId!.isNotEmpty) {
       ref.invalidate(
         isUserInBlacklistProvider(widget.meetingId, currentUserId!),
@@ -204,11 +199,11 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
           isUserInBlacklistProvider(meeting.id, currentUserId!),
         );
 
-        print('刷新黑名单状态检查[$refreshKey]');
+        debugPrint('刷新黑名单状态检查[$refreshKey]');
 
         return blacklistStatus.when(
           data: (isInBlacklist) {
-            print('获取到黑名单检查结果[$refreshKey]: $isInBlacklist');
+            debugPrint('获取到黑名单检查结果[$refreshKey]: $isInBlacklist');
             if (isInBlacklist) {
               // 用户在黑名单中，显示被封禁消息
               return Center(
@@ -218,7 +213,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
+                        color: Colors.red.withAlpha(26),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -259,7 +254,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
               ),
           error: (error, stack) {
             // 发生错误时，继续显示会议详情
-            print('检查黑名单状态失败: $error');
+            debugPrint('检查黑名单状态失败: $error');
             return _buildMeetingDetailUI(context, meeting, theme);
           },
         );
@@ -342,7 +337,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withOpacity(0.1),
+                        color: theme.primaryColor.withAlpha(26),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -387,7 +382,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                    side: BorderSide(color: Colors.grey.withAlpha(51)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -398,7 +393,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
                           decoration: BoxDecoration(
                             color: getPermissionColor(
                               userPermission,
-                            ).withOpacity(0.1),
+                            ).withAlpha(26),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -443,7 +438,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+                side: BorderSide(color: Colors.grey.withAlpha(51)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -582,9 +577,9 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
               margin: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withAlpha(26),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+                border: Border.all(color: Colors.red.withAlpha(77)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,7 +641,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
                 // 进入会议按钮 - 已取消的会议无法进入
                 if (!isCancelled)
-                  Container(
+                  SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed:
@@ -768,7 +763,7 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
 
           if (responseData['code'] == 200) {
             final isInBlacklist = responseData['data'] as bool;
-            print('进入会议前直接检查黑名单状态[$timestamp]: $isInBlacklist');
+            debugPrint('进入会议前直接检查黑名单状态[$timestamp]: $isInBlacklist');
 
             if (isInBlacklist) {
               if (context.mounted) {
@@ -785,23 +780,23 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
         }
       } catch (e) {
         // 检查失败时记录错误，但允许用户继续
-        print('直接检查黑名单状态失败: $e');
+        debugPrint('直接检查黑名单状态失败: $e');
       }
     }
 
-    print('准备进入会议 - ID: ${meeting.id}, 标题: ${meeting.title}');
-    print(
+    debugPrint('准备进入会议 - ID: ${meeting.id}, 标题: ${meeting.title}');
+    debugPrint(
       '会议密码状态: ${meeting.password != null && meeting.password!.isNotEmpty ? "需要密码: ${meeting.password}" : "不需要密码"}',
     );
 
     // 检查会议是否需要密码
     if (meeting.password != null && meeting.password!.isNotEmpty) {
-      print('会议需要密码验证');
-      if (!mounted) return;
+      debugPrint('会议需要密码验证');
+      if (!context.mounted) return;
 
       try {
         // 显示密码验证对话框
-        print('显示密码验证对话框');
+        debugPrint('显示密码验证对话框');
         final passwordValid = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -809,33 +804,32 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
               (context) => MeetingPasswordDialog(meetingId: widget.meetingId),
         );
 
-        print('密码验证结果类型: ${passwordValid.runtimeType}');
-        print('密码验证结果值: $passwordValid');
+        debugPrint('密码验证结果类型: ${passwordValid.runtimeType}');
+        debugPrint('密码验证结果值: $passwordValid');
 
         // 如果密码验证返回null，表示用户取消；如果返回false，表示密码错误
         if (passwordValid == null) {
-          print('用户取消了密码验证');
+          debugPrint('用户取消了密码验证');
           // 用户取消验证，直接返回
           return;
         } else if (passwordValid == false) {
-          print('密码验证失败，显示错误提示');
+          debugPrint('密码验证失败，显示错误提示');
           // 密码验证失败
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('密码验证失败，无法进入会议'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('密码验证失败，无法进入会议'),
+              backgroundColor: Colors.red,
+            ),
+          );
           return;
         }
 
-        print('密码验证通过，继续进入会议');
+        debugPrint('密码验证通过，继续进入会议');
       } catch (e) {
         // 处理密码验证过程中的任何错误
-        print('密码验证过程出错: $e');
-        if (mounted) {
+        debugPrint('密码验证过程出错: $e');
+        if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('密码验证过程出错: $e'),
@@ -848,65 +842,19 @@ class _MeetingDetailPageState extends ConsumerState<MeetingDetailPage> {
     }
 
     // 密码验证成功或不需要密码，进入会议
-    print('密码验证通过或不需要密码，准备进入会议');
-    if (!mounted) return;
-
-    // 如果是进行中的会议，建立WebSocket连接
-    if (meeting.status == MeetingStatus.ongoing && currentUserId != null) {
-      try {
-        // 连接到WebSocket
-        await ref.read(
-          webSocketConnectProvider({
-            'meetingId': widget.meetingId,
-            'userId': currentUserId!,
-          }).future,
-        );
-
-        // WebSocket连接成功后，将其设置给ApiChatService使用
-        final chatService = ref.read(chatServiceProvider);
-        if (chatService is ApiChatService) {
-          chatService.useExternalWebSocket(ref, widget.meetingId);
-          print('已将外部WebSocket连接设置给ApiChatService使用');
-        }
-      } catch (e) {
-        if (!context.mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('WebSocket连接失败: $e'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        // 失败但仍继续进入会议（可能使用HTTP请求作为回退方式）
-      }
-    }
-
-    if (!mounted) return;
-
-    // 打开会议处理页面，并等待页面关闭
+    debugPrint('密码验证通过或不需要密码，准备进入会议');
     if (!context.mounted) return;
 
-    await Navigator.push(
-      context,
+    // 导航到会议进程页面并等待结果
+    final result = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder:
-            (context) => MeetingProcessPage(
-              meetingId: widget.meetingId,
-              meeting: meeting,
-            ),
+        builder: (context) => MeetingProcessPage(meetingId: widget.meetingId),
       ),
     );
 
-    // 页面关闭后，断开WebSocket连接（无论页面如何关闭）
-    if (!mounted) return;
-
-    final isConnected = ref.read(webSocketConnectedProvider);
-    if (isConnected) {
-      try {
-        await ref.read(webSocketDisconnectProvider)();
-      } catch (e) {
-        print('断开WebSocket连接失败: $e');
-      }
+    // 如果返回结果为true，表示需要刷新会议详情
+    if (result == true) {
+      ref.invalidate(meetingDetailProvider(widget.meetingId));
     }
   }
 }

@@ -72,11 +72,9 @@ class MeetingVisibilitySelector extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppConstants.paddingS),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
             borderRadius: BorderRadius.circular(AppConstants.radiusS),
-            border: Border.all(
-              color: theme.colorScheme.outline.withOpacity(0.1),
-            ),
+            border: Border.all(color: theme.colorScheme.outline.withAlpha(26)),
           ),
           child: Row(
             children: [

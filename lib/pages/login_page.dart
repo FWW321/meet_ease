@@ -194,8 +194,8 @@ class _LoginPageState extends ConsumerState<LoginPage>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.8),
-              theme.colorScheme.secondary.withOpacity(0.7),
+              theme.colorScheme.primary.withAlpha(204),
+              theme.colorScheme.secondary.withAlpha(179),
             ],
           ),
         ),
@@ -227,7 +227,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       Text(
                         '便捷高效的会议管理系统',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withAlpha(204),
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -273,8 +273,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入用户名';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -306,8 +307,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入密码';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -378,7 +380,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withAlpha(26),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -425,7 +427,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                     '服务器: ${AppConstants.apiDomain}',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withAlpha(230),
                                     ),
                                   ),
                               const SizedBox(width: 8),

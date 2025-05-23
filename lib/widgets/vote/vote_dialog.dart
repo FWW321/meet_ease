@@ -184,7 +184,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                 ),
                 margin: const EdgeInsets.only(top: 8, bottom: 12),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.04),
+                  color: colorScheme.primary.withAlpha(10),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -195,7 +195,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                       child: Icon(
                         Icons.info_outline,
                         size: 16,
-                        color: colorScheme.primary.withOpacity(0.7),
+                        color: colorScheme.primary.withAlpha(179),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -204,7 +204,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                         widget.vote.description!,
                         style: textTheme.bodySmall?.copyWith(
                           height: 1.3,
-                          color: colorScheme.onSurface.withOpacity(0.8),
+                          color: colorScheme.onSurface.withAlpha(204),
                         ),
                       ),
                     ),
@@ -215,7 +215,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.2),
+                color: colorScheme.primaryContainer.withAlpha(51),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -282,7 +282,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                 margin: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: colorScheme.outline.withOpacity(0.2)),
+                  side: BorderSide(color: colorScheme.outline.withAlpha(51)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -302,8 +302,8 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
 
                           // 根据百分比计算颜色强度
                           final percentValue = double.parse(percentage) / 100;
-                          final progressColor = colorScheme.primary.withOpacity(
-                            0.2 + (percentValue * 0.8),
+                          final progressColor = colorScheme.primary.withAlpha(
+                            (51 + (percentValue * 204)).round(),
                           );
 
                           // 创建带有计数的选项标题
@@ -327,8 +327,9 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.primaryContainer
-                                      .withOpacity(0.3),
+                                  color: colorScheme.primaryContainer.withAlpha(
+                                    77,
+                                  ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
@@ -374,11 +375,11 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                                   tileColor:
                                       isSelected
                                           ? colorScheme.primaryContainer
-                                              .withOpacity(0.2)
+                                              .withAlpha(51)
                                           : null,
                                   selectedTileColor: colorScheme
                                       .primaryContainer
-                                      .withOpacity(0.2),
+                                      .withAlpha(51),
                                 ),
                                 // 进度条显示
                                 if (totalVotes > 0)
@@ -435,11 +436,11 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
                                   tileColor:
                                       isSelected
                                           ? colorScheme.primaryContainer
-                                              .withOpacity(0.2)
+                                              .withAlpha(51)
                                           : null,
                                   selectedTileColor: colorScheme
                                       .primaryContainer
-                                      .withOpacity(0.2),
+                                      .withAlpha(51),
                                 ),
                                 // 进度条显示
                                 if (totalVotes > 0)
@@ -573,7 +574,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
       );
 
       // 添加日志
-      print('提交投票响应: ${response.body}');
+      debugPrint('提交投票响应: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
@@ -581,6 +582,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
         // 检查响应码
         if (responseData['code'] == 200) {
           // 投票成功
+          if (!context.mounted) return;
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -599,6 +601,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
           ref.invalidate(voteResultsProvider(widget.vote.id));
         } else {
           // 投票失败
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Row(
@@ -621,6 +624,7 @@ class _VoteDialogState extends ConsumerState<VoteDialog> {
           defaultMessage: '投票提交失败',
         );
 
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(

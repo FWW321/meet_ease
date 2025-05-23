@@ -53,7 +53,7 @@ class VotesListWidget extends ConsumerWidget {
                       size: 64,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.4),
+                      ).colorScheme.onSurface.withAlpha(102),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -61,7 +61,7 @@ class VotesListWidget extends ConsumerWidget {
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.6),
+                        ).colorScheme.onSurface.withAlpha(153),
                       ),
                     ),
                   ],

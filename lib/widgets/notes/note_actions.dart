@@ -16,6 +16,8 @@ class NoteActions {
     ref.read(currentUserIdProvider.future).then((currentUserId) {
       // 获取要删除的笔记
       ref.read(noteDetailProvider(noteId).future).then((note) {
+        if (!context.mounted) return;
+
         // 如果笔记不存在，显示错误信息
         if (note == null) {
           ScaffoldMessenger.of(

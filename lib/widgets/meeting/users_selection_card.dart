@@ -3,7 +3,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import '../../providers/user_providers.dart';
 import '../../constants/app_constants.dart';
-import '../../models/user.dart';
 
 /// 用户选择卡片组件
 class UsersSelectionCard extends HookConsumerWidget {
@@ -26,7 +25,7 @@ class UsersSelectionCard extends HookConsumerWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusM),
-        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.1)),
+        side: BorderSide(color: theme.colorScheme.outline.withAlpha(26)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingM),
@@ -75,7 +74,7 @@ class UsersSelectionCard extends HookConsumerWidget {
                 margin: const EdgeInsets.only(top: AppConstants.paddingM),
                 padding: const EdgeInsets.all(AppConstants.paddingS),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer.withOpacity(0.3),
+                  color: theme.colorScheme.errorContainer.withAlpha(77),
                   borderRadius: BorderRadius.circular(AppConstants.radiusS),
                 ),
                 child: Row(
@@ -154,7 +153,7 @@ class UsersSelectionCard extends HookConsumerWidget {
             // 用户列表
             Container(
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(77),
                 borderRadius: BorderRadius.circular(AppConstants.radiusS),
               ),
               child: ListView.separated(
@@ -169,7 +168,7 @@ class UsersSelectionCard extends HookConsumerWidget {
                 separatorBuilder:
                     (context, index) => Divider(
                       height: 1,
-                      color: theme.colorScheme.outline.withOpacity(0.1),
+                      color: theme.colorScheme.outline.withAlpha(26),
                       indent: AppConstants.paddingM,
                       endIndent: AppConstants.paddingM,
                     ),
@@ -239,7 +238,7 @@ class UsersSelectionCard extends HookConsumerWidget {
             margin: const EdgeInsets.all(AppConstants.paddingS),
             padding: const EdgeInsets.all(AppConstants.paddingS),
             decoration: BoxDecoration(
-              color: theme.colorScheme.errorContainer.withOpacity(0.5),
+              color: theme.colorScheme.errorContainer.withAlpha(128),
               borderRadius: BorderRadius.circular(AppConstants.radiusS),
             ),
             child: Text(

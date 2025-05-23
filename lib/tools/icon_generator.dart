@@ -52,7 +52,7 @@ class IconGenerator {
     final file = File('assets/images/app_icon.png');
     await file.writeAsBytes(pngBytes);
 
-    print('图标已生成并保存到: ${file.path}');
+    debugPrint('图标已生成并保存到: ${file.path}');
   }
 
   /// 绘制会议相关的图形元素

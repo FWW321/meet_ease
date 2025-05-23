@@ -4,7 +4,6 @@ import '../constants/app_constants.dart';
 import '../services/service_providers.dart' as service_providers;
 import '../services/auth_service.dart';
 import '../providers/user_providers.dart';
-import 'dart:developer' as developer;
 
 class AccountSecurityPage extends StatefulHookConsumerWidget {
   const AccountSecurityPage({super.key});
@@ -213,8 +212,9 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                           obscureText: true,
                           validator: (value) {
                             if (value == null || value.isEmpty) return '请确认新密码';
-                            if (value != newPasswordController.text)
+                            if (value != newPasswordController.text) {
                               return '两次输入的密码不一致';
+                            }
                             return null;
                           },
                         ),
@@ -237,8 +237,9 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                                   try {
                                     final currentUser =
                                         await userService.getCurrentUser();
-                                    if (currentUser == null)
+                                    if (currentUser == null) {
                                       throw Exception('未获取到用户信息，请重新登录');
+                                    }
                                     final success = await userService
                                         .updatePassword(
                                           currentUser.id,
@@ -246,14 +247,16 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                                           newPasswordController.text,
                                         );
                                     if (success) {
-                                      Navigator.of(context).pop();
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('密码修改成功，请重新登录'),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('密码修改成功，请重新登录'),
+                                          ),
+                                        );
+                                      }
                                       await AuthService.clearLoginStatus();
                                       await ref
                                           .read(authStateProvider.notifier)
@@ -267,14 +270,21 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                                       }
                                     }
                                   } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('密码修改失败：${e.toString()}'),
-                                      ),
-                                    );
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            '密码修改失败：${e.toString()}',
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   } finally {
-                                    if (context.mounted)
+                                    if (context.mounted) {
                                       setState(() => isLoading = false);
+                                    }
                                   }
                                 }
                               },
@@ -378,17 +388,21 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
 
                                     if (success) {
                                       // 关闭对话框
-                                      Navigator.of(context).pop();
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                      }
 
                                       // 显示成功提示
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('账号已成功注销'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('账号已成功注销'),
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
 
                                       // 清除登录状态并退出
                                       await AuthService.clearLoginStatus();
@@ -422,11 +436,8 @@ class _AccountSecurityPageState extends ConsumerState<AccountSecurityPage> {
                                       );
                                     }
                                   } finally {
-                                    // 更新加载状态
                                     if (context.mounted) {
-                                      setState(() {
-                                        isLoading = false;
-                                      });
+                                      setState(() => isLoading = false);
                                     }
                                   }
                                 }

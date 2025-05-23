@@ -57,6 +57,7 @@ class NoteEditPage extends StatefulWidget {
       createdAt: DateTime.now(),
     );
 
+    if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder:
@@ -208,7 +209,7 @@ class _NoteEditPageState extends State<NoteEditPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isNewNote ? '创建笔记' : '编辑笔记'),
-        backgroundColor: colorScheme.primary.withOpacity(0.1),
+        backgroundColor: colorScheme.primary.withAlpha(26),
         foregroundColor: colorScheme.primary,
         actions: [
           Consumer(
@@ -244,7 +245,7 @@ class _NoteEditPageState extends State<NoteEditPage> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurface.withOpacity(0.8),
+                        color: colorScheme.onSurface.withAlpha(204),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -256,7 +257,7 @@ class _NoteEditPageState extends State<NoteEditPage> {
                         hintText: '请输入笔记标题',
                         filled: true,
                         fillColor: colorScheme.surfaceContainerHighest
-                            .withOpacity(0.3),
+                            .withAlpha(77),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
@@ -281,7 +282,7 @@ class _NoteEditPageState extends State<NoteEditPage> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: colorScheme.onSurface.withOpacity(0.8),
+                        color: colorScheme.onSurface.withAlpha(204),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -292,11 +293,12 @@ class _NoteEditPageState extends State<NoteEditPage> {
                       Container(
                         height: 45,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withAlpha(
+                            77,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: colorScheme.outline.withOpacity(0.2),
+                            color: colorScheme.outline.withAlpha(51),
                           ),
                         ),
                         // 使用SingleChildScrollView包裹工具栏使其可以滚动
@@ -423,11 +425,12 @@ class _NoteEditPageState extends State<NoteEditPage> {
                       // 大屏幕版本 - 标准工具栏
                       Container(
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest
-                              .withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withAlpha(
+                            77,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: colorScheme.outline.withOpacity(0.2),
+                            color: colorScheme.outline.withAlpha(51),
                           ),
                         ),
                         padding: const EdgeInsets.symmetric(
@@ -462,7 +465,7 @@ class _NoteEditPageState extends State<NoteEditPage> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: colorScheme.outline.withOpacity(0.2),
+                          color: colorScheme.outline.withAlpha(51),
                         ),
                       ),
                       child: GestureDetector(
@@ -487,8 +490,8 @@ class _NoteEditPageState extends State<NoteEditPage> {
                     // 共享开关
                     Container(
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withOpacity(
-                          0.3,
+                        color: colorScheme.surfaceContainerHighest.withAlpha(
+                          77,
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),

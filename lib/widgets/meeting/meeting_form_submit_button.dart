@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 /// 会议表单提交按钮组件
 class MeetingFormSubmitButton extends ConsumerWidget {

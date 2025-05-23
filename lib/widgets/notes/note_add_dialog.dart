@@ -45,7 +45,7 @@ class NoteAddDialog {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withAlpha(26),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -69,7 +69,7 @@ class NoteAddDialog {
                             IconButton(
                               icon: Icon(
                                 Icons.close,
-                                color: colorScheme.onSurface.withOpacity(0.7),
+                                color: colorScheme.onSurface.withAlpha(179),
                               ),
                               onPressed: () => Navigator.of(context).pop(),
                               padding: EdgeInsets.zero,
@@ -114,9 +114,7 @@ class NoteAddDialog {
                                 Text(
                                   '笔记内容',
                                   style: textTheme.bodyLarge?.copyWith(
-                                    color: colorScheme.onSurface.withOpacity(
-                                      0.7,
-                                    ),
+                                    color: colorScheme.onSurface.withAlpha(179),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -148,8 +146,9 @@ class NoteAddDialog {
                                     Text(
                                       '附件:',
                                       style: textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurface
-                                            .withOpacity(0.7),
+                                        color: colorScheme.onSurface.withAlpha(
+                                          179,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -162,7 +161,7 @@ class NoteAddDialog {
                                           ),
                                           border: Border.all(
                                             color: colorScheme.outline
-                                                .withOpacity(0.2),
+                                                .withAlpha(30),
                                             width: 0.5,
                                           ),
                                         ),
@@ -198,6 +197,8 @@ class NoteAddDialog {
                                                               .single
                                                               .path !=
                                                           null) {
+                                                    if (!context.mounted)
+                                                      return;
                                                     setState(() {
                                                       selectedFile = File(
                                                         result
@@ -213,6 +214,7 @@ class NoteAddDialog {
                                                     });
                                                   }
                                                 } catch (e) {
+                                                  if (!context.mounted) return;
                                                   ScaffoldMessenger.of(
                                                     context,
                                                   ).showSnackBar(
@@ -260,7 +262,7 @@ class NoteAddDialog {
                                                 width: 1,
                                                 height: 16,
                                                 color: colorScheme.outline
-                                                    .withOpacity(0.3),
+                                                    .withAlpha(30),
                                               ),
                                               const SizedBox(width: 8),
                                               Icon(
@@ -309,7 +311,7 @@ class NoteAddDialog {
                                                       ?.copyWith(
                                                         color: colorScheme
                                                             .onSurface
-                                                            .withOpacity(0.5),
+                                                            .withAlpha(179),
                                                         fontSize: 11,
                                                       ),
                                                 ),
@@ -332,14 +334,17 @@ class NoteAddDialog {
                                     title: Text(
                                       '与团队共享',
                                       style: textTheme.bodyLarge?.copyWith(
-                                        color: colorScheme.onSurface,
+                                        color: colorScheme.onSurface.withAlpha(
+                                          179,
+                                        ),
                                       ),
                                     ),
                                     subtitle: Text(
                                       '其他会议成员可以看到这个笔记',
                                       style: textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurface
-                                            .withOpacity(0.7),
+                                        color: colorScheme.onSurface.withAlpha(
+                                          179,
+                                        ),
                                       ),
                                     ),
                                     value: isShared,
@@ -451,6 +456,7 @@ class NoteAddDialog {
 
                                       try {
                                         // 显示加载状态
+                                        if (!context.mounted) return;
                                         final scaffoldMessenger =
                                             ScaffoldMessenger.of(context);
                                         scaffoldMessenger.showSnackBar(
@@ -465,7 +471,7 @@ class NoteAddDialog {
                                                         strokeWidth: 2,
                                                         color:
                                                             colorScheme
-                                                                .onBackground,
+                                                                .onSurface,
                                                       ),
                                                 ),
                                                 const SizedBox(width: 16),
@@ -539,6 +545,7 @@ class NoteAddDialog {
                                         scaffoldMessenger.hideCurrentSnackBar();
 
                                         // 关闭对话框
+                                        if (!context.mounted) return;
                                         Navigator.of(context).pop();
 
                                         // 显示成功消息
@@ -558,7 +565,7 @@ class NoteAddDialog {
                                             ),
                                             behavior: SnackBarBehavior.floating,
                                             backgroundColor: Colors.green
-                                                .withOpacity(0.1),
+                                                .withAlpha(26),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(8),
@@ -567,6 +574,7 @@ class NoteAddDialog {
                                         );
                                       } catch (e) {
                                         // 隐藏之前的SnackBar
+                                        if (!context.mounted) return;
                                         ScaffoldMessenger.of(
                                           context,
                                         ).hideCurrentSnackBar();
@@ -597,7 +605,7 @@ class NoteAddDialog {
                                               ],
                                             ),
                                             backgroundColor: Colors.red
-                                                .withOpacity(0.1),
+                                                .withAlpha(26),
                                             behavior: SnackBarBehavior.floating,
                                             shape: RoundedRectangleBorder(
                                               borderRadius:

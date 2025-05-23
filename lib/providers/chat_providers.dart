@@ -2,50 +2,65 @@ import 'dart:async';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import '../models/chat_message.dart';
 import '../services/service_providers.dart';
+import 'package:flutter/foundation.dart';
 
 /// WebSocket聊天消息流提供者
-final webSocketMessagesProvider =
-    StreamProvider.autoDispose<Map<String, dynamic>>((ref) {
-      final webSocketService = ref.watch(webSocketServiceProvider);
-
-      // 不在这里断开WebSocket连接，连接生命周期由MeetingDetailPage控制
-      // ref.onDispose(() {
-      //   webSocketService.disconnect();
-      // });
-
-      return webSocketService.messageStream;
-    });
+final webSocketMessagesProvider = StreamProvider.autoDispose<ChatMessage>((
+  ref,
+) {
+  final chatService = ref.watch(chatServiceProvider);
+  return chatService.getMessageStream('').handleError((error, stackTrace) {
+    debugPrint('WebSocket消息流错误: $error');
+    return Stream.empty();
+  });
+});
 
 /// 通过WebSocket发送消息的提供者
 final webSocketSendMessageProvider = Provider<Function(String)>((ref) {
-  final webSocketService = ref.watch(webSocketServiceProvider);
+  final chatService = ref.watch(chatServiceProvider);
 
-  return (String message) async {
-    await webSocketService.sendMessage(message);
+  return (String content) async {
+    try {
+      await chatService.sendTextMessage(content);
+    } catch (e) {
+      debugPrint('发送消息失败: $e');
+      rethrow;
+    }
   };
 });
 
 /// WebSocket连接状态提供者
-final webSocketConnectedProvider = StateProvider<bool>((ref) => false);
+final webSocketConnectedProvider = StreamProvider.autoDispose<bool>((ref) {
+  final chatService = ref.watch(chatServiceProvider);
+  return chatService.connectionStateStream;
+});
 
 /// WebSocket连接提供者
 final webSocketConnectProvider =
     FutureProvider.family<void, Map<String, String>>((ref, params) async {
-      final webSocketService = ref.watch(webSocketServiceProvider);
+      final chatService = ref.watch(chatServiceProvider);
       final meetingId = params['meetingId']!;
       final userId = params['userId']!;
 
-      await webSocketService.connectToChat(meetingId, userId);
-      ref.read(webSocketConnectedProvider.notifier).state = true;
+      try {
+        await chatService.connectToChat(meetingId, userId);
+      } catch (e) {
+        debugPrint('WebSocket连接失败: $e');
+        rethrow;
+      }
     });
 
 /// WebSocket断开连接提供者
 final webSocketDisconnectProvider = Provider<Future<void> Function()>((ref) {
-  final webSocketService = ref.watch(webSocketServiceProvider);
+  final chatService = ref.watch(chatServiceProvider);
 
   return () async {
-    await webSocketService.disconnect();
-    ref.read(webSocketConnectedProvider.notifier).state = false;
+    try {
+      await chatService.disconnect();
+    } catch (e) {
+      debugPrint('WebSocket断开连接失败: $e');
+      rethrow;
+    }
   };
 });
 
@@ -56,64 +71,24 @@ final meetingMessagesProvider =
       meetingId,
     ) async {
       final service = ref.watch(chatServiceProvider);
-      return await service.getMeetingMessages(meetingId);
+      try {
+        return await service.getMeetingMessages(meetingId);
+      } catch (e) {
+        debugPrint('获取会议消息失败: $e');
+        rethrow;
+      }
     });
 
 /// 发送文字消息提供者
-final sendTextMessageProvider =
-    AutoDisposeFutureProvider.family<ChatMessage, Map<String, dynamic>>((
-      ref,
-      params,
-    ) async {
-      final service = ref.read(chatServiceProvider);
-      final meetingId = params['meetingId'] as String;
-      final senderId = params['senderId'] as String;
-      final senderName = params['senderName'] as String;
-      final content = params['content'] as String;
-      final senderAvatar = params['senderAvatar'] as String?;
+final sendTextMessageProvider = Provider<Function(String)>((ref) {
+  final service = ref.read(chatServiceProvider);
 
-      return service.sendTextMessage(
-        meetingId,
-        senderId,
-        senderName,
-        content,
-        senderAvatar: senderAvatar,
-      );
-    });
-
-/// 发送语音消息提供者
-final sendVoiceMessageProvider =
-    AutoDisposeFutureProvider.family<ChatMessage, Map<String, dynamic>>((
-      ref,
-      params,
-    ) async {
-      final service = ref.read(chatServiceProvider);
-      final meetingId = params['meetingId'] as String;
-      final senderId = params['senderId'] as String;
-      final senderName = params['senderName'] as String;
-      final voiceUrl = params['voiceUrl'] as String;
-      final voiceDuration = params['voiceDuration'] as Duration;
-      final senderAvatar = params['senderAvatar'] as String?;
-
-      return service.sendVoiceMessage(
-        meetingId,
-        senderId,
-        senderName,
-        voiceUrl,
-        voiceDuration,
-        senderAvatar: senderAvatar,
-      );
-    });
-
-/// 标记消息为已读提供者
-final markMessageAsReadProvider =
-    AutoDisposeFutureProvider.family<void, Map<String, String>>((
-      ref,
-      params,
-    ) async {
-      final service = ref.read(chatServiceProvider);
-      final messageId = params['messageId'] as String;
-      final userId = params['userId'] as String;
-
-      return service.markMessageAsRead(messageId, userId);
-    });
+  return (String content) async {
+    try {
+      await service.sendTextMessage(content);
+    } catch (e) {
+      debugPrint('发送文字消息失败: $e');
+      rethrow;
+    }
+  };
+});

@@ -5,13 +5,13 @@ import '../models/meeting_vote.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import '../services/meeting_service.dart';
 import 'package:http/http.dart' as http;
 import '../utils/http_utils.dart';
 import 'package:intl/intl.dart';
 import '../services/user_service.dart';
-import '../services/api_user_service.dart';
 
 /// 会议过程管理服务接口
 abstract class MeetingProcessService {
@@ -555,7 +555,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加调试日志
-        print('获取会议资料响应: $responseData');
+        debugPrint('获取会议资料响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200) {
@@ -808,10 +808,10 @@ class ApiMeetingProcessService implements MeetingProcessService {
       }
 
       // 如果请求失败或没有数据，返回空列表
-      print('获取会议笔记列表失败: HTTP ${response.statusCode}');
+      debugPrint('获取会议笔记列表失败: HTTP ${response.statusCode}');
       return [];
     } catch (e) {
-      print('获取会议笔记列表出错: $e');
+      debugPrint('获取会议笔记列表出错: $e');
       // 出错时返回空列表而不是抛出异常，确保UI不会崩溃
       return [];
     }
@@ -854,7 +854,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加日志
-        print('创建会议笔记响应: $responseData');
+        debugPrint('创建会议笔记响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -887,7 +887,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('创建会议笔记失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('创建会议笔记出错: $e');
+      debugPrint('创建会议笔记出错: $e');
       throw Exception('创建会议笔记时出错: $e');
     }
   }
@@ -936,7 +936,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 打印请求内容用于调试
-      print(
+      debugPrint(
         '上传笔记文件请求参数: meetingId=$meetingId, userId=$userId, isPublic=${isShared ? '1' : '0'}, 文件名=${file.path.split('/').last}, noteName=$noteName',
       );
 
@@ -949,7 +949,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加日志
-        print('上传笔记文件响应: $responseData');
+        debugPrint('上传笔记文件响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -966,7 +966,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
             // 尝试解析创建时间
             createdAt = DateTime.parse(data['createdAt'].toString());
           } catch (e) {
-            print('解析创建时间失败: $e');
+            debugPrint('解析创建时间失败: $e');
             createdAt = DateTime.now();
           }
 
@@ -994,7 +994,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('上传笔记文件失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('上传笔记文件出错: $e');
+      debugPrint('上传笔记文件出错: $e');
       throw Exception('上传笔记文件时出错: $e');
     }
   }
@@ -1043,7 +1043,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       // 将更新后的笔记列表保存回本地存储
       await prefs.setString(storageKey, jsonEncode(existingNotes));
     } catch (e) {
-      print('保存笔记到本地存储出错: $e');
+      debugPrint('保存笔记到本地存储出错: $e');
       // 继续抛出异常，让调用者处理
       rethrow;
     }
@@ -1074,7 +1074,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 添加调试信息
-      print('更新笔记请求URL: $uri');
+      debugPrint('更新笔记请求URL: $uri');
 
       // 发送PUT请求
       final response = await client.put(
@@ -1087,7 +1087,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加调试日志
-        print('更新笔记响应: $responseData');
+        debugPrint('更新笔记响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200) {
@@ -1101,7 +1101,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('更新笔记请求失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('更新笔记出错: $e');
+      debugPrint('更新笔记出错: $e');
       throw Exception('更新笔记时出错: $e');
     }
   }
@@ -1117,7 +1117,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       final String? userIdParam = userId ?? prefs.getString('userId');
 
       if (userIdParam == null || userIdParam.isEmpty) {
-        print('删除笔记失败: 未找到用户ID');
+        debugPrint('删除笔记失败: 未找到用户ID');
         return false;
       }
 
@@ -1126,7 +1126,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         '${AppConstants.apiBaseUrl}/meeting/notes/$noteId',
       ).replace(queryParameters: {'userId': userIdParam});
 
-      print('删除笔记请求URL: $uri');
+      debugPrint('删除笔记请求URL: $uri');
 
       // 发送DELETE请求
       final response = await client.delete(
@@ -1139,23 +1139,23 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加日志
-        print('删除笔记响应: $responseData');
+        debugPrint('删除笔记响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200) {
           return true;
         } else {
           final errorMsg = responseData['message'] ?? '删除笔记失败';
-          print('删除笔记失败: $errorMsg');
+          debugPrint('删除笔记失败: $errorMsg');
           return false;
         }
       } else {
         final errorMsg = '删除笔记请求失败: HTTP ${response.statusCode}';
-        print(errorMsg);
+        debugPrint(errorMsg);
         return false;
       }
     } catch (e) {
-      print('删除笔记出错: $e');
+      debugPrint('删除笔记出错: $e');
       return false;
     }
   }
@@ -1184,7 +1184,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加日志
-        print('获取投票列表响应: $responseData');
+        debugPrint('获取投票列表响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -1258,7 +1258,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('获取投票列表失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('获取投票列表出错: $e');
+      debugPrint('获取投票列表出错: $e');
       throw Exception('获取投票列表时出错: $e');
     }
   }
@@ -1284,7 +1284,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       }
 
       // 打印请求参数作为调试信息
-      print('创建投票请求参数: ${jsonEncode(requestBody)}');
+      debugPrint('创建投票请求参数: ${jsonEncode(requestBody)}');
 
       // 创建HTTP客户端
       final client = http.Client();
@@ -1300,7 +1300,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加日志
-        print('创建投票响应: $responseData');
+        debugPrint('创建投票响应: $responseData');
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
@@ -1372,7 +1372,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 添加日志
-      print('开始投票响应: ${response.body}');
+      debugPrint('开始投票响应: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
@@ -1399,7 +1399,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('开始投票失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('开始投票出错: $e');
+      debugPrint('开始投票出错: $e');
       throw Exception('开始投票时出错: $e');
     }
   }
@@ -1417,7 +1417,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 添加日志
-      print('结束投票响应: ${response.body}');
+      debugPrint('结束投票响应: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
@@ -1444,7 +1444,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('结束投票失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('结束投票出错: $e');
+      debugPrint('结束投票出错: $e');
       throw Exception('结束投票时出错: $e');
     }
   }
@@ -1476,7 +1476,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 添加日志
-      print('提交投票响应: ${response.body}');
+      debugPrint('提交投票响应: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
@@ -1506,7 +1506,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
         throw Exception('提交投票失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('提交投票出错: $e');
+      debugPrint('提交投票出错: $e');
       throw Exception('提交投票时出错: $e');
     }
   }
@@ -1514,14 +1514,14 @@ class ApiMeetingProcessService implements MeetingProcessService {
   @override
   Future<List<VoteOption>> getVoteResults(String voteId) async {
     try {
-      print('正在获取投票选项，投票ID: $voteId');
+      debugPrint('正在获取投票选项，投票ID: $voteId');
 
       // 创建HTTP客户端
       final client = http.Client();
 
       // 构建请求URL
       final url = '${AppConstants.apiBaseUrl}/vote/detail/$voteId';
-      print('请求URL: $url');
+      debugPrint('请求URL: $url');
 
       // 发起获取投票选项请求
       final response = await client.get(
@@ -1530,27 +1530,27 @@ class ApiMeetingProcessService implements MeetingProcessService {
       );
 
       // 打印完整的响应内容
-      print('获取投票选项响应状态码: ${response.statusCode}');
-      print('获取投票选项响应头: ${response.headers}');
-      print('获取投票选项响应体: ${response.body}');
+      debugPrint('获取投票选项响应状态码: ${response.statusCode}');
+      debugPrint('获取投票选项响应头: ${response.headers}');
+      debugPrint('获取投票选项响应体: ${response.body}');
 
       if (response.statusCode == 200) {
         final responseData = HttpUtils.decodeResponse(response);
 
         // 添加详细日志
-        print('解码后的响应数据: $responseData');
-        print('响应码: ${responseData['code']}');
-        print('响应消息: ${responseData['message']}');
-        print('响应数据类型: ${responseData['data']?.runtimeType}');
+        debugPrint('解码后的响应数据: $responseData');
+        debugPrint('响应码: ${responseData['code']}');
+        debugPrint('响应消息: ${responseData['message']}');
+        debugPrint('响应数据类型: ${responseData['data']?.runtimeType}');
 
         // 检查响应码
         if (responseData['code'] == 200 && responseData['data'] != null) {
           final data = responseData['data'] as List<dynamic>;
-          print('投票选项数量: ${data.length}');
+          debugPrint('投票选项数量: ${data.length}');
 
           // 打印每个选项的内容
           for (var i = 0; i < data.length; i++) {
-            print('选项 $i: ${data[i]}');
+            debugPrint('选项 $i: ${data[i]}');
           }
 
           // 将API响应数据转换为VoteOption对象列表
@@ -1560,7 +1560,7 @@ class ApiMeetingProcessService implements MeetingProcessService {
                 final text = optionData['content'].toString();
                 final votesCount = optionData['voteCount'] as int? ?? 0;
 
-                print('转换选项: id=$id, text=$text, votesCount=$votesCount');
+                debugPrint('转换选项: id=$id, text=$text, votesCount=$votesCount');
 
                 return VoteOption(
                   id: id,
@@ -1571,21 +1571,21 @@ class ApiMeetingProcessService implements MeetingProcessService {
                 );
               }).toList();
 
-          print('转换完成，返回 ${options.length} 个选项');
+          debugPrint('转换完成，返回 ${options.length} 个选项');
           return options;
         } else {
           final errorMsg = '获取投票选项失败: ${responseData['message'] ?? "未知错误"}';
-          print(errorMsg);
+          debugPrint(errorMsg);
           throw Exception(errorMsg);
         }
       } else {
         final errorMsg = '获取投票选项失败: HTTP ${response.statusCode}';
-        print(errorMsg);
+        debugPrint(errorMsg);
         throw Exception(errorMsg);
       }
     } catch (e, stackTrace) {
-      print('获取投票选项出错: $e');
-      print('堆栈跟踪: $stackTrace');
+      debugPrint('获取投票选项出错: $e');
+      debugPrint('堆栈跟踪: $stackTrace');
       throw Exception('获取投票选项时出错: $e');
     }
   }
@@ -1649,10 +1649,10 @@ class ApiMeetingProcessService implements MeetingProcessService {
       }
 
       // 如果请求失败或没有数据，返回null
-      print('获取笔记详情失败: HTTP ${response.statusCode}');
+      debugPrint('获取笔记详情失败: HTTP ${response.statusCode}');
       return null;
     } catch (e) {
-      print('获取笔记详情出错: $e');
+      debugPrint('获取笔记详情出错: $e');
       // 出错时返回null而不是抛出异常，确保UI不会崩溃
       return null;
     }

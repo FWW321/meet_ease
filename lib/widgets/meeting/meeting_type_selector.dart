@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_constants.dart';
 import '../../models/meeting.dart';
-import '../../utils/meeting_utils.dart';
 
 /// 会议类型选择组件
 class MeetingTypeSelector extends StatelessWidget {
@@ -74,9 +73,8 @@ class MeetingTypeSelector extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   ),
                   label: Text(type['label'] as String),
-                  backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                    0.7,
-                  ),
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest
+                      .withAlpha(179),
                   onPressed: () {
                     typeController.text = type['label'] as String;
                     // 强制刷新

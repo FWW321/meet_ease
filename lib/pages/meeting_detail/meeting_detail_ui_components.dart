@@ -192,24 +192,22 @@ Widget buildOrganizersAndAdminsList(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 8),
-                      ...managers
-                          .map(
-                            (manager) => ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.blue.withAlpha(51),
-                                child: Text(
-                                  manager.name.isNotEmpty
-                                      ? manager.name[0].toUpperCase()
-                                      : '?',
-                                  style: const TextStyle(color: Colors.blue),
-                                ),
-                              ),
-                              title: Text(manager.name),
-                              trailing: buildRoleTag('管理员', Colors.blue),
-                              dense: true,
+                      ...managers.map(
+                        (manager) => ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue.withAlpha(51),
+                            child: Text(
+                              manager.name.isNotEmpty
+                                  ? manager.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(color: Colors.blue),
                             ),
-                          )
-                          .toList(),
+                          ),
+                          title: Text(manager.name),
+                          trailing: buildRoleTag('管理员', Colors.blue),
+                          dense: true,
+                        ),
+                      ),
                     ],
                   );
                 },

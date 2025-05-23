@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'dart:convert' show utf8;
-import 'dart:convert' show base64;
+import 'package:flutter/foundation.dart';
 
 /// 聊天消息类型枚举
 enum ChatMessageType {
@@ -34,8 +33,6 @@ class ChatMessage {
   final String content; // 文字内容或语音URL
   final Duration? voiceDuration; // 语音持续时间（仅对语音消息有效）
   final DateTime timestamp;
-  final bool isRead;
-  final List<String> readByUserIds;
 
   const ChatMessage({
     required this.id,
@@ -47,16 +44,11 @@ class ChatMessage {
     required this.content,
     this.voiceDuration,
     required this.timestamp,
-    this.isRead = false,
-    this.readByUserIds = const [],
   });
 
   // 从API JSON响应创建ChatMessage对象
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     try {
-      // 打印原始JSON，帮助调试
-      print('正在解析消息: $json');
-
       // 检查是否存在messageId，如果不存在使用id，并确保转换为字符串
       final messageId =
           json['messageId'] != null
@@ -66,55 +58,34 @@ class ChatMessage {
       final meetingId =
           json['meetingId'] != null ? json['meetingId'].toString() : '';
 
-      final userId =
-          json['userId'] != null
-              ? json['userId'].toString()
-              : (json['senderId'] != null ? json['senderId'].toString() : '');
-
+      // 解析发送者信息
+      final userId = json['userId']?.toString() ?? '';
       final senderName = json['senderName']?.toString() ?? '';
+      final senderAvatar = json['senderAvatar']?.toString();
 
       // 解析消息类型
-      final messageTypeStr = json['messageType']?.toString() ?? 'CHAT';
-      final messageType = messageTypeFromString(messageTypeStr);
+      final messageType = messageTypeFromString(
+        json['messageType']?.toString() ?? 'CHAT',
+      );
 
-      // 解析内容 - 确保使用正确的UTF-8编码
-      var content = '';
-      if (json['content'] != null) {
-        content = json['content'].toString();
-        // 尝试处理可能的编码问题
-        try {
-          // 如果内容看起来是Base64编码的UTF-8字符串，尝试解码
-          if (RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(content) &&
-              content.length % 4 == 0) {
-            final decoded = utf8.decode(base64.decode(content));
-            if (decoded.isNotEmpty) {
-              content = decoded;
-            }
-          }
-        } catch (e) {
-          print('尝试解码内容失败，保持原始内容: $e');
-          // 保持原始内容
-        }
-      }
-
+      // 解析消息内容
+      String content = '';
       Duration? voiceDuration;
 
-      // 如果是语音消息且内容是JSON字符串，尝试解析语音时长
-      if (messageType == ChatMessageType.voice && content.isNotEmpty) {
+      if (messageType == ChatMessageType.voice) {
         try {
-          final contentObj = jsonDecode(content);
-          if (contentObj is Map && contentObj.containsKey('voiceDuration')) {
-            final durationVal = contentObj['voiceDuration'];
-            if (durationVal is int) {
-              voiceDuration = Duration(seconds: durationVal);
-            } else if (durationVal is String) {
-              voiceDuration = Duration(seconds: int.tryParse(durationVal) ?? 0);
-            }
+          final voiceContent = jsonDecode(json['content'] ?? '{}');
+          content = voiceContent['voiceUrl']?.toString() ?? '';
+          final duration = voiceContent['voiceDuration'];
+          if (duration != null) {
+            voiceDuration = Duration(seconds: duration is int ? duration : 0);
           }
         } catch (e) {
-          print('解析语音消息内容失败: $e');
-          // 忽略解析错误，保持原始内容
+          debugPrint('解析语音消息内容失败: $e');
+          content = json['content']?.toString() ?? '';
         }
+      } else {
+        content = json['content']?.toString() ?? '';
       }
 
       // 解析发送时间
@@ -156,27 +127,23 @@ class ChatMessage {
           sendTime = DateTime.now();
         }
       } catch (e) {
-        print('解析时间错误: $e，将使用当前时间');
+        debugPrint('解析时间错误: $e，将使用当前时间');
         sendTime = DateTime.now();
       }
-
-      // 处理已读状态（暂时没有后端API提供此信息）
-      final readByUserIds = <String>[];
 
       return ChatMessage(
         id: messageId,
         meetingId: meetingId,
         senderId: userId,
         senderName: senderName,
+        senderAvatar: senderAvatar,
         type: messageType,
         content: content,
         voiceDuration: voiceDuration,
         timestamp: sendTime,
-        isRead: false,
-        readByUserIds: readByUserIds,
       );
     } catch (e) {
-      print('创建ChatMessage对象失败: $e，JSON: $json');
+      debugPrint('创建ChatMessage对象失败: $e');
       rethrow; // 重新抛出异常以便上层处理
     }
   }
@@ -192,8 +159,6 @@ class ChatMessage {
     String? content,
     Duration? voiceDuration,
     DateTime? timestamp,
-    bool? isRead,
-    List<String>? readByUserIds,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -205,8 +170,6 @@ class ChatMessage {
       content: content ?? this.content,
       voiceDuration: voiceDuration ?? this.voiceDuration,
       timestamp: timestamp ?? this.timestamp,
-      isRead: isRead ?? this.isRead,
-      readByUserIds: readByUserIds ?? this.readByUserIds,
     );
   }
 

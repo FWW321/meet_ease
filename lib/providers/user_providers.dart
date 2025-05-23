@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/user.dart';
 import '../services/user_service.dart';
-import '../services/api_user_service.dart';
 
 part 'user_providers.g.dart';
 

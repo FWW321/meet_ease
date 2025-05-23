@@ -67,10 +67,10 @@ class LeaveTile extends HookConsumerWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: leave.getStatusColor().withOpacity(0.1),
+                    color: leave.getStatusColor().withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: leave.getStatusColor().withOpacity(0.5),
+                      color: leave.getStatusColor().withValues(alpha: 0.5),
                     ),
                   ),
                   child: Text(

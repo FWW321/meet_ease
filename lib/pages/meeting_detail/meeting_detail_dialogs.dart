@@ -146,7 +146,7 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
           borderRadius: BorderRadius.circular(AppConstants.radiusL),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.shadow.withOpacity(0.1),
+              color: colorScheme.shadow.withAlpha(26),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -162,7 +162,7 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
                 vertical: AppConstants.paddingM,
               ),
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.1),
+                color: colorScheme.primary.withAlpha(26),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(AppConstants.radiusL),
                   topRight: Radius.circular(AppConstants.radiusL),
@@ -188,8 +188,9 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
                     decoration: InputDecoration(
                       hintText: '简要说明您的请假原因...',
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest
-                          .withOpacity(0.5),
+                      fillColor: colorScheme.surfaceContainerHighest.withAlpha(
+                        128,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(
                           AppConstants.radiusM,
@@ -236,7 +237,7 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
                             ? null
                             : () => Navigator.of(context).pop(),
                     style: TextButton.styleFrom(
-                      foregroundColor: colorScheme.onSurface.withOpacity(0.7),
+                      foregroundColor: colorScheme.onSurface.withAlpha(179),
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppConstants.paddingL,
                         vertical: AppConstants.paddingM,
@@ -312,11 +313,7 @@ class _LeaveRequestDialogState extends ConsumerState<_LeaveRequestDialog> {
       final meetingService = ref.read(meetingServiceProvider);
       final currentUserId = await ref.read(currentUserIdProvider.future);
 
-      if (currentUserId == null) {
-        throw Exception('用户未登录');
-      }
-
-      final result = await meetingService.submitLeaveRequest(
+      await meetingService.submitLeaveRequest(
         currentUserId,
         widget.meeting.id,
         reason,

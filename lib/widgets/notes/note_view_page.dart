@@ -4,7 +4,6 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'dart:convert';
 import '../../models/meeting_note.dart';
 import '../../providers/meeting_process_providers.dart';
-import '../../providers/user_providers.dart';
 import 'note_edit_page.dart';
 
 /// 笔记查看页面 - 全屏查看笔记内容

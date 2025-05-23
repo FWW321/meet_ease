@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:async';
 import '../../models/meeting.dart';
 import '../../providers/meeting_providers.dart';
@@ -9,8 +8,6 @@ import '../../providers/user_providers.dart';
 import '../../widgets/user_selection_dialog.dart';
 import '../../constants/app_constants.dart';
 import '../../utils/http_utils.dart';
-import '../../providers/chat_providers.dart';
-import '../../models/chat_message.dart';
 import '../../services/service_providers.dart';
 import 'user_tile.dart';
 
@@ -68,11 +65,10 @@ class BlacklistTab extends HookConsumerWidget {
     final managersAsync = ref.watch(meetingManagersProvider(meeting.id));
 
     // 获取主题色
-    final primaryColor = Theme.of(context).primaryColor;
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: backgroundColor.withOpacity(0.5),
+      color: backgroundColor.withValues(alpha: 0.5),
       child: Column(
         children: [
           // 黑名单列表
@@ -84,7 +80,7 @@ class BlacklistTab extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),
@@ -187,7 +183,7 @@ class BlacklistTab extends HookConsumerWidget {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.shade300.withOpacity(0.3),
+                        color: Colors.red.shade300.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -343,15 +339,15 @@ class BlacklistTab extends HookConsumerWidget {
 
       // 发送系统消息
       final systemMessage = "userId:$userId, username:$userName, action:禁止加入";
-      print('准备发送黑名单系统消息: $systemMessage');
+      debugPrint('准备发送黑名单系统消息: $systemMessage');
 
       // 使用ChatService发送系统消息
       try {
         final chatService = ref.read(chatServiceProvider);
         await chatService.sendSystemMessage(meeting.id, systemMessage);
-        print('黑名单系统消息发送成功');
+        debugPrint('黑名单系统消息发送成功');
       } catch (e) {
-        print('发送黑名单系统消息异常: $e');
+        debugPrint('发送黑名单系统消息异常: $e');
         // 消息发送失败不阻止主流程
       }
 
@@ -368,7 +364,7 @@ class BlacklistTab extends HookConsumerWidget {
         );
       }
     } catch (error) {
-      print('添加黑名单或发送系统消息失败: $error');
+      debugPrint('添加黑名单或发送系统消息失败: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

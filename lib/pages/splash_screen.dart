@@ -266,7 +266,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 Positioned.fill(
                   child: CustomPaint(
                     painter: GridPainter(
-                      lineColor: theme.colorScheme.primary.withOpacity(0.1),
+                      lineColor: theme.colorScheme.primary.withAlpha(26),
                     ),
                   ),
                 ),
@@ -285,7 +285,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                             shape: BoxShape.circle,
                             color: Colors.transparent,
                             border: Border.all(
-                              color: theme.colorScheme.primary.withOpacity(0.2),
+                              color: theme.colorScheme.primary.withAlpha(51),
                               width: 2,
                             ),
                           ),
@@ -337,12 +337,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                         height: 30,
                                         decoration: BoxDecoration(
                                           color: theme.colorScheme.primary
-                                              .withOpacity(0.7),
+                                              .withAlpha(179),
                                           shape: BoxShape.circle,
                                           boxShadow: [
                                             BoxShadow(
                                               color: theme.colorScheme.primary
-                                                  .withOpacity(0.3),
+                                                  .withAlpha(77),
                                               blurRadius: 10,
                                               spreadRadius: 2,
                                             ),
@@ -383,8 +383,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: theme.colorScheme.primary
-                                        .withOpacity(0.5),
+                                    color: theme.colorScheme.primary.withAlpha(
+                                      77,
+                                    ),
                                     blurRadius: 20,
                                     spreadRadius: 5,
                                   ),
@@ -636,7 +637,7 @@ class ParticlePainter extends CustomPainter {
     for (final particle in particles) {
       final paint =
           Paint()
-            ..color = color.withOpacity(0.6)
+            ..color = color.withAlpha(153)
             ..style = PaintingStyle.fill;
 
       final position = center + particle.position;
@@ -645,7 +646,7 @@ class ParticlePainter extends CustomPainter {
       // 绘制粒子尾巴/轨迹
       final tailPaint =
           Paint()
-            ..color = color.withOpacity(0.3)
+            ..color = color.withAlpha(102)
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2;
 
@@ -695,7 +696,7 @@ class GridPainter extends CustomPainter {
     // 绘制会议室布局
     final roomPaint =
         Paint()
-          ..color = lineColor.withOpacity(0.7)
+          ..color = lineColor.withAlpha(179)
           ..strokeWidth = 3.0
           ..style = PaintingStyle.stroke;
 
@@ -714,7 +715,7 @@ class GridPainter extends CustomPainter {
     // 会议桌
     final tablePaint =
         Paint()
-          ..color = lineColor.withOpacity(0.5)
+          ..color = lineColor.withAlpha(128)
           ..strokeWidth = 2.0
           ..style = PaintingStyle.stroke;
 

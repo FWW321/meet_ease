@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../constants/app_constants.dart';
+import '../utils/http_utils.dart';
 
 /// 用户服务接口
 abstract class UserService {
@@ -59,107 +62,36 @@ abstract class UserService {
   Future<bool> deleteAccount(String userId, String password);
 }
 
-/// 模拟用户服务实现
-class MockUserService implements UserService {
-  // 模拟用户数据
-  final User _mockUser = const User(
-    id: 'user1',
-    name: '张三',
-    email: 'zhangsan@example.com',
-    department: '技术部',
-    position: '开发工程师',
-    phoneNumber: '13800138000',
-  );
-
-  // 模拟多个用户
-  final List<User> _users = [
-    User(
-      id: 'user1',
-      name: '张三',
-      email: 'zhangsan@example.com',
-      department: '技术部',
-      position: '开发工程师',
-    ),
-    User(
-      id: 'user2',
-      name: '李四',
-      email: 'lisi@example.com',
-      department: '产品部',
-      position: '产品经理',
-    ),
-    User(
-      id: 'user3',
-      name: '王五',
-      email: 'wangwu@example.com',
-      department: '设计部',
-      position: 'UI设计师',
-    ),
-    User(
-      id: 'user4',
-      name: '赵六',
-      email: 'zhaoliu@example.com',
-      department: '市场部',
-      position: '市场专员',
-    ),
-    User(
-      id: 'user5',
-      name: '孙七',
-      email: 'sunqi@example.com',
-      department: '人事部',
-      position: 'HR专员',
-    ),
-    User(
-      id: 'user6',
-      name: '周八',
-      email: 'zhouba@example.com',
-      department: '技术部',
-      position: '测试工程师',
-    ),
-    User(
-      id: 'user7',
-      name: '吴九',
-      email: 'wujiu@example.com',
-      department: '技术部',
-      position: '架构师',
-    ),
-    User(
-      id: 'user8',
-      name: '郑十',
-      email: 'zhengshi@example.com',
-      department: '财务部',
-      position: '会计',
-    ),
-  ];
+/// API用户服务实现
+class ApiUserService implements UserService {
+  final http.Client _client = http.Client();
 
   @override
   Future<User?> getCurrentUser() async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 800));
-    return _mockUser;
+    return getUserFromLocal();
   }
 
   @override
   Future<User> getUserById(String userId) async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 查找用户
-    final user = _users.firstWhere(
-      (user) => user.id == userId,
-      orElse: () => throw Exception('用户不存在'),
+    final response = await _client.get(
+      Uri.parse('${AppConstants.apiBaseUrl}/user/$userId'),
+      headers: HttpUtils.createHeaders(),
     );
 
-    return user;
+    if (response.statusCode == 200) {
+      final userData = HttpUtils.decodeResponse(response);
+      return User(
+        id: userData['id'],
+        name: userData['username'],
+        email: userData['email'],
+        phoneNumber: userData['phone'],
+      );
+    } else {
+      throw Exception('获取用户信息失败: ${response.statusCode}');
+    }
   }
 
-  @override
-  Future<User> updateUserInfo(User user) async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 1000));
-    // 返回更新后的用户信息
-    return user.copyWith(updatedAt: DateTime.now());
-  }
-
+  /// 搜索用户
   @override
   Future<List<User>> searchUsers({
     String? username,
@@ -167,77 +99,163 @@ class MockUserService implements UserService {
     String? phone,
     String? userId,
   }) async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 如果所有搜索参数都为空，返回所有用户
-    if ((username == null || username.isEmpty) &&
-        (email == null || email.isEmpty) &&
-        (phone == null || phone.isEmpty) &&
-        (userId == null || userId.isEmpty)) {
-      return _users;
+    // 构建查询参数
+    final queryParameters = <String, String>{};
+    if (username != null && username.isNotEmpty) {
+      queryParameters['username'] = username;
+    }
+    if (email != null && email.isNotEmpty) {
+      queryParameters['email'] = email;
+    }
+    if (phone != null && phone.isNotEmpty) {
+      queryParameters['phone'] = phone;
+    }
+    if (userId != null && userId.isNotEmpty) {
+      queryParameters['userId'] = userId;
     }
 
-    // 过滤用户
-    return _users.where((user) {
-      bool matches = true;
+    // 构建请求URL
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/user/search',
+    ).replace(queryParameters: queryParameters);
 
-      if (username != null && username.isNotEmpty) {
-        matches =
-            matches && user.name.toLowerCase().contains(username.toLowerCase());
+    try {
+      final response = await _client.get(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final userResponse = UserSearchResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+
+        // 转换为应用内用户模型列表
+        return userResponse.data.map((apiUser) => apiUser.toUser()).toList();
+      } else {
+        developer.log('搜索用户失败: ${response.statusCode}, ${response.body}');
+        throw Exception('搜索用户失败: ${response.statusCode}');
       }
-
-      if (email != null && email.isNotEmpty) {
-        matches =
-            matches && user.email.toLowerCase().contains(email.toLowerCase());
-      }
-
-      if (phone != null && phone.isNotEmpty && user.phoneNumber != null) {
-        matches = matches && user.phoneNumber!.contains(phone);
-      }
-
-      if (userId != null && userId.isNotEmpty) {
-        matches = matches && user.id.contains(userId);
-      }
-
-      return matches;
-    }).toList();
+    } catch (e) {
+      developer.log('搜索用户异常: $e');
+      throw Exception('搜索用户异常: $e');
+    }
   }
 
   @override
-  Future<String> getUserNameById(String userId) async {
-    // 模拟网络延迟
-    await Future.delayed(const Duration(milliseconds: 300));
+  Future<User> updateUserInfo(User user) async {
+    // 构建查询参数
+    final queryParameters = <String, String>{
+      'userId': user.id, // 必选参数
+    };
 
-    // 查找用户
-    try {
-      final user = _users.firstWhere((user) => user.id == userId);
-      return user.name;
-    } catch (e) {
-      return '未知用户';
+    // 添加可选参数
+    if (user.name.isNotEmpty) {
+      queryParameters['username'] = user.name;
+    }
+    if (user.email.isNotEmpty) {
+      queryParameters['email'] = user.email;
+    }
+    if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) {
+      queryParameters['phone'] = user.phoneNumber!;
+    }
+
+    // 构建请求URL
+    final uri = Uri.parse(
+      '${AppConstants.apiBaseUrl}/user/updateInfo',
+    ).replace(queryParameters: queryParameters);
+
+    // 发送请求
+    final response = await _client.put(uri, headers: HttpUtils.createHeaders());
+
+    if (response.statusCode == 200) {
+      final responseData = HttpUtils.decodeResponse(response);
+
+      // 检查响应码
+      if (responseData['code'] == 200 && responseData['data'] != null) {
+        final userData = responseData['data'];
+        final updatedUser = User(
+          id: userData['userId'] ?? user.id,
+          name: userData['username'] ?? user.name,
+          email: userData['email'] ?? user.email,
+          phoneNumber: userData['phone'] ?? user.phoneNumber,
+          department: user.department,
+          position: user.position,
+          avatarUrl: user.avatarUrl,
+        );
+
+        // 更新本地存储
+        await saveUserToLocal(updatedUser);
+        return updatedUser;
+      } else {
+        throw Exception(responseData['message'] ?? '更新用户信息失败');
+      }
+    } else {
+      throw Exception('更新用户信息失败: ${response.statusCode}');
     }
   }
 
   @override
   Future<User> login(String username, String password) async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 1000));
+    try {
+      developer.log('开始登录请求: $username');
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/login'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode({'username': username, 'password': password}),
+      );
 
-    // 模拟登录验证
-    if (username.isEmpty || password.isEmpty) {
-      throw Exception('用户名或密码不能为空');
+      developer.log('收到响应: ${response.statusCode}');
+      developer.log('响应体: ${response.body}');
+
+      // 处理响应
+      final Map<String, dynamic> responseData = HttpUtils.decodeResponse(
+        response,
+      );
+      developer.log('解析后的响应数据类型: ${responseData.runtimeType}');
+      developer.log('解析后的响应数据: $responseData');
+
+      // 判断成功条件：有code字段且值为200
+      final code = responseData['code'];
+      if (code == 200) {
+        // 获取用户数据，处理响应格式
+        if (responseData.containsKey('data') && responseData['data'] != null) {
+          final userData = responseData['data'];
+          developer.log('用户数据: $userData');
+
+          // 创建用户对象，使用正确的字段名
+          final user = User(
+            id: _safeGetString(userData, 'userId') ?? '',
+            name: _safeGetString(userData, 'username') ?? username,
+            email: _safeGetString(userData, 'email') ?? '',
+            phoneNumber: _safeGetString(userData, 'phone') ?? '',
+          );
+
+          developer.log('创建的用户对象: ${user.id}, ${user.name}, ${user.email}');
+          await saveUserToLocal(user);
+          return user;
+        } else {
+          throw Exception('登录成功但未返回用户数据');
+        }
+      } else {
+        final message = responseData['message']?.toString();
+        throw Exception(message ?? '登录失败: 服务器返回码 ${code ?? "未知"}');
+      }
+    } catch (e) {
+      developer.log('登录异常: ${e.toString()}', error: e);
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
     }
+  }
 
-    // 模拟找到对应用户
-    final user = _users.firstWhere(
-      (user) => user.name.toLowerCase() == username.toLowerCase(),
-      orElse: () => throw Exception('用户不存在'),
-    );
-
-    // 保存到本地
-    await saveUserToLocal(user);
-
-    return user;
+  /// 安全获取字符串值，处理可能的空值和类型转换
+  String? _safeGetString(Map<String, dynamic> map, String key) {
+    final value = map[key];
+    if (value == null) return null;
+    return value.toString();
   }
 
   @override
@@ -247,16 +265,44 @@ class MockUserService implements UserService {
     String email,
     String phone,
   ) async {
-    // Implementation needed
-    throw UnimplementedError();
+    try {
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/register'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'email': email,
+          'phone': phone,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final userData = HttpUtils.decodeResponse(response);
+        final user = User(
+          id: userData['id'] ?? '',
+          name: username,
+          email: email,
+          phoneNumber: phone,
+        );
+        await saveUserToLocal(user);
+        return user;
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '注册失败'),
+        );
+      }
+    } catch (e) {
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
+    }
   }
 
   @override
   Future<void> logout() async {
-    // 模拟网络请求延迟
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // 清除本地用户信息
     await clearUserFromLocal();
   }
 
@@ -304,18 +350,109 @@ class MockUserService implements UserService {
   }
 
   @override
+  Future<String> getUserNameById(String userId) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/getname/$userId'),
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          return responseData['data'] as String;
+        } else {
+          developer.log('获取用户名失败: ${responseData['message']}');
+          return '未知用户';
+        }
+      } else {
+        developer.log('获取用户名失败: ${response.statusCode}, ${response.body}');
+        return '未知用户';
+      }
+    } catch (e) {
+      developer.log('获取用户名异常: $e');
+      return '未知用户';
+    }
+  }
+
+  @override
   Future<bool> updatePassword(
     String userId,
     String oldPassword,
     String newPassword,
   ) async {
-    // Implementation needed
-    throw UnimplementedError();
+    try {
+      final response = await _client.post(
+        Uri.parse('${AppConstants.apiBaseUrl}/user/updatePassword'),
+        headers: HttpUtils.createHeaders(),
+        body: jsonEncode({
+          'userId': userId,
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200) {
+          return true;
+        } else {
+          throw Exception(responseData['message'] ?? '修改密码失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '修改密码失败'),
+        );
+      }
+    } catch (e) {
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
+    }
   }
 
   @override
   Future<bool> deleteAccount(String userId, String password) async {
-    // Implementation needed
-    throw UnimplementedError();
+    try {
+      // 构建查询参数
+      final queryParameters = <String, String>{
+        'userId': userId,
+        'password': password,
+      };
+
+      // 构建请求URL
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/user/deleteAccount',
+      ).replace(queryParameters: queryParameters);
+
+      final response = await _client.delete(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+        if (responseData['code'] == 200) {
+          // 清除本地用户信息
+          await clearUserFromLocal();
+          return true;
+        } else {
+          throw Exception(responseData['message'] ?? '注销账号失败');
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '注销账号失败'),
+        );
+      }
+    } catch (e) {
+      developer.log('注销账号异常: ${e.toString()}', error: e);
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
+        throw Exception('无法连接到服务器(${AppConstants.apiDomain})，请检查服务器是否运行或网络连接');
+      }
+      rethrow;
+    }
   }
 }

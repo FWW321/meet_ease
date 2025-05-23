@@ -8,7 +8,7 @@ import '../../utils/time_utils.dart';
 class VoteCreateDialog extends ConsumerStatefulWidget {
   final String meetingId;
 
-  const VoteCreateDialog({required this.meetingId, Key? key}) : super(key: key);
+  const VoteCreateDialog({required this.meetingId, super.key});
 
   @override
   ConsumerState<VoteCreateDialog> createState() => _VoteCreateDialogState();
@@ -48,13 +48,14 @@ class _VoteCreateDialogState extends ConsumerState<VoteCreateDialog> {
     );
 
     if (pickedDate != null) {
-      // ignore: use_build_context_synchronously
+      if (!context.mounted) return;
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.now(),
       );
 
       if (pickedTime != null) {
+        if (!context.mounted) return;
         setState(() {
           endTime = DateTime(
             pickedDate.year,

@@ -8,11 +8,16 @@ import '../widgets/user_selection_dialog.dart';
 import '../widgets/meeting/index.dart';
 import '../constants/app_constants.dart';
 
-class CreateMeetingPage extends HookConsumerWidget {
+class CreateMeetingPage extends StatefulHookConsumerWidget {
   const CreateMeetingPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CreateMeetingPage> createState() => _CreateMeetingPageState();
+}
+
+class _CreateMeetingPageState extends ConsumerState<CreateMeetingPage> {
+  @override
+  Widget build(BuildContext context) {
     final formKey = GlobalKey<FormState>();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -130,6 +135,9 @@ class CreateMeetingPage extends HookConsumerWidget {
           currentLoggedInUserIdProvider.future,
         );
 
+        // 检查context是否仍然挂载
+        if (!context.mounted) return;
+
         isValid = await MeetingFormValidators.validatePrivateMeetingUsers(
           context: context,
           visibility: meetingVisibility.value,
@@ -199,18 +207,18 @@ class CreateMeetingPage extends HookConsumerWidget {
             fillColor:
                 colorScheme.brightness == Brightness.light
                     ? Colors.white
-                    : colorScheme.surfaceVariant.withOpacity(0.5),
+                    : colorScheme.surfaceContainerHighest.withAlpha(26),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.radiusS),
               borderSide: BorderSide(
-                color: colorScheme.outline.withOpacity(0.5),
+                color: colorScheme.outline.withAlpha(13),
                 width: 1.0,
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppConstants.radiusS),
               borderSide: BorderSide(
-                color: colorScheme.outline.withOpacity(0.5),
+                color: colorScheme.outline.withAlpha(13),
                 width: 1.0,
               ),
             ),
@@ -230,11 +238,9 @@ class CreateMeetingPage extends HookConsumerWidget {
               horizontal: 16,
               vertical: 16,
             ),
-            hoverColor: colorScheme.primaryContainer.withOpacity(0.08),
-            labelStyle: TextStyle(
-              color: colorScheme.onSurface.withOpacity(0.8),
-            ),
-            hintStyle: TextStyle(color: colorScheme.onSurface.withOpacity(0.5)),
+            hoverColor: colorScheme.primaryContainer.withAlpha(20),
+            labelStyle: TextStyle(color: colorScheme.onSurface.withAlpha(204)),
+            hintStyle: TextStyle(color: colorScheme.onSurface.withAlpha(128)),
           ),
         ),
         child: Container(
@@ -361,13 +367,14 @@ class CreateMeetingPage extends HookConsumerWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,
-                      disabledBackgroundColor: colorScheme.primary.withOpacity(
-                        0.6,
+                      disabledBackgroundColor: colorScheme.primary.withAlpha(
+                        153,
                       ),
-                      disabledForegroundColor: colorScheme.onPrimary
-                          .withOpacity(0.7),
+                      disabledForegroundColor: colorScheme.onPrimary.withAlpha(
+                        179,
+                      ),
                       elevation: 2,
-                      shadowColor: colorScheme.shadow.withOpacity(0.3),
+                      shadowColor: colorScheme.shadow.withAlpha(77),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(
                           AppConstants.radiusM,
@@ -420,7 +427,7 @@ class CreateMeetingPage extends HookConsumerWidget {
         Text(
           '填写以下信息创建您的会议，带*号的为必填项',
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
+            color: theme.colorScheme.onSurface.withAlpha(179),
           ),
         ),
       ],
@@ -441,12 +448,12 @@ class CreateMeetingPage extends HookConsumerWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppConstants.radiusL),
-        side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.05)),
+        side: BorderSide(color: theme.colorScheme.outline.withAlpha(13)),
       ),
       color:
           theme.colorScheme.brightness == Brightness.light
               ? Colors.white
-              : theme.colorScheme.surfaceVariant.withOpacity(0.1),
+              : theme.colorScheme.surfaceContainerHighest.withAlpha(26),
       child: Padding(
         padding: const EdgeInsets.all(AppConstants.paddingM),
         child: Column(
@@ -469,7 +476,7 @@ class CreateMeetingPage extends HookConsumerWidget {
             Divider(
               height: AppConstants.paddingL,
               thickness: 1,
-              color: theme.colorScheme.outlineVariant.withOpacity(0.3),
+              color: theme.colorScheme.outlineVariant.withAlpha(77),
             ),
             // 卡片内容
             child,

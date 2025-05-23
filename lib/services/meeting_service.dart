@@ -10,6 +10,7 @@ import '../constants/app_constants.dart';
 import '../utils/http_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_providers.dart';
+import 'package:flutter/foundation.dart';
 
 /// 会议服务接口
 abstract class MeetingService {
@@ -489,18 +490,18 @@ class MockMeetingService implements MeetingService {
     // 如果已有验证正在进行，等待锁
     try {
       await lock.acquire();
-      print('获取到密码验证锁，开始验证: $meetingId');
+      debugPrint('获取到密码验证锁，开始验证: $meetingId');
     } catch (e) {
-      print('获取验证锁失败: $e');
+      debugPrint('获取验证锁失败: $e');
       throw Exception('无法验证密码，请稍后重试');
     }
 
     try {
-      print('验证会议密码 - 会议ID: $meetingId, 密码: $password');
+      debugPrint('验证会议密码 - 会议ID: $meetingId, 密码: $password');
 
       // 尝试获取会议详情并验证密码
       final meetingFuture = getMeetingById(meetingId).timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 5),
         onTimeout: () {
           throw TimeoutException('获取会议详情超时');
         },
@@ -510,24 +511,24 @@ class MockMeetingService implements MeetingService {
 
       // 如果会议无密码，直接通过
       if (meeting.password == null || meeting.password!.isEmpty) {
-        print('会议未设置密码，验证通过');
+        debugPrint('会议未设置密码，验证通过');
         return true;
       }
 
       // 比较密码是否匹配
       final isValid = meeting.password == password;
-      print('密码比较: "${meeting.password}" == "$password" => $isValid');
+      debugPrint('密码比较: "${meeting.password}" == "$password" => $isValid');
 
       // 根据比较结果返回，不区分环境
       return isValid;
     } catch (e) {
       // 捕获到异常时，输出并向上传递
-      print('密码验证过程出错: $e');
+      debugPrint('密码验证过程出错: $e');
       rethrow;
     } finally {
       // 无论成功失败，都释放锁
       lock.release();
-      print('释放密码验证锁: $meetingId');
+      debugPrint('释放密码验证锁: $meetingId');
     }
   }
 
@@ -854,7 +855,9 @@ class ApiMeetingService implements MeetingService {
 
           // 解析会议可见性
           final visibility = _parseMeetingVisibility(meetingData['visibility']);
-          print('从API解析的会议可见性: ${meetingData['visibility']} => $visibility');
+          debugPrint(
+            '从API解析的会议可见性: ${meetingData['visibility']} => $visibility',
+          );
 
           return Meeting(
             id: meetingData['meetingId'].toString(),
@@ -864,7 +867,7 @@ class ApiMeetingService implements MeetingService {
             location: meetingData['location'] ?? '',
             status: meetingStatus,
             type: MeetingType.regular, // 默认为常规会议
-            visibility: visibility, // 使用解析的可见性而不是硬编码默认值
+            visibility: visibility,
             organizerId: meetingData['organizerId'].toString(),
             organizerName: '', // API未提供组织者名称
             description: meetingData['description'],
@@ -937,7 +940,7 @@ class ApiMeetingService implements MeetingService {
         throw Exception('获取参与会议历史失败: ${response.statusCode}');
       }
     } catch (e) {
-      print('获取我的会议列表异常: $e');
+      debugPrint('获取我的会议列表异常: $e');
       throw Exception('获取我的会议列表失败: $e');
     }
   }
@@ -995,7 +998,7 @@ class ApiMeetingService implements MeetingService {
         );
       }
     } catch (e) {
-      print('签到失败: $e');
+      debugPrint('签到失败: $e');
       throw Exception('签到时出错: $e');
     }
   }
@@ -1066,7 +1069,7 @@ class ApiMeetingService implements MeetingService {
       }
     } catch (e) {
       // 如果API调用失败，返回空列表
-      print('获取会议参与者失败: $e');
+      debugPrint('获取会议参与者失败: $e');
       return [];
     }
   }
@@ -1236,7 +1239,7 @@ class ApiMeetingService implements MeetingService {
         final responseData = HttpUtils.decodeResponse(response);
 
         if (responseData['code'] == 200) {
-          print('添加黑名单成功: ${responseData['data']}');
+          debugPrint('添加黑名单成功: ${responseData['data']}');
         } else {
           throw Exception(responseData['message'] ?? '添加黑名单失败');
         }
@@ -1288,7 +1291,7 @@ class ApiMeetingService implements MeetingService {
         final responseData = HttpUtils.decodeResponse(response);
 
         if (responseData['code'] == 200) {
-          print('移除黑名单成功: ${responseData['data']}');
+          debugPrint('移除黑名单成功: ${responseData['data']}');
         } else {
           throw Exception(responseData['message'] ?? '移除黑名单失败');
         }
@@ -1364,7 +1367,7 @@ class ApiMeetingService implements MeetingService {
 
         if (responseData['code'] == 200) {
           // 操作成功，可以处理返回的消息
-          print('更新会议成功: ${responseData['data']}');
+          debugPrint('更新会议成功');
         } else {
           throw Exception(responseData['message'] ?? '更新会议失败');
         }
@@ -1539,18 +1542,18 @@ class ApiMeetingService implements MeetingService {
     // 如果已有验证正在进行，等待锁
     try {
       await lock.acquire();
-      print('获取到密码验证锁，开始验证: $meetingId');
+      debugPrint('获取到密码验证锁，开始验证: $meetingId');
     } catch (e) {
-      print('获取验证锁失败: $e');
+      debugPrint('获取验证锁失败: $e');
       throw Exception('无法验证密码，请稍后重试');
     }
 
     try {
-      print('验证会议密码 - 会议ID: $meetingId, 密码: $password');
+      debugPrint('验证会议密码 - 会议ID: $meetingId, 密码: $password');
 
       // 尝试获取会议详情并验证密码
       final meetingFuture = getMeetingById(meetingId).timeout(
-        const Duration(seconds: 2),
+        const Duration(seconds: 5),
         onTimeout: () {
           throw TimeoutException('获取会议详情超时');
         },
@@ -1560,24 +1563,24 @@ class ApiMeetingService implements MeetingService {
 
       // 如果会议无密码，直接通过
       if (meeting.password == null || meeting.password!.isEmpty) {
-        print('会议未设置密码，验证通过');
+        debugPrint('会议未设置密码，验证通过');
         return true;
       }
 
       // 比较密码是否匹配
       final isValid = meeting.password == password;
-      print('密码比较: "${meeting.password}" == "$password" => $isValid');
+      debugPrint('密码比较: "${meeting.password}" == "$password" => $isValid');
 
       // 根据比较结果返回，不区分环境
       return isValid;
     } catch (e) {
       // 捕获到异常时，输出并向上传递
-      print('密码验证过程出错: $e');
+      debugPrint('密码验证过程出错: $e');
       rethrow;
     } finally {
       // 无论成功失败，都释放锁
       lock.release();
-      print('释放密码验证锁: $meetingId');
+      debugPrint('释放密码验证锁: $meetingId');
     }
   }
 
@@ -1595,8 +1598,78 @@ class ApiMeetingService implements MeetingService {
 
   @override
   Future<Meeting> endMeeting(String meetingId, String creatorId) async {
-    // TODO: 使用HTTP客户端调用后端API
-    throw UnimplementedError('API会议服务尚未实现');
+    try {
+      // 构建请求 URL
+      final uri = Uri.parse(
+        '${AppConstants.apiBaseUrl}/meeting/$meetingId/end',
+      ).replace(queryParameters: {'userId': creatorId});
+
+      // 发送 POST 请求
+      final response = await _client.post(
+        uri,
+        headers: HttpUtils.createHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = HttpUtils.decodeResponse(response);
+
+        // 检查响应码
+        if (responseData['code'] == 200 && responseData['data'] != null) {
+          final meetingData = responseData['data'];
+
+          // 解析会议状态
+          MeetingStatus meetingStatus = _parseMeetingStatus(
+            meetingData['status'] ?? '已结束',
+          );
+
+          // 解析开始和结束时间
+          final startTime = DateTime.parse(meetingData['startTime']);
+          final endTime = DateTime.parse(meetingData['endTime']);
+
+          // 获取可见性
+          final visibility = _parseMeetingVisibility(meetingData['visibility']);
+
+          // 获取管理员列表
+          final adminIds =
+              (meetingData['adminIds'] as List<dynamic>?)
+                  ?.map((id) => id.toString())
+                  .toList() ??
+              [];
+
+          return Meeting(
+            id: meetingData['meetingId'].toString(),
+            title: meetingData['title'],
+            startTime: startTime,
+            endTime: endTime,
+            location: meetingData['location'] ?? '',
+            status: meetingStatus,
+            type: MeetingType.regular, // 默认为常规会议
+            visibility: visibility,
+            organizerId: meetingData['organizerId'].toString(),
+            organizerName: '', // API未提供组织者名称
+            description: meetingData['description'],
+            createdAt:
+                meetingData['createdAt'] != null
+                    ? DateTime.parse(meetingData['createdAt'])
+                    : null,
+            admins: adminIds,
+            blacklist: const [], // API未提供
+            allowedUsers: const [], // API未提供
+            password: meetingData['joinPassword'],
+          );
+        } else {
+          final message = responseData['message'] ?? '结束会议失败';
+          throw Exception(message);
+        }
+      } else {
+        throw Exception(
+          HttpUtils.extractErrorMessage(response, defaultMessage: '结束会议请求失败'),
+        );
+      }
+    } catch (e) {
+      debugPrint('结束会议时出错: $e');
+      throw Exception('结束会议时出错: $e');
+    }
   }
 
   @override
@@ -1671,7 +1744,7 @@ class ApiMeetingService implements MeetingService {
 
       return [];
     } catch (e) {
-      print('获取推荐会议失败: $e');
+      debugPrint('获取推荐会议失败: $e');
       rethrow;
     }
   }
@@ -1738,7 +1811,7 @@ class ApiMeetingService implements MeetingService {
 
       return [];
     } catch (e) {
-      print('获取我的私密会议失败: $e');
+      debugPrint('获取我的私密会议失败: $e');
       rethrow;
     }
   }
@@ -1845,7 +1918,7 @@ class ApiMeetingService implements MeetingService {
 
       return [];
     } catch (e) {
-      print('搜索私有会议失败: $e');
+      debugPrint('搜索私有会议失败: $e');
       rethrow;
     }
   }
@@ -1927,7 +2000,7 @@ class ApiMeetingService implements MeetingService {
 
       return [];
     } catch (e) {
-      print('搜索公有会议失败: $e');
+      debugPrint('搜索公有会议失败: $e');
       rethrow;
     }
   }

@@ -41,10 +41,10 @@ class MeetingInfoTab extends HookConsumerWidget {
     final duration = endTime.value.difference(startTime.value);
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
-    final durationText = '${hours}小时${minutes > 0 ? ' ${minutes}分钟' : ''}';
+    final durationText = '$hours小时${minutes > 0 ? ' $minutes分钟' : ''}';
 
     return Container(
-      color: backgroundColor.withOpacity(0.5),
+      color: backgroundColor.withValues(alpha: 0.5),
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         children: [
@@ -62,7 +62,7 @@ class MeetingInfoTab extends HookConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.05),
+                    color: primaryColor.withValues(alpha: 0.05),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
@@ -103,12 +103,12 @@ class MeetingInfoTab extends HookConsumerWidget {
                         decoration: BoxDecoration(
                           color: _getStatusColor(
                             meeting.status,
-                          ).withOpacity(0.1),
+                          ).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: _getStatusColor(
                               meeting.status,
-                            ).withOpacity(0.5),
+                            ).withValues(alpha: 0.5),
                           ),
                         ),
                         child: Row(
@@ -171,10 +171,10 @@ class MeetingInfoTab extends HookConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.05),
+                          color: Colors.blue.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.blue.withOpacity(0.1),
+                            color: Colors.blue.withValues(alpha: 0.1),
                           ),
                         ),
                         child: Column(
@@ -394,7 +394,7 @@ class MeetingInfoTab extends HookConsumerWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: primaryColor.withOpacity(0.3),
+                  color: primaryColor.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 3),
                 ),

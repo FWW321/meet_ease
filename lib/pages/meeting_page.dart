@@ -71,10 +71,10 @@ class MeetingPage extends HookConsumerWidget {
                 controller: textController,
                 decoration: InputDecoration(
                   hintText: '搜索会议...',
-                  hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.6)),
+                  hintStyle: TextStyle(color: theme.hintColor.withAlpha(153)),
                   prefixIcon: Icon(
                     Icons.search,
-                    color: theme.colorScheme.primary.withOpacity(0.7),
+                    color: theme.colorScheme.primary.withAlpha(179),
                   ),
                   suffixIcon:
                       searchQueryState.value.isNotEmpty
@@ -91,7 +91,8 @@ class MeetingPage extends HookConsumerWidget {
                           )
                           : null,
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withAlpha(77),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     borderSide: BorderSide.none,
@@ -103,7 +104,7 @@ class MeetingPage extends HookConsumerWidget {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12.0),
                     borderSide: BorderSide(
-                      color: theme.colorScheme.primary.withOpacity(0.5),
+                      color: theme.colorScheme.primary.withAlpha(128),
                       width: 1.0,
                     ),
                   ),
@@ -123,67 +124,6 @@ class MeetingPage extends HookConsumerWidget {
               ),
             ),
 
-            // 搜索状态指示
-            if (isSearchingState.value && searchQueryState.value.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.search,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '搜索: "${searchQueryState.value}"',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                      TextButton.icon(
-                        icon: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: theme.colorScheme.primary,
-                        ),
-                        label: Text(
-                          '清除',
-                          style: TextStyle(color: theme.colorScheme.primary),
-                        ),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8.0,
-                            vertical: 2.0,
-                          ),
-                        ),
-                        onPressed: () {
-                          textController.clear();
-                          searchQueryState.value = '';
-                          isSearchingState.value = false;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
             // 标签页和筛选条件
             if (!isSearchingState.value) ...[
               // 标签页切换
@@ -192,7 +132,7 @@ class MeetingPage extends HookConsumerWidget {
                   color: theme.scaffoldBackgroundColor,
                   boxShadow: [
                     BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.05),
+                      color: theme.shadowColor.withAlpha(13),
                       blurRadius: 1,
                       offset: const Offset(0, 2),
                     ),
@@ -253,10 +193,39 @@ class MeetingPage extends HookConsumerWidget {
                       selectedFilterState.value != null
                           ? meetings.where((m) {
                             if (m is Meeting) {
-                              return m.status == selectedFilterState.value;
+                              // 获取当前时间
+                              final now = DateTime.now();
+                              // 计算实际状态
+                              MeetingStatus actualStatus = m.status;
+                              if (m.status == MeetingStatus.upcoming) {
+                                if (now.isAfter(m.startTime) ||
+                                    now.isAtSameMomentAs(m.startTime)) {
+                                  if (now.isBefore(m.endTime) ||
+                                      now.isAtSameMomentAs(m.endTime)) {
+                                    actualStatus = MeetingStatus.ongoing;
+                                  } else {
+                                    actualStatus = MeetingStatus.completed;
+                                  }
+                                }
+                              }
+                              return actualStatus == selectedFilterState.value;
                             } else if (m is MeetingRecommendation) {
-                              return m.meeting.status ==
-                                  selectedFilterState.value;
+                              // 获取当前时间
+                              final now = DateTime.now();
+                              // 计算实际状态
+                              MeetingStatus actualStatus = m.meeting.status;
+                              if (m.meeting.status == MeetingStatus.upcoming) {
+                                if (now.isAfter(m.meeting.startTime) ||
+                                    now.isAtSameMomentAs(m.meeting.startTime)) {
+                                  if (now.isBefore(m.meeting.endTime) ||
+                                      now.isAtSameMomentAs(m.meeting.endTime)) {
+                                    actualStatus = MeetingStatus.ongoing;
+                                  } else {
+                                    actualStatus = MeetingStatus.completed;
+                                  }
+                                }
+                              }
+                              return actualStatus == selectedFilterState.value;
                             }
                             return false;
                           }).toList()
@@ -368,7 +337,7 @@ class MeetingPage extends HookConsumerWidget {
           decoration: BoxDecoration(
             color:
                 isSelected
-                    ? theme.colorScheme.primary.withOpacity(0.1)
+                    ? theme.colorScheme.primary.withAlpha(26)
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(8.0),
             border: Border(
@@ -387,7 +356,7 @@ class MeetingPage extends HookConsumerWidget {
                 color:
                     isSelected
                         ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface.withOpacity(0.6),
+                        : theme.colorScheme.onSurface.withAlpha(153),
                 size: 20,
               ),
               const SizedBox(height: 4),
@@ -397,7 +366,7 @@ class MeetingPage extends HookConsumerWidget {
                   color:
                       isSelected
                           ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurface.withOpacity(0.6),
+                          : theme.colorScheme.onSurface.withAlpha(153),
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   fontSize: 13,
                 ),
@@ -423,7 +392,7 @@ class MeetingPage extends HookConsumerWidget {
         color: theme.scaffoldBackgroundColor,
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withOpacity(0.03),
+            color: theme.shadowColor.withAlpha(13),
             blurRadius: 1,
             offset: const Offset(0, 1),
           ),
@@ -450,9 +419,8 @@ class MeetingPage extends HookConsumerWidget {
                   selectedFilter.value = null;
                 }
               },
-              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                0.3,
-              ),
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withAlpha(77),
               selectedColor: theme.colorScheme.primary,
               checkmarkColor: theme.colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -463,7 +431,7 @@ class MeetingPage extends HookConsumerWidget {
                 color:
                     selectedFilter.value == null
                         ? Colors.transparent
-                        : theme.colorScheme.outline.withOpacity(0.2),
+                        : theme.colorScheme.outline.withAlpha(51),
                 width: 1,
               ),
               elevation: 0,
@@ -486,9 +454,8 @@ class MeetingPage extends HookConsumerWidget {
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.upcoming : null;
               },
-              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                0.3,
-              ),
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withAlpha(77),
               selectedColor: theme.colorScheme.primary,
               checkmarkColor: theme.colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -499,7 +466,7 @@ class MeetingPage extends HookConsumerWidget {
                 color:
                     selectedFilter.value == MeetingStatus.upcoming
                         ? Colors.transparent
-                        : theme.colorScheme.outline.withOpacity(0.2),
+                        : theme.colorScheme.outline.withAlpha(51),
                 width: 1,
               ),
               elevation: 0,
@@ -522,9 +489,8 @@ class MeetingPage extends HookConsumerWidget {
               onSelected: (selected) {
                 selectedFilter.value = selected ? MeetingStatus.ongoing : null;
               },
-              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                0.3,
-              ),
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withAlpha(77),
               selectedColor: theme.colorScheme.primary,
               checkmarkColor: theme.colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -535,44 +501,7 @@ class MeetingPage extends HookConsumerWidget {
                 color:
                     selectedFilter.value == MeetingStatus.ongoing
                         ? Colors.transparent
-                        : theme.colorScheme.outline.withOpacity(0.2),
-                width: 1,
-              ),
-              elevation: 0,
-              pressElevation: 0,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: const Text('已结束'),
-              labelStyle: TextStyle(
-                color:
-                    selectedFilter.value == MeetingStatus.completed
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
-              selected: selectedFilter.value == MeetingStatus.completed,
-              onSelected: (selected) {
-                selectedFilter.value =
-                    selected ? MeetingStatus.completed : null;
-              },
-              backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(
-                0.3,
-              ),
-              selectedColor: theme.colorScheme.primary,
-              checkmarkColor: theme.colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              side: BorderSide(
-                color:
-                    selectedFilter.value == MeetingStatus.completed
-                        ? Colors.transparent
-                        : theme.colorScheme.outline.withOpacity(0.2),
+                        : theme.colorScheme.outline.withAlpha(51),
                 width: 1,
               ),
               elevation: 0,
@@ -580,20 +509,21 @@ class MeetingPage extends HookConsumerWidget {
             ),
           ),
           FilterChip(
-            label: const Text('已取消'),
+            label: const Text('已结束'),
             labelStyle: TextStyle(
               color:
-                  selectedFilter.value == MeetingStatus.cancelled
+                  selectedFilter.value == MeetingStatus.completed
                       ? theme.colorScheme.onPrimary
                       : theme.colorScheme.onSurface,
               fontWeight: FontWeight.w500,
               fontSize: 12,
             ),
-            selected: selectedFilter.value == MeetingStatus.cancelled,
+            selected: selectedFilter.value == MeetingStatus.completed,
             onSelected: (selected) {
-              selectedFilter.value = selected ? MeetingStatus.cancelled : null;
+              selectedFilter.value = selected ? MeetingStatus.completed : null;
             },
-            backgroundColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+            backgroundColor: theme.colorScheme.surfaceContainerHighest
+                .withAlpha(77),
             selectedColor: theme.colorScheme.primary,
             checkmarkColor: theme.colorScheme.onPrimary,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -602,9 +532,9 @@ class MeetingPage extends HookConsumerWidget {
             ),
             side: BorderSide(
               color:
-                  selectedFilter.value == MeetingStatus.cancelled
+                  selectedFilter.value == MeetingStatus.completed
                       ? Colors.transparent
-                      : theme.colorScheme.outline.withOpacity(0.2),
+                      : theme.colorScheme.outline.withAlpha(51),
               width: 1,
             ),
             elevation: 0,
@@ -631,7 +561,7 @@ class MeetingPage extends HookConsumerWidget {
           Icon(
             Icons.event_busy,
             size: 70,
-            color: theme.colorScheme.primary.withOpacity(0.3),
+            color: theme.colorScheme.primary.withAlpha(77),
           ),
           const SizedBox(height: 24),
           if (isSearching && searchQuery.isNotEmpty)
@@ -639,7 +569,7 @@ class MeetingPage extends HookConsumerWidget {
               '没有找到包含"$searchQuery"的会议',
               style: TextStyle(
                 fontSize: 16,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withAlpha(179),
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -649,7 +579,7 @@ class MeetingPage extends HookConsumerWidget {
               '没有找到会议',
               style: TextStyle(
                 fontSize: 16,
-                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                color: theme.colorScheme.onSurface.withAlpha(179),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -686,6 +616,56 @@ class MeetingPage extends HookConsumerWidget {
     String? searchQuery,
     bool isRecommended,
   ) {
+    final now = DateTime.now();
+
+    // 对会议列表进行排序
+    meetings.sort((a, b) {
+      // 获取会议 a 的实际状态和对象
+      final Meeting meetingA;
+      final MeetingStatus statusA;
+      double? matchScoreA;
+
+      if (a is MeetingRecommendation) {
+        meetingA = a.meeting;
+        matchScoreA = a.matchScore;
+      } else {
+        meetingA = a as Meeting;
+      }
+
+      statusA = _getActualMeetingStatus(meetingA, now);
+
+      // 获取会议 b 的实际状态和对象
+      final Meeting meetingB;
+      final MeetingStatus statusB;
+      double? matchScoreB;
+
+      if (b is MeetingRecommendation) {
+        meetingB = b.meeting;
+        matchScoreB = b.matchScore;
+      } else {
+        meetingB = b as Meeting;
+      }
+
+      statusB = _getActualMeetingStatus(meetingB, now);
+
+      // 首先按照进行中状态排序
+      if (statusA == MeetingStatus.ongoing &&
+          statusB != MeetingStatus.ongoing) {
+        return -1;
+      } else if (statusB == MeetingStatus.ongoing &&
+          statusA != MeetingStatus.ongoing) {
+        return 1;
+      }
+
+      // 如果是推荐列表，且状态相同，则按匹配度排序
+      if (isRecommended && matchScoreA != null && matchScoreB != null) {
+        return matchScoreB.compareTo(matchScoreA);
+      }
+
+      // 如果状态相同且不是推荐列表（或没有匹配度），按开始时间排序
+      return meetingA.startTime.compareTo(meetingB.startTime);
+    });
+
     return RefreshIndicator(
       onRefresh: () async {
         // 刷新数据
@@ -705,21 +685,22 @@ class MeetingPage extends HookConsumerWidget {
         padding: const EdgeInsets.all(16.0),
         itemCount: meetings.length,
         itemBuilder: (context, index) {
-          // 获取会议对象，可能是Meeting或MeetingRecommendation
           final meetingObj = meetings[index];
           final Meeting meeting;
           String? matchScore;
 
           if (meetingObj is MeetingRecommendation) {
             meeting = meetingObj.meeting;
-            // 将匹配度转换为百分比
             matchScore = '${(meetingObj.matchScore * 100).toStringAsFixed(0)}%';
           } else {
             meeting = meetingObj as Meeting;
           }
 
+          // 获取实际状态
+          final displayStatus = _getActualMeetingStatus(meeting, now);
+
           return MeetingListItem(
-            meeting: meeting,
+            meeting: meeting.copyWith(status: displayStatus),
             matchScore: matchScore,
             onTap: () {
               Navigator.push(
@@ -734,5 +715,21 @@ class MeetingPage extends HookConsumerWidget {
         },
       ),
     );
+  }
+
+  // 获取会议的实际状态
+  MeetingStatus _getActualMeetingStatus(Meeting meeting, DateTime now) {
+    if (meeting.status == MeetingStatus.upcoming) {
+      if (now.isAfter(meeting.startTime) ||
+          now.isAtSameMomentAs(meeting.startTime)) {
+        if (now.isBefore(meeting.endTime) ||
+            now.isAtSameMomentAs(meeting.endTime)) {
+          return MeetingStatus.ongoing;
+        } else {
+          return MeetingStatus.completed;
+        }
+      }
+    }
+    return meeting.status;
   }
 }

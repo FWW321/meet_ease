@@ -6,9 +6,10 @@ class AppConstants {
   AppConstants._();
 
   /// API相关
-  static String apiDomain = 'fwwhub.fun:8080'; // Android模拟器访问主机的特殊IP
+  // static String apiDomain = 'fwwhub.fun:8080';
+  static String apiDomain = '192.168.83.99:8080';
   static String get apiBaseUrl => 'http://$apiDomain/api';
-  static const int apiTimeout = 10000; // 毫秒
+  static const int apiTimeout = 30000; // 毫秒
 
   /// 更新服务器地址并保存到本地存储
   static Future<void> updateApiDomain(String newDomain) async {
@@ -70,4 +71,7 @@ class AppConstants {
   /// 图标路径
   static const String appIconPath = 'assets/images/app_icon.png';
   static const String appLogoPath = 'assets/images/app_logo.png';
+
+  // static const String webSocketUrl = 'ws://fwwhub.fun:8080/websocket/chat';
+  static const String webSocketUrl = 'ws://192.168.83.99:8080/websocket/chat';
 }

@@ -87,13 +87,13 @@ class MeetingTimeSelector extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(AppConstants.paddingS),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(128),
             borderRadius: BorderRadius.circular(AppConstants.radiusS),
             border: Border.all(
               color:
                   isValidDuration
-                      ? theme.colorScheme.outline.withOpacity(0.1)
-                      : theme.colorScheme.error.withOpacity(0.5),
+                      ? theme.colorScheme.outline.withAlpha(26)
+                      : theme.colorScheme.error.withAlpha(128),
             ),
           ),
           child: Row(
@@ -142,7 +142,7 @@ class MeetingTimeSelector extends StatelessWidget {
       confirmText: '确定',
     );
 
-    if (pickedDate == null) return;
+    if (pickedDate == null || !context.mounted) return;
 
     // 选择时间
     final TimeOfDay? pickedTime = await showTimePicker(
@@ -153,7 +153,7 @@ class MeetingTimeSelector extends StatelessWidget {
       confirmText: '确定',
     );
 
-    if (pickedTime == null) return;
+    if (pickedTime == null || !context.mounted) return;
 
     // 更新日期时间
     final DateTime newDateTime = DateTime(

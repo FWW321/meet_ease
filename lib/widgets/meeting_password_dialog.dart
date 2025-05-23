@@ -123,13 +123,13 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
           ref.read(validateMeetingPasswordProvider(widget.meetingId).notifier);
 
       // 记录调用开始
-      print('开始验证密码: ${DateTime.now()}');
+      debugPrint('开始验证密码: ${DateTime.now()}');
 
       // 执行验证
       final result = await validator!.validate(password);
 
       // 记录调用结束
-      print('密码验证完成: ${DateTime.now()}, 结果: $result');
+      debugPrint('密码验证完成: ${DateTime.now()}, 结果: $result');
 
       // 检查组件状态
       if (!mounted) return;
@@ -145,7 +145,7 @@ class _MeetingPasswordDialogState extends ConsumerState<MeetingPasswordDialog> {
       }
     } catch (e) {
       // 记录并处理错误
-      print('密码验证异常: $e');
+      debugPrint('密码验证异常: $e');
 
       if (!mounted) return;
 

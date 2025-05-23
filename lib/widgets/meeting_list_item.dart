@@ -66,6 +66,129 @@ class MeetingListItem extends ConsumerWidget {
         break;
     }
 
+    // 等待用户名加载完成后才显示整个卡片
+    return userNameAsync.when(
+      data:
+          (userName) => _buildCard(
+            context,
+            userName,
+            timeDisplay,
+            statusColor,
+            statusText,
+            typeText,
+            visibilityText,
+            visibilityIcon,
+            visibilityColor,
+          ),
+      loading:
+          () => Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            elevation: 2,
+            child: Container(
+              height: 120, // 增加高度解决溢出问题
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 会议标题和状态
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          meeting.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withAlpha(25),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: statusColor),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: TextStyle(fontSize: 12, color: statusColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 时间
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        timeDisplay,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+
+                  // 地点
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          meeting.location,
+                          style: const TextStyle(color: Colors.grey),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      error:
+          (_, __) => _buildCard(
+            context,
+            meeting.organizerName,
+            timeDisplay,
+            statusColor,
+            statusText,
+            typeText,
+            visibilityText,
+            visibilityIcon,
+            visibilityColor,
+          ),
+    );
+  }
+
+  // 构建卡片主体
+  Widget _buildCard(
+    BuildContext context,
+    String organizerName,
+    String timeDisplay,
+    Color statusColor,
+    String statusText,
+    String typeText,
+    String visibilityText,
+    IconData visibilityIcon,
+    Color visibilityColor,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -166,29 +289,13 @@ class MeetingListItem extends ConsumerWidget {
                       const SizedBox(width: 8),
                       const Icon(Icons.person, size: 16, color: Colors.grey),
                       const SizedBox(width: 4),
-                      // 动态显示组织者姓名，使用Expanded防止溢出
+                      // 使用已加载的组织者姓名
                       Expanded(
-                        child: userNameAsync.when(
-                          data:
-                              (name) => Text(
-                                name,
-                                style: const TextStyle(color: Colors.grey),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          loading:
-                              () => const SizedBox(
-                                width: 40,
-                                height: 12,
-                                child: LinearProgressIndicator(),
-                              ),
-                          error:
-                              (_, __) => Text(
-                                meeting.organizerName,
-                                style: const TextStyle(color: Colors.grey),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                        child: Text(
+                          organizerName,
+                          style: const TextStyle(color: Colors.grey),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (meeting.isSignedIn) ...[
@@ -239,10 +346,7 @@ class MeetingListItem extends ConsumerWidget {
 
                 // 签到状态 - 只为私有会议显示
                 if (meeting.visibility == MeetingVisibility.private &&
-                        meeting
-                            .participationInfo!['signInStatus']
-                            ?.isNotEmpty ??
-                    false) ...[
+                    meeting.participationInfo!['signInStatus']?.isNotEmpty) ...[
                   Row(
                     children: [
                       Icon(

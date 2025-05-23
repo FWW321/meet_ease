@@ -10,8 +10,11 @@ class VoteCardWidget extends ConsumerWidget {
   final MeetingVote vote;
   final String meetingId;
 
-  const VoteCardWidget({required this.vote, required this.meetingId, Key? key})
-    : super(key: key);
+  const VoteCardWidget({
+    required this.vote,
+    required this.meetingId,
+    super.key,
+  });
 
   // 获取投票状态颜色
   Color _getVoteStatusColor(VoteStatus status) {
@@ -78,7 +81,7 @@ class VoteCardWidget extends ConsumerWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withAlpha(26),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(color: statusColor),
                     ),

@@ -204,8 +204,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              theme.colorScheme.primary.withOpacity(0.8),
-              theme.colorScheme.secondary.withOpacity(0.7),
+              theme.colorScheme.primary.withAlpha(204),
+              theme.colorScheme.secondary.withAlpha(179),
             ],
           ),
         ),
@@ -237,7 +237,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       Text(
                         '便捷高效的会议管理系统',
                         style: theme.textTheme.titleMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withAlpha(204),
                         ),
                       ),
                       const SizedBox(height: 40),
@@ -283,8 +283,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入用户名';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -310,10 +311,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入邮箱';
-                                    if (!value.contains('@'))
+                                    }
+                                    if (!value.contains('@')) {
                                       return '请输入有效的邮箱地址';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -339,9 +342,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入手机号码';
-                                    if (value.length != 11) return '请输入11位手机号码';
+                                    }
+                                    if (value.length != 11) {
+                                      return '请输入11位手机号码';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -373,9 +379,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请输入密码';
-                                    if (value.length < 6) return '密码至少需要6位';
+                                    }
+                                    if (value.length < 6) {
+                                      return '密码至少需要6位';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -408,10 +417,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ),
                                   ),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return '请确认密码';
-                                    if (value != _passwordController.text)
+                                    }
+                                    if (value != _passwordController.text) {
                                       return '两次密码不一致';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -483,7 +494,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withAlpha(26),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
@@ -530,7 +541,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     '服务器: ${AppConstants.apiDomain}',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white.withOpacity(0.9),
+                                      color: Colors.white.withAlpha(230),
                                     ),
                                   ),
                               const SizedBox(width: 8),

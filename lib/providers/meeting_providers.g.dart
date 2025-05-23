@@ -6,7 +6,7 @@ part of 'meeting_providers.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$meetingListHash() => r'a56c0cca30b22641e44f845c386021191eb29515';
+String _$meetingListHash() => r'81584d84abd8d47285042488f2d0e1236afe8283';
 
 /// 会议列表提供者
 ///
@@ -24,7 +24,7 @@ final meetingListProvider = AutoDisposeFutureProvider<List<Meeting>>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MeetingListRef = AutoDisposeFutureProviderRef<List<Meeting>>;
-String _$meetingDetailHash() => r'8c96711bb3f1555611b678c6f565c50295d02b37';
+String _$meetingDetailHash() => r'fb712116557bf2a78cb087019b564d19d7618a88';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -178,7 +178,7 @@ class _MeetingDetailProviderElement
   String get meetingId => (origin as MeetingDetailProvider).meetingId;
 }
 
-String _$myMeetingsHash() => r'344978d82f356fa00bbc9a0c293cf79071b4e2c1';
+String _$myMeetingsHash() => r'6f9b1c79c2fbfc42be33be073138bdf90fd9da92';
 
 /// 我的会议提供者 (我参与的会议)
 ///
@@ -734,7 +734,7 @@ class _MeetingParticipantsProviderElement
   String get meetingId => (origin as MeetingParticipantsProvider).meetingId;
 }
 
-String _$meetingManagersHash() => r'5b41ef77a7d7ebe6f6d6e3bc4aa02e4639d42032';
+String _$meetingManagersHash() => r'd5da71dc8c435c6b738d01a8ba4c630d014a3042';
 
 /// 会议管理员列表提供者
 ///
@@ -868,7 +868,7 @@ class _MeetingManagersProviderElement
 }
 
 String _$recommendedMeetingsHash() =>
-    r'c0ca0f0c7e2b77c49905be59e5e8c9478ad7e1fa';
+    r'807f4e2b4cb978eeb876014078fc04342dc3d335';
 
 /// 推荐会议列表提供者
 ///
@@ -890,7 +890,7 @@ final recommendedMeetingsProvider =
 // ignore: unused_element
 typedef RecommendedMeetingsRef =
     AutoDisposeFutureProviderRef<List<MeetingRecommendation>>;
-String _$myPrivateMeetingsHash() => r'dad7ff8d7ee2d5d7d5a8f1ec5debf8242addc9c8';
+String _$myPrivateMeetingsHash() => r'114007a59931ac9fca9d4cd309f0aa426edccfb7';
 
 /// 我的私密会议列表提供者
 ///
@@ -1045,24 +1045,24 @@ class _BlacklistMembersProviderElement
   String get meetingId => (origin as BlacklistMembersProvider).meetingId;
 }
 
-String _$isUserInBlacklistHash() => r'1a75c0657d511652d1199220c41a14fc41821d13';
+String _$isUserInBlacklistHash() => r'526293fedaa0df2bc55646068e2275a44092f3a0';
 
-/// 检查用户是否在黑名单中
+/// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
 ///
 /// Copied from [isUserInBlacklist].
 @ProviderFor(isUserInBlacklist)
 const isUserInBlacklistProvider = IsUserInBlacklistFamily();
 
-/// 检查用户是否在黑名单中
+/// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
 ///
 /// Copied from [isUserInBlacklist].
 class IsUserInBlacklistFamily extends Family<AsyncValue<bool>> {
-  /// 检查用户是否在黑名单中
+  /// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
   ///
   /// Copied from [isUserInBlacklist].
   const IsUserInBlacklistFamily();
 
-  /// 检查用户是否在黑名单中
+  /// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
   ///
   /// Copied from [isUserInBlacklist].
   IsUserInBlacklistProvider call(String meetingId, String userId) {
@@ -1091,11 +1091,11 @@ class IsUserInBlacklistFamily extends Family<AsyncValue<bool>> {
   String? get name => r'isUserInBlacklistProvider';
 }
 
-/// 检查用户是否在黑名单中
+/// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
 ///
 /// Copied from [isUserInBlacklist].
 class IsUserInBlacklistProvider extends AutoDisposeFutureProvider<bool> {
-  /// 检查用户是否在黑名单中
+  /// 检查用户是否在黑名单中 - 使用autoDispose完全禁用缓存
   ///
   /// Copied from [isUserInBlacklist].
   IsUserInBlacklistProvider(String meetingId, String userId)
@@ -1211,7 +1211,7 @@ final createMeetingProvider =
 
 typedef _$CreateMeeting = AutoDisposeAsyncNotifier<Meeting?>;
 String _$validateMeetingPasswordHash() =>
-    r'2a007aa4a6e5475f5630a0ba82fff5a920686d1c';
+    r'4bb7a08a53fc4fa5e9a9300367bb7079682e1d8f';
 
 abstract class _$ValidateMeetingPassword
     extends BuildlessAutoDisposeAsyncNotifier<bool?> {

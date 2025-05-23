@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'dart:developer' as developer;
 import '../../models/meeting.dart';
-import '../../providers/meeting_providers.dart';
 import '../../providers/leave_providers.dart';
 import 'leave_tile.dart';
 
@@ -32,7 +31,7 @@ class LeavesTab extends HookConsumerWidget {
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Container(
-      color: backgroundColor.withOpacity(0.5),
+      color: backgroundColor.withValues(alpha: 0.5),
       child: Column(
         children: [
           // 请假申请列表
@@ -44,7 +43,7 @@ class LeavesTab extends HookConsumerWidget {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),

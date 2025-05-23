@@ -80,7 +80,7 @@ class _ProfileForm extends HookConsumerWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.primaryColor.withOpacity(0.2),
+                        color: theme.primaryColor.withAlpha(51),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
                       ),
